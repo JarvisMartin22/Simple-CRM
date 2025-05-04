@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -25,24 +26,32 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))'
+					DEFAULT: '#3A86FF',
+					foreground: '#FFFFFF'
 				},
 				secondary: {
-					DEFAULT: 'hsl(var(--secondary))',
-					foreground: 'hsl(var(--secondary-foreground))'
+					DEFAULT: '#8338EC',
+					foreground: '#FFFFFF'
 				},
-				destructive: {
-					DEFAULT: 'hsl(var(--destructive))',
-					foreground: 'hsl(var(--destructive-foreground))'
+				success: {
+					DEFAULT: '#06D6A0',
+					foreground: '#FFFFFF'
+				},
+				warning: {
+					DEFAULT: '#FFD166',
+					foreground: '#212529'
+				},
+				danger: {
+					DEFAULT: '#EF476F',
+					foreground: '#FFFFFF'
 				},
 				muted: {
-					DEFAULT: 'hsl(var(--muted))',
-					foreground: 'hsl(var(--muted-foreground))'
+					DEFAULT: '#F8F9FA',
+					foreground: '#6C757D'
 				},
 				accent: {
-					DEFAULT: 'hsl(var(--accent))',
-					foreground: 'hsl(var(--accent-foreground))'
+					DEFAULT: '#8338EC',
+					foreground: '#FFFFFF'
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
@@ -53,20 +62,32 @@ export default {
 					foreground: 'hsl(var(--card-foreground))'
 				},
 				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
+					DEFAULT: '#FFFFFF',
+					foreground: '#212529',
+					primary: '#3A86FF',
+					'primary-foreground': '#FFFFFF',
+					accent: '#F8F9FA',
+					'accent-foreground': '#212529',
+					border: '#DDE2E5',
+					ring: '#3A86FF'
 				}
 			},
 			borderRadius: {
-				lg: 'var(--radius)',
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				lg: '12px',
+				md: '8px',
+				sm: '4px'
+			},
+			fontSize: {
+				'h1': ['28px', '36px'],
+				'h2': ['24px', '32px'],
+				'h3': ['20px', '28px'],
+				'h4': ['18px', '24px'],
+				'body': ['16px', '24px'],
+				'small': ['14px', '20px'],
+				'micro': ['12px', '16px'],
+			},
+			boxShadow: {
+				'card': '0px 4px 12px rgba(0, 0, 0, 0.08)',
 			},
 			keyframes: {
 				'accordion-down': {
@@ -84,11 +105,20 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+				'fade-in': {
+					'0%': {
+						opacity: '0',
+					},
+					'100%': {
+						opacity: '1',
+					},
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.3s ease-out',
 			}
 		}
 	},
