@@ -15,6 +15,7 @@ import Contacts from "./pages/Contacts";
 import Pipelines from "./pages/Pipelines";
 import Campaigns from "./pages/Campaigns";
 import Calendar from "./pages/Calendar";
+import Integrations from "./pages/Integrations";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
@@ -46,6 +47,7 @@ function App() {
                   <Route path="/pipelines" element={<Pipelines />} />
                   <Route path="/campaigns" element={<Campaigns />} />
                   <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/integrations" element={<Integrations />} />
                   <Route path="/settings" element={<Settings />} />
                 </Route>
                 
