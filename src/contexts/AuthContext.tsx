@@ -53,8 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: "Welcome back!",
       });
-      
-      return data;
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -86,8 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Registration successful",
         description: "Please check your email for confirmation",
       });
-      
-      return data;
     } catch (error: any) {
       toast({
         variant: "destructive",
