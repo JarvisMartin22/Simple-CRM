@@ -78,12 +78,52 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Notion-like styling */
+  .notion-card {
+    @apply border border-border bg-white p-5 rounded-lg transition-all duration-200 hover:shadow-sm;
+  }
+  
+  .notion-button {
+    @apply px-4 py-2 text-sm text-primary bg-transparent border border-gray-200 rounded-md hover:bg-accent transition-colors duration-200;
+  }
+  
+  .notion-primary-button {
+    @apply px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90 transition-colors duration-200;
+  }
+  
+  .notion-link {
+    @apply text-primary hover:underline transition-all duration-200;
+  }
+  
+  .notion-input {
+    @apply bg-transparent border-0 border-b border-gray-200 focus:border-primary focus:ring-0 transition-all duration-200;
+  }
+  
+  .notion-subtle-hover {
+    @apply hover:bg-muted transition-colors duration-200;
+  }
+  
+  .notion-sidebar-item {
+    @apply flex items-center px-2 py-1.5 rounded-md text-gray-700 my-0.5 hover:bg-gray-100 transition-colors duration-150;
+  }
+  
+  .notion-sidebar-item-active {
+    @apply bg-gray-100 text-primary font-medium;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 }
 
 .kanban-column {
-  @apply w-80 flex-shrink-0 bg-muted rounded-lg p-4 min-h-[calc(100vh-13rem)] flex flex-col;
+  @apply w-72 flex-shrink-0 bg-muted rounded-lg p-4 min-h-[calc(100vh-13rem)] flex flex-col;
 }
 
 .kanban-card {
-  @apply bg-white p-4 rounded-lg shadow-card mb-3 cursor-pointer border border-transparent hover:border-primary/20;
+  @apply bg-white p-4 rounded-md shadow-sm mb-3 cursor-pointer border border-transparent hover:border-gray-200 transition-all duration-150;
 }
+

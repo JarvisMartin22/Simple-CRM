@@ -26,32 +26,32 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: '#3A86FF',
+					DEFAULT: '#191919', // More Notion-like neutral dark color
 					foreground: '#FFFFFF'
 				},
 				secondary: {
-					DEFAULT: '#8338EC',
+					DEFAULT: '#6B7280', // Subtle gray
 					foreground: '#FFFFFF'
 				},
 				success: {
-					DEFAULT: '#06D6A0',
+					DEFAULT: '#10B981', // Softer green
 					foreground: '#FFFFFF'
 				},
 				warning: {
-					DEFAULT: '#FFD166',
-					foreground: '#212529'
+					DEFAULT: '#F59E0B', // Softer amber
+					foreground: '#FFFFFF'
 				},
 				danger: {
-					DEFAULT: '#EF476F',
+					DEFAULT: '#EF4444', // Softer red
 					foreground: '#FFFFFF'
 				},
 				muted: {
-					DEFAULT: '#F8F9FA',
-					foreground: '#6C757D'
+					DEFAULT: '#F9FAFB', // Lighter gray background
+					foreground: '#6B7280'
 				},
 				accent: {
-					DEFAULT: '#8338EC',
-					foreground: '#FFFFFF'
+					DEFAULT: '#E5E7EB', // Light gray accent
+					foreground: '#111827'
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
@@ -63,31 +63,31 @@ export default {
 				},
 				sidebar: {
 					DEFAULT: '#FFFFFF',
-					foreground: '#212529',
-					primary: '#3A86FF',
+					foreground: '#111827',
+					primary: '#191919',
 					'primary-foreground': '#FFFFFF',
-					accent: '#F8F9FA',
-					'accent-foreground': '#212529',
-					border: '#DDE2E5',
-					ring: '#3A86FF'
+					accent: '#F9FAFB',
+					'accent-foreground': '#111827',
+					border: '#F3F4F6',
+					ring: '#191919'
 				}
 			},
 			borderRadius: {
-				lg: '12px',
-				md: '8px',
-				sm: '4px'
+				lg: '8px',     // Reduced from 12px
+				md: '6px',     // Reduced
+				sm: '4px'      // Kept the same
 			},
 			fontSize: {
-				'h1': ['28px', '36px'],
-				'h2': ['24px', '32px'],
-				'h3': ['20px', '28px'],
-				'h4': ['18px', '24px'],
-				'body': ['16px', '24px'],
-				'small': ['14px', '20px'],
-				'micro': ['12px', '16px'],
+				'h1': ['24px', '32px'],     // Slightly smaller
+				'h2': ['20px', '28px'],     // Slightly smaller
+				'h3': ['18px', '26px'],     // Slightly smaller
+				'h4': ['16px', '24px'],     // Slightly smaller
+				'body': ['14px', '22px'],   // Slightly smaller
+				'small': ['13px', '20px'],  // Slightly smaller
+				'micro': ['12px', '16px'],  // Kept the same
 			},
 			boxShadow: {
-				'card': '0px 4px 12px rgba(0, 0, 0, 0.08)',
+				'card': '0px 1px 3px rgba(0, 0, 0, 0.05)',  // Much subtler shadow
 			},
 			keyframes: {
 				'accordion-down': {

@@ -17,24 +17,24 @@ const Layout: React.FC = () => {
       <Sidebar isCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
       
       <div className="flex flex-col flex-1 overflow-hidden">
-        <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center">
+        <header className="bg-white border-b border-gray-100 py-3 px-4 flex items-center">
           <div className="relative w-64 mr-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             <Input 
               placeholder="Search..." 
-              className="pl-10 pr-4 py-2 w-full rounded-md border border-gray-300 focus:ring-primary"
+              className="pl-10 pr-4 py-2 w-full rounded-md border border-gray-200 text-sm focus:border-gray-300 focus:ring-0"
             />
           </div>
           
           <div className="ml-auto flex items-center space-x-4">
-            <button className="p-2 rounded-full hover:bg-gray-100 relative">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            <button className="p-1.5 rounded-md hover:bg-gray-100 transition-colors relative">
+              <Bell size={18} className="text-gray-600" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
             </button>
           </div>
         </header>
         
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-6 bg-gray-50">
           <Outlet />
         </main>
       </div>

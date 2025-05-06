@@ -30,111 +30,107 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-h1 font-semibold">Dashboard</h1>
-          <p className="text-muted-foreground">{currentDate}</p>
+          <h1 className="text-h1 font-medium">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">{currentDate}</p>
         </div>
-        <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 flex items-center">
+        <button className="notion-primary-button flex items-center">
           <span className="mr-2">Quick Add</span>
           <span className="text-lg">+</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="shadow-card hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-normal">Total Contacts</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-gray-500 text-sm font-normal">Total Contacts</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between">
               <div className="flex items-center">
-                <Users className="mr-3 text-primary" />
-                <span className="text-3xl font-semibold">248</span>
+                <Users className="mr-3 text-gray-600" size={18} />
+                <span className="text-2xl font-medium">248</span>
               </div>
-              <div className="flex items-center text-success text-small">
-                <ArrowUp size={16} className="mr-1" />
+              <div className="flex items-center text-success text-xs">
+                <ArrowUp size={14} className="mr-1" />
                 <span>12%</span>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-card hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-normal">Active Deals</CardTitle>
+        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-gray-500 text-sm font-normal">Active Deals</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between">
               <div className="flex items-center">
-                <Briefcase className="mr-3 text-secondary" />
-                <span className="text-3xl font-semibold">36</span>
+                <Briefcase className="mr-3 text-gray-600" size={18} />
+                <span className="text-2xl font-medium">36</span>
               </div>
-              <div className="flex items-center text-success text-small">
-                <ArrowUp size={16} className="mr-1" />
+              <div className="flex items-center text-success text-xs">
+                <ArrowUp size={14} className="mr-1" />
                 <span>8%</span>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-card hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-normal">Tasks Due</CardTitle>
+        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-gray-500 text-sm font-normal">Tasks Due</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-end justify-between">
               <div className="flex items-center">
-                <Calendar className="mr-3 text-warning" />
-                <span className="text-3xl font-semibold">12</span>
+                <Calendar className="mr-3 text-gray-600" size={18} />
+                <span className="text-2xl font-medium">12</span>
               </div>
-              <div className="text-small text-muted-foreground">
+              <div className="text-xs text-gray-500">
                 <span>Today</span>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-card hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-sm font-normal">Deal Conversions</CardTitle>
+        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
+          <CardHeader className="pb-2 pt-4">
+            <CardTitle className="text-gray-500 text-sm font-normal">Deal Conversions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="font-medium">68%</span>
+                <span className="font-medium text-sm">68%</span>
                 <span className="text-success text-xs">+5.2%</span>
               </div>
-              <Progress value={68} className="h-2" />
+              <Progress value={68} className="h-1.5 bg-gray-200" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">
-          <Card className="shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle>Recent Activity</CardTitle>
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-2 pt-4 flex justify-between items-center">
+              <CardTitle className="text-lg font-medium">Recent Activity</CardTitle>
+              <button className="text-sm text-gray-500 hover:text-primary transition-colors">View All</button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 ${
-                      activity.type === 'contact' ? 'bg-primary/10 text-primary' :
-                      activity.type === 'deal' ? 'bg-secondary/10 text-secondary' :
-                      activity.type === 'task' ? 'bg-success/10 text-success' :
-                      'bg-warning/10 text-warning'
-                    }`}>
-                      {activity.type === 'contact' && <Users size={14} />}
-                      {activity.type === 'deal' && <Briefcase size={14} />}
-                      {activity.type === 'task' && <CircleCheck size={14} />}
-                      {activity.type === 'email' && <Mail size={14} />}
+                  <div key={activity.id} className="flex items-start pb-3 last:pb-0 border-b last:border-b-0 border-gray-100">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 bg-gray-100`}>
+                      {activity.type === 'contact' && <Users size={14} className="text-gray-600" />}
+                      {activity.type === 'deal' && <Briefcase size={14} className="text-gray-600" />}
+                      {activity.type === 'task' && <CircleCheck size={14} className="text-gray-600" />}
+                      {activity.type === 'email' && <Mail size={14} className="text-gray-600" />}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{activity.name}</p>
-                      <p className="text-muted-foreground text-small">{activity.action}</p>
+                      <p className="text-sm font-medium">{activity.name}</p>
+                      <p className="text-xs text-gray-500">{activity.action}</p>
                     </div>
-                    <div className="text-muted-foreground text-micro">{activity.time}</div>
+                    <div className="text-xs text-gray-500">{activity.time}</div>
                   </div>
                 ))}
               </div>
@@ -143,26 +139,24 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div>
-          <Card className="shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between">
-                <span>Upcoming Tasks</span>
-                <button className="text-primary text-small">View All</button>
-              </CardTitle>
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-2 pt-4 flex justify-between items-center">
+              <CardTitle className="text-lg font-medium">Upcoming Tasks</CardTitle>
+              <button className="text-sm text-gray-500 hover:text-primary transition-colors">View All</button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {upcomingTasks.map((task) => (
-                  <div key={task.id} className="flex items-center p-3 rounded-md hover:bg-muted">
-                    <input type="checkbox" className="w-4 h-4 mr-3 accent-primary" />
+                  <div key={task.id} className="flex items-center p-2 rounded-md hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                    <input type="checkbox" className="w-4 h-4 mr-3 rounded border-gray-300 text-primary focus:ring-0" />
                     <div className="flex-1">
-                      <p className="font-medium">{task.title}</p>
-                      <p className="text-muted-foreground text-small">Due {task.dueDate}</p>
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <p className="text-xs text-gray-500">Due {task.dueDate}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded text-micro ${
-                      task.priority === 'high' ? 'bg-danger/10 text-danger' :
-                      task.priority === 'medium' ? 'bg-warning/10 text-warning' :
-                      'bg-success/10 text-success'
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                      task.priority === 'high' ? 'bg-red-50 text-red-600' :
+                      task.priority === 'medium' ? 'bg-yellow-50 text-yellow-600' :
+                      'bg-green-50 text-green-600'
                     }`}>
                       {task.priority}
                     </span>
