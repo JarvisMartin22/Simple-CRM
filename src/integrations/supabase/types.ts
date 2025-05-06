@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          api_key: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_used_at: string | null
+          name: string | null
+          revoked: boolean
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          name?: string | null
+          revoked?: boolean
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          name?: string | null
+          revoked?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           created_at: string
@@ -160,6 +193,54 @@ export type Database = {
           },
         ]
       }
+      email_tracking: {
+        Row: {
+          clicked_at: string | null
+          created_at: string
+          email_id: string
+          id: string
+          opened_at: string | null
+          provider: string
+          recipient: string
+          replied_at: string | null
+          sent_at: string
+          subject: string | null
+          tracking_pixel_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clicked_at?: string | null
+          created_at?: string
+          email_id: string
+          id?: string
+          opened_at?: string | null
+          provider: string
+          recipient: string
+          replied_at?: string | null
+          sent_at: string
+          subject?: string | null
+          tracking_pixel_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clicked_at?: string | null
+          created_at?: string
+          email_id?: string
+          id?: string
+          opened_at?: string | null
+          provider?: string
+          recipient?: string
+          replied_at?: string | null
+          sent_at?: string
+          subject?: string | null
+          tracking_pixel_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           contact_id: string | null
@@ -306,6 +387,48 @@ export type Database = {
           last_name?: string | null
           title?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_integrations: {
+        Row: {
+          access_token: string
+          created_at: string
+          email: string | null
+          expires_at: string | null
+          id: string
+          provider: string
+          provider_user_id: string | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string | null
+          id?: string
+          provider: string
+          provider_user_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          provider_user_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

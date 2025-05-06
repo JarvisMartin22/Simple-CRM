@@ -1,47 +1,56 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Check, Users, Copy, AlertCircle } from "lucide-react";
+import { Check, Users, Copy, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+
+interface ApiKey {
+  id: string;
+  api_key: string;
+  name: string | null;
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked: boolean;
+}
 
 const ContactsApiIntegration = () => {
-  const [isSetup, setIsSetup] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
   
-  const apiKey = "folk_crm_api_key_12345abcde";
-  
-  const handleSetup = () => {
-    // In a real implementation, this would generate an API key
-    setTimeout(() => {
-      setIsSetup(true);
-      setIsDialogOpen(false);
-      toast({
-        title: "API access configured",
-        description: "Your API key has been generated successfully.",
-      });
-    }, 1000);
-  };
-  
-  const handleRevokeAccess = () => {
-    setIsSetup(false);
-    toast({
-      title: "API access revoked",
-      description: "Your API key has been revoked successfully.",
-    });
-  };
-  
-  const handleCopyApiKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    toast({
-      title: "API key copied",
-      description: "Your API key has been copied to clipboard.",
-    });
-  };
+  // Fetch API key data
+  const { data: apiKey, isLoading, error, refetch } = useQuery<ApiKey | null>({
+    queryKey: ['api-key', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('api_keys')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('revoked', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "Row Not Found"
+        console.error("Error fetching API key:", error);
+        throw error;
+      }
+      
+      return data as ApiKey | null;
+    },
+    enabled: !!user?.id,
+  });
   
   const apiEndpoints = [
     { method: 'GET', endpoint: '/api/contacts', description: 'List all contacts' },
@@ -50,6 +59,106 @@ const ContactsApiIntegration = () => {
     { method: 'PUT', endpoint: '/api/contacts/:id', description: 'Update a contact' },
     { method: 'DELETE', endpoint: '/api/contacts/:id', description: 'Delete a contact' }
   ];
+  
+  const generateApiKey = async () => {
+    try {
+      setIsGenerating(true);
+      
+      // Generate a random API key
+      const keyBuffer = new Uint8Array(32);
+      crypto.getRandomValues(keyBuffer);
+      const apiKeyValue = Array.from(keyBuffer)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+        .substring(0, 32);
+      
+      // Store the API key in the database
+      const { error } = await supabase
+        .from('api_keys')
+        .insert({
+          user_id: user?.id,
+          api_key: `folk_${apiKeyValue}`,
+          name: 'Default API Key'
+        });
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "API access configured",
+        description: "Your API key has been generated successfully.",
+      });
+      
+      refetch();
+      setIsDialogOpen(false);
+      
+    } catch (error) {
+      console.error("Error generating API key:", error);
+      
+      toast({
+        title: "Generation failed",
+        description: "There was an error generating your API key.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  const revokeApiKey = async () => {
+    if (!apiKey) return;
+    
+    try {
+      // Mark the API key as revoked
+      const { error } = await supabase
+        .from('api_keys')
+        .update({ revoked: true })
+        .eq('id', apiKey.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "API access revoked",
+        description: "Your API key has been revoked successfully.",
+      });
+      
+      refetch();
+      
+    } catch (error) {
+      console.error("Error revoking API key:", error);
+      
+      toast({
+        title: "Revocation failed",
+        description: "There was an error revoking your API key.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const copyApiKey = () => {
+    if (!apiKey) return;
+    
+    navigator.clipboard.writeText(apiKey.api_key);
+    
+    toast({
+      title: "API key copied",
+      description: "Your API key has been copied to clipboard.",
+    });
+  };
+  
+  const isSetup = !!apiKey && !apiKey.revoked;
+  
+  // If there's an error fetching the API key
+  if (error) {
+    toast({
+      title: "Error",
+      description: "There was an error fetching your API key data.",
+      variant: "destructive"
+    });
+  }
 
   return (
     <>
@@ -58,7 +167,12 @@ const ContactsApiIntegration = () => {
           <div className="flex items-center space-x-2">
             <Users className="h-5 w-5 text-purple-500" />
             <CardTitle>Contacts API</CardTitle>
-            {isSetup ? (
+            {isLoading ? (
+              <Badge className="ml-2 bg-gray-300">
+                <Loader2 size={12} className="mr-1 animate-spin" />
+                Loading
+              </Badge>
+            ) : isSetup ? (
               <Badge className="ml-2 bg-green-500">
                 <Check size={12} className="mr-1" />
                 Configured
@@ -79,9 +193,9 @@ const ContactsApiIntegration = () => {
                 <span className="font-medium">API Key</span>
                 <div className="flex items-center">
                   <code className="bg-gray-100 px-3 py-1 rounded text-sm font-mono mr-2">
-                    {apiKey.substring(0, 10)}...
+                    {apiKey.api_key.substring(0, 10)}...
                   </code>
-                  <Button size="icon" variant="ghost" onClick={handleCopyApiKey}>
+                  <Button size="icon" variant="ghost" onClick={copyApiKey}>
                     <Copy size={16} />
                   </Button>
                 </div>
@@ -108,7 +222,7 @@ const ContactsApiIntegration = () => {
         <CardFooter>
           {isSetup ? (
             <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleRevokeAccess}>Revoke Access</Button>
+              <Button variant="outline" onClick={revokeApiKey}>Revoke Access</Button>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button>View Documentation</Button>
@@ -164,7 +278,10 @@ const ContactsApiIntegration = () => {
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSetup}>Generate API Key</Button>
+                  <Button onClick={generateApiKey} disabled={isGenerating}>
+                    {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Generate API Key
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

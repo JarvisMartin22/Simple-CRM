@@ -1,37 +1,229 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Check, Mail, AlertCircle } from "lucide-react";
+import { Check, Mail, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+interface Integration {
+  id: string;
+  provider: string;
+  email: string;
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: string | null;
+}
+
+interface EmailStats {
+  sent: number;
+  opened: number;
+  replied: number;
+}
 
 const GmailIntegration = () => {
-  const [isConnected, setIsConnected] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
-
-  const handleConnect = () => {
-    // In a real implementation, this would initiate OAuth flow
-    // For demo purposes, we'll simulate a successful connection
-    setTimeout(() => {
-      setIsConnected(true);
-      setIsDialogOpen(false);
+  const { user } = useAuth();
+  
+  // Fetch integration data
+  const { data: integration, isLoading, error, refetch } = useQuery<Integration | null>({
+    queryKey: ['gmail-integration', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('user_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('provider', 'gmail')
+        .single();
+        
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "Row Not Found"
+        console.error("Error fetching integration:", error);
+        throw error;
+      }
+      
+      return data as Integration | null;
+    },
+    enabled: !!user?.id,
+  });
+  
+  // Fetch email stats if connected
+  const { data: emailStats } = useQuery<EmailStats>({
+    queryKey: ['gmail-stats', integration?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('email_tracking')
+        .select('id, opened_at, replied_at')
+        .eq('user_id', user?.id)
+        .eq('provider', 'gmail');
+        
+      if (error) {
+        console.error("Error fetching email stats:", error);
+        throw error;
+      }
+      
+      return {
+        sent: data.length,
+        opened: data.filter(email => email.opened_at).length,
+        replied: data.filter(email => email.replied_at).length
+      };
+    },
+    enabled: !!integration?.id,
+    initialData: { sent: 24, opened: 18, replied: 7 } // Default data until real data is fetched
+  });
+  
+  const handleConnect = async () => {
+    try {
+      setIsConnecting(true);
+      
+      // Call the Gmail auth Edge Function to get OAuth URL
+      const response = await supabase.functions.invoke('gmail-auth');
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      // Open OAuth URL in a popup window
+      const authUrl = response.data.url;
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        authUrl,
+        'Gmail Authorization',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+      
+      if (!popup) {
+        throw new Error('Popup blocked. Please enable popups for this site.');
+      }
+      
+      // Poll for popup closure or redirect
+      const pollTimer = setInterval(async () => {
+        try {
+          if (popup.closed) {
+            clearInterval(pollTimer);
+            setIsConnecting(false);
+            return;
+          }
+          
+          const currentUrl = popup.location.href;
+          
+          if (currentUrl.includes('code=')) {
+            clearInterval(pollTimer);
+            popup.close();
+            
+            // Extract code from URL
+            const url = new URL(currentUrl);
+            const code = url.searchParams.get('code');
+            
+            if (code) {
+              // Call Gmail auth endpoint with the code
+              const tokenResponse = await supabase.functions.invoke('gmail-auth', {
+                body: { code }
+              });
+              
+              if (tokenResponse.error) {
+                throw new Error(tokenResponse.error);
+              }
+              
+              // Save integration data to database
+              const { error: integrationError } = await supabase
+                .from('user_integrations')
+                .upsert({
+                  user_id: user?.id,
+                  ...tokenResponse.data
+                });
+                
+              if (integrationError) {
+                throw integrationError;
+              }
+              
+              toast({
+                title: "Gmail connected successfully",
+                description: `Connected as ${tokenResponse.data.email}`,
+              });
+              
+              refetch();
+              setIsDialogOpen(false);
+            }
+          }
+        } catch (e) {
+          console.error("Error in OAuth flow:", e);
+          clearInterval(pollTimer);
+          setIsConnecting(false);
+          
+          toast({
+            title: "Connection failed",
+            description: "There was an error connecting to Gmail.",
+            variant: "destructive"
+          });
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Error initiating OAuth flow:", error);
+      setIsConnecting(false);
+      
       toast({
-        title: "Gmail connected successfully",
-        description: "Your Gmail account has been integrated with the CRM.",
+        title: "Connection failed",
+        description: "There was an error connecting to Gmail.",
+        variant: "destructive"
       });
-    }, 1500);
+    }
   };
-
-  const handleDisconnect = () => {
-    setIsConnected(false);
+  
+  const handleDisconnect = async () => {
+    if (!integration) return;
+    
+    try {
+      // Delete the integration from the database
+      const { error } = await supabase
+        .from('user_integrations')
+        .delete()
+        .eq('id', integration.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Gmail disconnected",
+        description: "Your Gmail account has been disconnected from the CRM.",
+      });
+      
+      refetch();
+      
+    } catch (error) {
+      console.error("Error disconnecting Gmail:", error);
+      
+      toast({
+        title: "Disconnection failed",
+        description: "There was an error disconnecting from Gmail.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const isConnected = !!integration;
+  
+  // If there's an error fetching the integration
+  if (error) {
     toast({
-      title: "Gmail disconnected",
-      description: "Your Gmail account has been disconnected from the CRM.",
+      title: "Error",
+      description: "There was an error fetching your integration data.",
+      variant: "destructive"
     });
-  };
+  }
 
   return (
     <>
@@ -40,7 +232,12 @@ const GmailIntegration = () => {
           <div className="flex items-center space-x-2">
             <Mail className="h-5 w-5 text-red-500" />
             <CardTitle>Gmail Integration</CardTitle>
-            {isConnected ? (
+            {isLoading ? (
+              <Badge className="ml-2 bg-gray-300">
+                <Loader2 size={12} className="mr-1 animate-spin" />
+                Loading
+              </Badge>
+            ) : isConnected ? (
               <Badge className="ml-2 bg-green-500">
                 <Check size={12} className="mr-1" />
                 Connected
@@ -59,7 +256,7 @@ const GmailIntegration = () => {
             <div className="space-y-4">
               <div className="flex flex-col space-y-1">
                 <span className="font-medium">Account</span>
-                <span className="text-sm text-gray-500">user@example.com</span>
+                <span className="text-sm text-gray-500">{integration.email}</span>
               </div>
               
               <div className="flex flex-col space-y-1">
@@ -127,7 +324,10 @@ const GmailIntegration = () => {
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleConnect}>Continue with Google</Button>
+                  <Button onClick={handleConnect} disabled={isConnecting}>
+                    {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Continue with Google
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -148,15 +348,15 @@ const GmailIntegration = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">24</div>
+                    <div className="text-2xl font-semibold">{emailStats.sent}</div>
                     <div className="text-gray-500 text-sm">Emails Sent</div>
                   </div>
                   <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">18</div>
+                    <div className="text-2xl font-semibold">{emailStats.opened}</div>
                     <div className="text-gray-500 text-sm">Opens</div>
                   </div>
                   <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">7</div>
+                    <div className="text-2xl font-semibold">{emailStats.replied}</div>
                     <div className="text-gray-500 text-sm">Replies</div>
                   </div>
                 </div>
