@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Bell, Lock, User, KeyRound, Users, Shield, Building, Paintbrush, Globe, Mail, AlertCircle } from 'lucide-react';
+import { Bell, Lock, User, KeyRound, Users, Shield, Building, Paintbrush, Globe, Mail, AlertCircle, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const Settings: React.FC = () => {
   return (
