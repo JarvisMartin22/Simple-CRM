@@ -1,169 +1,329 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ArrowUp, Briefcase, Calendar, CircleCheck, Mail } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  BarChart, 
+  Calendar as CalendarIcon, 
+  CheckCircle, 
+  Clock, 
+  Edit, 
+  Mail, 
+  MoreHorizontal, 
+  Phone, 
+  Plus, 
+  UserPlus 
+} from 'lucide-react';
+
+// Sample data for the dashboard
+const recentContacts = [
+  { id: 1, name: 'Sarah Johnson', email: 'sarah@example.com', company: 'Acme Inc', lastContact: '2 days ago', avatar: '/avatars/sarah.jpg' },
+  { id: 2, name: 'Michael Brown', email: 'michael@example.com', company: 'TechCorp', lastContact: '5 days ago', avatar: '/avatars/michael.jpg' },
+  { id: 3, name: 'Emma Davis', email: 'emma@example.com', company: 'Design Studio', lastContact: 'Today', avatar: '/avatars/emma.jpg' },
+];
+
+const upcomingTasks = [
+  { id: 1, title: 'Follow up with Sarah Johnson', due: 'Today, 3:00 PM', priority: 'High' },
+  { id: 2, title: 'Prepare proposal for TechCorp', due: 'Tomorrow, 10:00 AM', priority: 'Medium' },
+  { id: 3, title: 'Review Q3 pipeline forecast', due: 'Aug 12, 9:00 AM', priority: 'Low' },
+  { id: 4, title: 'Schedule meeting with Design team', due: 'Aug 14, 2:00 PM', priority: 'Medium' },
+];
+
+const pipelineStages = [
+  { name: 'Lead', count: 16, value: 24600 },
+  { name: 'Meeting', count: 8, value: 42800 },
+  { name: 'Proposal', count: 6, value: 86500 },
+  { name: 'Negotiation', count: 4, value: 137200 },
+  { name: 'Closed', count: 3, value: 67500 },
+];
+
+const recentActivity = [
+  { id: 1, action: 'Added a new contact', user: 'You', time: '2 hours ago', details: 'James Wilson from InnoTech' },
+  { id: 2, action: 'Moved deal to Proposal stage', user: 'Emily Parker', time: '4 hours ago', details: 'TechCorp website redesign ($24,000)' },
+  { id: 3, action: 'Added a note', user: 'You', time: 'Yesterday', details: 'Follow-up call scheduled with Sarah Johnson' },
+  { id: 4, action: 'Created new campaign', user: 'Marcus Lee', time: 'Yesterday', details: 'Q3 Newsletter - Software Solutions' },
+];
 
 const Dashboard: React.FC = () => {
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-
-  const recentActivities = [
-    { id: 1, type: 'contact', name: 'Sarah Johnson', action: 'added to contacts', time: '2 hours ago' },
-    { id: 2, type: 'deal', name: 'Acme Corp Partnership', action: 'moved to Negotiation', time: '3 hours ago' },
-    { id: 3, type: 'task', name: 'Call with Michael Brown', action: 'marked as completed', time: '5 hours ago' },
-    { id: 4, type: 'email', name: 'Follow-up email', action: 'sent to Emma Davis', time: 'Yesterday' },
-  ];
-
-  const upcomingTasks = [
-    { id: 1, title: 'Send proposal to InnoTech', dueDate: 'Today', priority: 'high' },
-    { id: 2, title: 'Follow up with James about pricing', dueDate: 'Tomorrow', priority: 'medium' },
-    { id: 3, title: 'Prepare for team meeting', dueDate: 'Jun 6', priority: 'low' },
-    { id: 4, title: 'Review Q2 metrics', dueDate: 'Jun 8', priority: 'medium' },
-  ];
-
+  // Calculate pipeline total value
+  const pipelineTotal = pipelineStages.reduce((sum, stage) => sum + stage.value, 0);
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-h1 font-medium">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">{currentDate}</p>
-        </div>
-        <button className="notion-primary-button flex items-center">
-          <span className="mr-2">Quick Add</span>
-          <span className="text-lg">+</span>
-        </button>
+        <h1 className="text-h1 font-medium">Dashboard</h1>
+        <Button className="bg-primary">
+          <Plus size={16} className="mr-2" />
+          <span>Add Task</span>
+        </Button>
       </div>
-
+      
+      {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-gray-500 text-sm font-normal">Total Contacts</CardTitle>
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardDescription>Total Contacts</CardDescription>
+            <CardTitle className="text-2xl">1,234</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end justify-between">
-              <div className="flex items-center">
-                <Users className="mr-3 text-gray-600" size={18} />
-                <span className="text-2xl font-medium">248</span>
-              </div>
-              <div className="flex items-center text-success text-xs">
-                <ArrowUp size={14} className="mr-1" />
-                <span>12%</span>
-              </div>
+            <div className="text-sm text-gray-500 flex items-center">
+              <Badge variant="outline" className="text-green-600 bg-green-50">+5.2%</Badge>
+              <span className="ml-2">vs last month</span>
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-gray-500 text-sm font-normal">Active Deals</CardTitle>
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardDescription>Open Deals</CardDescription>
+            <CardTitle className="text-2xl">34</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end justify-between">
-              <div className="flex items-center">
-                <Briefcase className="mr-3 text-gray-600" size={18} />
-                <span className="text-2xl font-medium">36</span>
-              </div>
-              <div className="flex items-center text-success text-xs">
-                <ArrowUp size={14} className="mr-1" />
-                <span>8%</span>
-              </div>
+            <div className="text-sm text-gray-500 flex items-center">
+              <Badge variant="outline" className="text-blue-600 bg-blue-50">$291,100</Badge>
+              <span className="ml-2">total value</span>
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-gray-500 text-sm font-normal">Tasks Due</CardTitle>
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardDescription>This Month's Revenue</CardDescription>
+            <CardTitle className="text-2xl">$67,500</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end justify-between">
-              <div className="flex items-center">
-                <Calendar className="mr-3 text-gray-600" size={18} />
-                <span className="text-2xl font-medium">12</span>
-              </div>
-              <div className="text-xs text-gray-500">
-                <span>Today</span>
-              </div>
+            <div className="text-sm text-gray-500 flex items-center">
+              <Badge variant="outline" className="text-red-600 bg-red-50">-2.3%</Badge>
+              <span className="ml-2">vs last month</span>
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border shadow-sm hover:shadow-md transition-all duration-150">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-gray-500 text-sm font-normal">Deal Conversions</CardTitle>
+
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-2">
+            <CardDescription>Active Campaigns</CardDescription>
+            <CardTitle className="text-2xl">8</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="font-medium text-sm">68%</span>
-                <span className="text-success text-xs">+5.2%</span>
-              </div>
-              <Progress value={68} className="h-1.5 bg-gray-200" />
+            <div className="text-sm text-gray-500 flex items-center">
+              <Badge variant="outline" className="text-green-600 bg-green-50">22.5%</Badge>
+              <span className="ml-2">open rate</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <Card className="border shadow-sm">
-            <CardHeader className="pb-2 pt-4 flex justify-between items-center">
-              <CardTitle className="text-lg font-medium">Recent Activity</CardTitle>
-              <button className="text-sm text-gray-500 hover:text-primary transition-colors">View All</button>
+      {/* Main Dashboard Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tasks & Activities Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Tasks */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Tasks</CardTitle>
+                  <CardDescription>Your upcoming tasks and priorities</CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  <Plus size={16} className="mr-1" /> New Task
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start pb-3 last:pb-0 border-b last:border-b-0 border-gray-100">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 bg-gray-100`}>
-                      {activity.type === 'contact' && <Users size={14} className="text-gray-600" />}
-                      {activity.type === 'deal' && <Briefcase size={14} className="text-gray-600" />}
-                      {activity.type === 'task' && <CircleCheck size={14} className="text-gray-600" />}
-                      {activity.type === 'email' && <Mail size={14} className="text-gray-600" />}
+                {upcomingTasks.map((task) => (
+                  <div key={task.id} className="flex items-start space-x-4 py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex-shrink-0 pt-0.5">
+                      <CheckCircle size={18} className="text-gray-400" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.name}</p>
-                      <p className="text-xs text-gray-500">{activity.action}</p>
+                    <div className="flex-grow min-w-0">
+                      <div className="flex justify-between">
+                        <p className="text-sm font-medium truncate">{task.title}</p>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={
+                            task.priority === 'High' ? 'default' : 
+                            task.priority === 'Medium' ? 'secondary' : 
+                            'outline'
+                          } className={
+                            task.priority === 'High' ? 'bg-red-50 text-red-700 hover:bg-red-50' : 
+                            task.priority === 'Medium' ? 'bg-orange-50 text-orange-700 hover:bg-orange-50' : 
+                            'bg-gray-50 text-gray-700 hover:bg-gray-50'
+                          }>
+                            {task.priority}
+                          </Badge>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500 mt-1">
+                        <Clock size={14} className="mr-1" />
+                        <span>{task.due}</span>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">{activity.time}</div>
                   </div>
                 ))}
               </div>
             </CardContent>
+            <CardFooter className="pt-0">
+              <Button variant="link" className="ml-auto">View All Tasks</Button>
+            </CardFooter>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Latest actions across your workspace</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex space-x-4 py-2 border-b border-gray-100 last:border-0">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      {activity.user === 'You' ? 
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>JD</AvatarFallback>
+                        </Avatar> : 
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>{activity.user.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                        </Avatar>
+                      }
+                    </div>
+                    <div className="flex-grow">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <span className="font-medium">{activity.user}</span> {activity.action}
+                        </div>
+                        <div className="text-xs text-gray-500">{activity.time}</div>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{activity.details}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <Button variant="link" className="ml-auto">View All Activity</Button>
+            </CardFooter>
           </Card>
         </div>
 
-        <div>
-          <Card className="border shadow-sm">
-            <CardHeader className="pb-2 pt-4 flex justify-between items-center">
-              <CardTitle className="text-lg font-medium">Upcoming Tasks</CardTitle>
-              <button className="text-sm text-gray-500 hover:text-primary transition-colors">View All</button>
+        {/* Right sidebar */}
+        <div className="space-y-6">
+          {/* Pipeline Overview */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle>Pipeline Overview</CardTitle>
+              <CardDescription>Current deals by stage</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {upcomingTasks.map((task) => (
-                  <div key={task.id} className="flex items-center p-2 rounded-md hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                    <input type="checkbox" className="w-4 h-4 mr-3 rounded border-gray-300 text-primary focus:ring-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{task.title}</p>
-                      <p className="text-xs text-gray-500">Due {task.dueDate}</p>
+              <div className="space-y-4">
+                {pipelineStages.map((stage) => (
+                  <div key={stage.name} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{stage.name}</span>
+                      <span className="text-gray-500">{stage.count} deals · ${stage.value.toLocaleString()}</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${
-                      task.priority === 'high' ? 'bg-red-50 text-red-600' :
-                      task.priority === 'medium' ? 'bg-yellow-50 text-yellow-600' :
-                      'bg-green-50 text-green-600'
-                    }`}>
-                      {task.priority}
-                    </span>
+                    <Progress value={(stage.value / pipelineTotal) * 100} className="h-1.5" />
                   </div>
                 ))}
               </div>
             </CardContent>
+            <CardFooter className="pt-0">
+              <Button variant="link" className="ml-auto">View Pipeline</Button>
+            </CardFooter>
+          </Card>
+
+          {/* Recent Contacts */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Recent Contacts</CardTitle>
+                  <CardDescription>Recently added or updated</CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  <UserPlus size={16} className="mr-1" /> Add
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentContacts.map((contact) => (
+                  <div key={contact.id} className="flex items-center space-x-3 py-2 border-b border-gray-100 last:border-0">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback>{contact.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{contact.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{contact.company}</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button size="icon" variant="ghost" className="h-7 w-7">
+                        <Mail size={14} />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7">
+                        <Phone size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <Button variant="link" className="ml-auto">View All Contacts</Button>
+            </CardFooter>
+          </Card>
+
+          {/* Calendar Preview */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle>Upcoming Events</CardTitle>
+              <CardDescription>Your schedule for the next few days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">Client Demo Call</div>
+                    <Badge variant="outline">Today</Badge>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <CalendarIcon size={12} className="mr-1" /> 3:00 PM - 4:00 PM
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">Team Weekly Sync</div>
+                    <Badge variant="outline">Tomorrow</Badge>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <CalendarIcon size={12} className="mr-1" /> 10:00 AM - 11:00 AM
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">Product Roadmap Review</div>
+                    <Badge variant="outline">Aug 12</Badge>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                    <CalendarIcon size={12} className="mr-1" /> 2:00 PM - 3:30 PM
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <Button variant="link" className="ml-auto">Open Calendar</Button>
+            </CardFooter>
           </Card>
         </div>
       </div>

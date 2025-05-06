@@ -1,321 +1,713 @@
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Bell, Lock, User, KeyRound, Users, Shield, Building, Paintbrush, Globe, Mail, AlertCircle } from 'lucide-react';
 
 const Settings: React.FC = () => {
   return (
     <div className="space-y-6">
-      <h1 className="text-h1 font-semibold">Settings</h1>
+      <div>
+        <h1 className="text-h1 font-medium">Settings</h1>
+        <p className="text-gray-500 mt-1">Manage your account preferences and workspace settings</p>
+      </div>
       
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid grid-cols-4 max-w-lg">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="mb-6 w-full justify-start border-b pb-0 rounded-none">
+          <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <User className="w-4 h-4 mr-2" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="password" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <KeyRound className="w-4 h-4 mr-2" />
+            Password
+          </TabsTrigger>
+          <TabsTrigger value="team" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <Users className="w-4 h-4 mr-2" />
+            Team
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <Bell className="w-4 h-4 mr-2" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="company" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <Building className="w-4 h-4 mr-2" />
+            Company
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <Paintbrush className="w-4 h-4 mr-2" />
+            Appearance
+          </TabsTrigger>
         </TabsList>
         
+        {/* Profile Tab */}
         <TabsContent value="profile">
-          <Card className="shadow-card">
+          <div className="grid gap-6">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Profile Information</CardTitle>
+                <CardDescription>Update your account information.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:space-x-6">
+                  <div className="flex flex-col items-center space-y-3 mb-4 md:mb-0">
+                    <Avatar className="w-24 h-24">
+                      <AvatarFallback className="text-xl">JD</AvatarFallback>
+                    </Avatar>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">Upload</Button>
+                      <Button variant="ghost" size="sm">Remove</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input id="firstName" defaultValue="John" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input id="lastName" defaultValue="Doe" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" defaultValue="john@example.com" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input id="phone" type="tel" defaultValue="+1 (555) 123-4567" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between border-t pt-6">
+                <Button variant="outline">Cancel</Button>
+                <Button>Save Changes</Button>
+              </CardFooter>
+            </Card>
+            
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Time Zone & Language</CardTitle>
+                <CardDescription>Set your preferred language and time zone.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="language">Language</Label>
+                  <select id="language" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="en-US">English (United States)</option>
+                    <option value="es-ES">Español (España)</option>
+                    <option value="fr-FR">Français (France)</option>
+                    <option value="de-DE">Deutsch (Deutschland)</option>
+                    <option value="ja-JP">日本語 (日本)</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Time Zone</Label>
+                  <select id="timezone" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="UTC-8">Pacific Time (UTC-8)</option>
+                    <option value="UTC-5">Eastern Time (UTC-5)</option>
+                    <option value="UTC+0">Greenwich Mean Time (UTC+0)</option>
+                    <option value="UTC+1">Central European Time (UTC+1)</option>
+                    <option value="UTC+8">China Standard Time (UTC+8)</option>
+                    <option value="UTC+9">Japan Standard Time (UTC+9)</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dateFormat">Date Format</Label>
+                  <select id="dateFormat" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                  </select>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between border-t pt-6">
+                <Button variant="outline">Cancel</Button>
+                <Button>Save Changes</Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Password Tab */}
+        <TabsContent value="password">
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-              <CardDescription>Manage your account settings and profile information.</CardDescription>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>Update your password to enhance account security.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center space-x-6">
-                <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-h3">
-                  JD
-                </div>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input type="password" id="currentPassword" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input type="password" id="newPassword" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Input type="password" id="confirmPassword" />
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-md text-sm text-gray-600 flex items-start mt-2">
+                <AlertCircle className="w-5 h-5 mr-2 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <Button variant="outline" size="sm">Change Avatar</Button>
-                  <p className="text-muted-foreground text-xs mt-1">JPG, GIF or PNG. 1MB max.</p>
+                  <p className="font-medium">Password requirements:</p>
+                  <ul className="list-disc list-inside pl-1 mt-1 space-y-1">
+                    <li>Minimum 8 characters</li>
+                    <li>At least one uppercase letter</li>
+                    <li>At least one number</li>
+                    <li>At least one special character</li>
+                  </ul>
                 </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-6">
+              <Button variant="outline">Cancel</Button>
+              <Button>Update Password</Button>
+            </CardFooter>
+          </Card>
+          
+          <Card className="shadow-sm mt-6">
+            <CardHeader>
+              <CardTitle>Two-Factor Authentication</CardTitle>
+              <CardDescription>Add an extra layer of security to your account.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h4 className="font-medium text-base">Text Message Authentication</h4>
+                  <p className="text-sm text-gray-500">Receive a code via SMS when signing in.</p>
+                </div>
+                <Switch />
               </div>
               
               <Separator />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" placeholder="First Name" defaultValue="John" />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h4 className="font-medium text-base">Authenticator App</h4>
+                  <p className="text-sm text-gray-500">Use an authentication app to get verification codes.</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" placeholder="Last Name" defaultValue="Doe" />
+                <Button variant="outline">Set Up</Button>
+              </div>
+              
+              <Separator />
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h4 className="font-medium text-base">Security Keys</h4>
+                  <p className="text-sm text-gray-500">Use security keys for sign-in.</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Email" defaultValue="john@example.com" />
+                <Button variant="outline">Add Key</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Team Tab */}
+        <TabsContent value="team">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <div className="flex justify-between">
+                <div>
+                  <CardTitle>Team Members</CardTitle>
+                  <CardDescription>Manage your team members and their access levels.</CardDescription>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" type="tel" placeholder="Phone Number" />
+                <Button className="bg-primary">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Invite Member
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y divide-gray-100">
+                {/* Team Member 1 */}
+                <div className="py-4 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarFallback>JD</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">John Doe</p>
+                      <p className="text-gray-500 text-sm">john@example.com</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Badge className="mr-4">Admin</Badge>
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </div>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="company">Company</Label>
-                  <Input id="company" placeholder="Company Name" defaultValue="Folk CRM" />
+                
+                {/* Team Member 2 */}
+                <div className="py-4 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarFallback>EP</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">Emily Parker</p>
+                      <p className="text-gray-500 text-sm">emily@example.com</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Badge variant="outline" className="bg-gray-100 text-gray-800 mr-4">Member</Badge>
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </div>
+                </div>
+                
+                {/* Team Member 3 */}
+                <div className="py-4 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarFallback>ML</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">Marcus Lee</p>
+                      <p className="text-gray-500 text-sm">marcus@example.com</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Badge variant="outline" className="bg-gray-100 text-gray-800 mr-4">Member</Badge>
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </div>
+                </div>
+                
+                {/* Team Member 4 */}
+                <div className="py-4 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarFallback>JW</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-sm">Jessica Wong</p>
+                      <p className="text-gray-500 text-sm">jessica@example.com</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Badge className="bg-blue-50 text-blue-700 mr-4">Manager</Badge>
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-6">
+              <div className="text-sm text-gray-500">4 team members</div>
+              <Button variant="outline">Manage Roles</Button>
+            </CardFooter>
+          </Card>
+          
+          <Card className="shadow-sm mt-6">
+            <CardHeader>
+              <CardTitle>Team Permissions</CardTitle>
+              <CardDescription>Set default permissions for team members.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <Checkbox id="contacts-access" />
+                  <div>
+                    <Label className="text-sm font-medium" htmlFor="contacts-access">Contacts Access</Label>
+                    <p className="text-sm text-gray-500">Allow team members to view and manage contacts.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Checkbox id="deal-creation" />
+                  <div>
+                    <Label className="text-sm font-medium" htmlFor="deal-creation">Deal Creation</Label>
+                    <p className="text-sm text-gray-500">Allow team members to create new deals.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Checkbox id="campaign-management" />
+                  <div>
+                    <Label className="text-sm font-medium" htmlFor="campaign-management">Campaign Management</Label>
+                    <p className="text-sm text-gray-500">Allow team members to create and manage campaigns.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Checkbox id="reports-access" />
+                  <div>
+                    <Label className="text-sm font-medium" htmlFor="reports-access">Reports Access</Label>
+                    <p className="text-sm text-gray-500">Allow team members to access performance reports.</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-6">
+              <Button className="ml-auto">Save Permissions</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        {/* Notifications Tab */}
+        <TabsContent value="notifications">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Notification Preferences</CardTitle>
+              <CardDescription>Manage how and when you receive notifications.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Email Notifications</h3>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">New lead notifications</Label>
+                    <p className="text-xs text-gray-500">Get notified when a new lead is added to the system.</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Deal updates</Label>
+                    <p className="text-xs text-gray-500">Get notified about status changes in your deals.</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Task reminders</Label>
+                    <p className="text-xs text-gray-500">Get reminders about upcoming and overdue tasks.</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Campaign statistics</Label>
+                    <p className="text-xs text-gray-500">Receive reports about your campaign performance.</p>
+                  </div>
+                  <Switch />
                 </div>
               </div>
               
               <Separator />
               
               <div className="space-y-4">
-                <h3 className="font-medium">Change Password</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input id="currentPassword" type="password" placeholder="Current Password" />
+                <h3 className="text-sm font-medium">In-App Notifications</h3>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Mentions</Label>
+                    <p className="text-xs text-gray-500">Get notified when someone mentions you in a comment.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>&nbsp;</Label>
-                    <div></div>
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Assignment notifications</Label>
+                    <p className="text-xs text-gray-500">Get notified when a contact or deal is assigned to you.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input id="newPassword" type="password" placeholder="New Password" />
+                  <Switch defaultChecked />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">System updates</Label>
+                    <p className="text-xs text-gray-500">Get notified about important system updates.</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" type="password" placeholder="Confirm Password" />
+                  <Switch />
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Email Digest</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="digest-frequency">Frequency</Label>
+                  <select id="digest-frequency" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="never">Never</option>
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-6">
+              <Button variant="outline">Cancel</Button>
+              <Button className="ml-auto">Save Preferences</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        {/* Company Tab */}
+        <TabsContent value="company">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Company Information</CardTitle>
+              <CardDescription>Update your company information.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input id="companyName" defaultValue="Acme Inc" />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="companyWebsite">Website</Label>
+                <Input id="companyWebsite" defaultValue="https://www.acmeinc.com" />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <select id="industry" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="technology">Technology</option>
+                    <option value="finance">Finance</option>
+                    <option value="healthcare">Healthcare</option>
+                    <option value="education">Education</option>
+                    <option value="manufacturing">Manufacturing</option>
+                    <option value="retail">Retail</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="companySize">Company Size</Label>
+                  <select id="companySize" className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-none ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-gray-300 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="1-10">1-10 employees</option>
+                    <option value="11-50">11-50 employees</option>
+                    <option value="51-200">51-200 employees</option>
+                    <option value="201-500">201-500 employees</option>
+                    <option value="501-1000">501-1000 employees</option>
+                    <option value="1000+">1000+ employees</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="companyDescription">Company Description</Label>
+                <textarea 
+                  id="companyDescription" 
+                  rows={4} 
+                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  defaultValue="Acme Inc is a technology company focused on innovative software solutions for businesses."
+                ></textarea>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-6">
+              <Button variant="outline">Cancel</Button>
+              <Button>Save Changes</Button>
+            </CardFooter>
+          </Card>
+          
+          <Card className="shadow-sm mt-6">
+            <CardHeader>
+              <CardTitle>Custom Fields</CardTitle>
+              <CardDescription>Manage custom fields for contacts, deals, and companies.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="contacts" className="w-full">
+                <TabsList className="mb-4 w-full">
+                  <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                  <TabsTrigger value="deals">Deals</TabsTrigger>
+                  <TabsTrigger value="companies">Companies</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="contacts" className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-sm">LinkedIn Profile</p>
+                      <p className="text-xs text-gray-500">Text field</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Delete</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-sm">First Contact Date</p>
+                      <p className="text-xs text-gray-500">Date field</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Delete</Button>
+                    </div>
+                  </div>
+                  
+                  <Button className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Custom Field
+                  </Button>
+                </TabsContent>
+                
+                <TabsContent value="deals" className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-sm">Decision Maker</p>
+                      <p className="text-xs text-gray-500">Contact lookup</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Delete</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-sm">Contract Value</p>
+                      <p className="text-xs text-gray-500">Currency field</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Delete</Button>
+                    </div>
+                  </div>
+                  
+                  <Button className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Custom Field
+                  </Button>
+                </TabsContent>
+                
+                <TabsContent value="companies" className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <div>
+                      <p className="font-medium text-sm">Industry Vertical</p>
+                      <p className="text-xs text-gray-500">Dropdown field</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="sm">Edit</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">Delete</Button>
+                    </div>
+                  </div>
+                  
+                  <Button className="mt-4">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Custom Field
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Appearance Tab */}
+        <TabsContent value="appearance">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Appearance Settings</CardTitle>
+              <CardDescription>Customize the look and feel of your CRM.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Theme</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="border rounded-md p-4 cursor-pointer bg-white flex flex-col items-center justify-center">
+                    <div className="w-full h-24 bg-white border rounded-md mb-2 flex items-center justify-center">
+                      <span className="text-sm text-gray-800 font-medium">Light</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Checkbox id="light-theme" defaultChecked />
+                      <Label htmlFor="light-theme" className="ml-2 text-sm">Light Theme</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4 cursor-pointer bg-white flex flex-col items-center justify-center">
+                    <div className="w-full h-24 bg-gray-900 border rounded-md mb-2 flex items-center justify-center">
+                      <span className="text-sm text-gray-100 font-medium">Dark</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Checkbox id="dark-theme" />
+                      <Label htmlFor="dark-theme" className="ml-2 text-sm">Dark Theme</Label>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4 cursor-pointer bg-white flex flex-col items-center justify-center">
+                    <div className="w-full h-24 bg-gradient-to-b from-white to-gray-900 border rounded-md mb-2 flex items-center justify-center">
+                      <span className="text-sm text-gray-800 font-medium">Auto</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Checkbox id="system-theme" />
+                      <Label htmlFor="system-theme" className="ml-2 text-sm">System Theme</Label>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-end">
-                <Button className="bg-primary">Save Changes</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="team">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Team Settings</CardTitle>
-              <CardDescription>Manage team members and permissions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-5">
-                <div className="flex items-center justify-between p-4 bg-muted rounded-md">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center">
-                      JD
-                    </div>
-                    <div className="ml-4">
-                      <p className="font-medium">John Doe</p>
-                      <p className="text-muted-foreground text-small">john@example.com</p>
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Custom Branding</h3>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryColor">Primary Color</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input type="color" id="primaryColor" defaultValue="#191919" className="w-12 h-10 p-1" />
+                      <Input defaultValue="#191919" className="flex-1" />
                     </div>
                   </div>
-                  <div className="bg-primary/10 text-primary px-3 py-1 rounded text-small">
-                    Admin
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-muted rounded-md">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-                      AS
-                    </div>
-                    <div className="ml-4">
-                      <p className="font-medium">Alex Smith</p>
-                      <p className="text-muted-foreground text-small">alex@example.com</p>
-                    </div>
-                  </div>
-                  <div className="bg-muted-foreground/10 text-muted-foreground px-3 py-1 rounded text-small">
-                    Member
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-muted rounded-md">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-                      SK
-                    </div>
-                    <div className="ml-4">
-                      <p className="font-medium">Sarah Kim</p>
-                      <p className="text-muted-foreground text-small">sarah@example.com</p>
-                    </div>
-                  </div>
-                  <div className="bg-muted-foreground/10 text-muted-foreground px-3 py-1 rounded text-small">
-                    Member
-                  </div>
-                </div>
-                
-                <Button className="w-full border border-dashed border-gray-300" variant="ghost">
-                  + Invite Team Member
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="notifications">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>Configure how you receive notifications.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-medium mb-4">Email Notifications</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">New contacts added</p>
-                        <p className="text-muted-foreground text-small">Get notified when new contacts are added</p>
-                      </div>
-                      <Switch defaultChecked={true} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Pipeline updates</p>
-                        <p className="text-muted-foreground text-small">Get notified when deals change stages</p>
-                      </div>
-                      <Switch defaultChecked={true} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Task reminders</p>
-                        <p className="text-muted-foreground text-small">Get reminders for upcoming and overdue tasks</p>
-                      </div>
-                      <Switch defaultChecked={true} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Campaign reports</p>
-                        <p className="text-muted-foreground text-small">Get weekly campaign performance reports</p>
-                      </div>
-                      <Switch defaultChecked={false} />
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="font-medium mb-4">App Notifications</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Team activity</p>
-                        <p className="text-muted-foreground text-small">Get notified of actions by team members</p>
-                      </div>
-                      <Switch defaultChecked={true} />
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">Deal status alerts</p>
-                        <p className="text-muted-foreground text-small">Get notified when deals are at risk or stalled</p>
-                      </div>
-                      <Switch defaultChecked={true} />
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="accentColor">Accent Color</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input type="color" id="accentColor" defaultValue="#6B7280" className="w-12 h-10 p-1" />
+                      <Input defaultValue="#6B7280" className="flex-1" />
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="integrations">
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Integrations</CardTitle>
-              <CardDescription>Connect with other services and tools.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#EA4335] rounded-md flex items-center justify-center text-white font-bold">
-                      G
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Layout</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm">Compact Mode</Label>
+                      <p className="text-xs text-gray-500">Use a more compact layout with less white space.</p>
                     </div>
-                    <div className="ml-3">
-                      <p className="font-medium">Google Workspace</p>
-                      <p className="text-muted-foreground text-small">Email, Calendar, Contacts</p>
-                    </div>
+                    <Switch />
                   </div>
-                  <Button variant="outline" size="sm">Connect</Button>
-                </div>
-                
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#0078D4] rounded-md flex items-center justify-center text-white font-bold">
-                      M
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm">Full-width Layout</Label>
+                      <p className="text-xs text-gray-500">Use the full width of the screen for content.</p>
                     </div>
-                    <div className="ml-3">
-                      <p className="font-medium">Microsoft 365</p>
-                      <p className="text-muted-foreground text-small">Outlook, Teams, OneDrive</p>
-                    </div>
+                    <Switch />
                   </div>
-                  <Button variant="outline" size="sm">Connect</Button>
-                </div>
-                
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#0A66C2] rounded-md flex items-center justify-center text-white">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium">LinkedIn</p>
-                      <p className="text-muted-foreground text-small">Lead generation, contacts</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">Connect</Button>
-                </div>
-                
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#1DA1F2] rounded-md flex items-center justify-center text-white">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium">Twitter</p>
-                      <p className="text-muted-foreground text-small">Social engagement</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">Connect</Button>
-                </div>
-                
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#4285F4] rounded-md flex items-center justify-center text-white font-bold">
-                      S
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium">Slack</p>
-                      <p className="text-muted-foreground text-small">Team notifications</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">Connect</Button>
-                </div>
-                
-                <div className="border rounded-lg p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-[#008000] rounded-md flex items-center justify-center text-white font-bold">
-                      Q
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium">QuickBooks</p>
-                      <p className="text-muted-foreground text-small">Accounting & invoicing</p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">Connect</Button>
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-between border-t pt-6">
+              <Button variant="outline">Reset to Default</Button>
+              <Button>Save Changes</Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
