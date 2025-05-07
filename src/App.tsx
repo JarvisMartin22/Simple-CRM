@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import LandingPage from "./pages/LandingPage";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ function App() {
             <Sonner />
             <BrowserRouter>
               <Routes>
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/auth/login" element={<Login />} />
                 <Route path="/auth/register" element={<Register />} />
                 
@@ -42,7 +44,7 @@ function App() {
                     <Layout />
                   </ProtectedRoute>
                 }>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/pipelines" element={<Pipelines />} />
                   <Route path="/campaigns" element={<Campaigns />} />
