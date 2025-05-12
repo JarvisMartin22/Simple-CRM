@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +21,7 @@ import {
 import TaskForm from '@/components/dashboard/TaskForm';
 import ContactDetail from '@/components/dashboard/ContactDetail';
 import MetricDetail from '@/components/dashboard/MetricDetail';
+import TaskDetail from '@/components/dashboard/TaskDetail';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -70,6 +70,7 @@ const Dashboard: React.FC = () => {
     changeValue?: string;
     changeType?: 'positive' | 'negative' | 'neutral';
   }>(null);
+  const [selectedTask, setSelectedTask] = useState<null | typeof upcomingTasks[0]>(null);
   
   // Handle clicking on a card
   const handleMetricClick = (title: string, value: string | number, changeValue?: string, change?: string, changeType?: 'positive' | 'negative' | 'neutral') => {
@@ -104,7 +105,7 @@ const Dashboard: React.FC = () => {
   
   // Handle task actions
   const handleTaskClick = (task: typeof upcomingTasks[0]) => {
-    toast.info(`Viewing details for task: ${task.title}`);
+    setSelectedTask(task);
   };
   
   // Handle pipeline view
@@ -417,6 +418,7 @@ const Dashboard: React.FC = () => {
       {taskFormOpen && <TaskForm isOpen={taskFormOpen} onClose={() => setTaskFormOpen(false)} />}
       {selectedContact && <ContactDetail isOpen={!!selectedContact} onClose={() => setSelectedContact(null)} contact={selectedContact} />}
       {selectedMetric && <MetricDetail isOpen={!!selectedMetric} onClose={() => setSelectedMetric(null)} metric={selectedMetric} />}
+      {selectedTask && <TaskDetail isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} task={selectedTask} />}
     </div>
   );
 };
