@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from './components/layout/Layout';
+import Layout from './components/layout/Layout';
 import { Toaster } from './components/ui/toaster';
 import { ContactsProvider } from './contexts/ContactsContext';
 
