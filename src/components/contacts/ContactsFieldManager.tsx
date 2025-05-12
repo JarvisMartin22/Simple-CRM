@@ -54,7 +54,7 @@ export const ContactsFieldManager: React.FC = () => {
           </DialogHeader>
           <FieldEditDialog 
             mode="create" 
-            onComplete={() => setOpenDialog(false)} 
+            onClose={() => setOpenDialog(false)} 
           />
         </DialogContent>
       </Dialog>

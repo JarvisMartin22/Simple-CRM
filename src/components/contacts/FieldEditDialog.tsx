@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Cross2Icon, PlusCircledIcon } from '@radix-ui/react-icons';
+import { Plus, X } from 'lucide-react';
 import { ContactField, FieldType, SelectOption, useContacts } from '@/contexts/ContactsContext';
 
 // Field types available for selection
@@ -159,7 +159,7 @@ export const FieldEditDialog: React.FC<FieldEditDialogProps> = ({ field, mode, o
               onClick={addOption}
               className="h-8 px-2"
             >
-              <PlusCircledIcon className="mr-1 h-4 w-4" />
+              <Plus className="mr-1 h-4 w-4" />
               Add Option
             </Button>
           </div>
@@ -189,7 +189,7 @@ export const FieldEditDialog: React.FC<FieldEditDialogProps> = ({ field, mode, o
                     onClick={() => removeOption(index)}
                     className="h-8 w-8 p-0"
                   >
-                    <Cross2Icon className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               ))

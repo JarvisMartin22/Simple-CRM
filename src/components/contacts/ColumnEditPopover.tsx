@@ -1,10 +1,9 @@
 
 import React from 'react';
 import { 
-  Pencil, 
+  Edit, 
   Filter, 
-  ArrowUpAZ, 
-  ArrowDownAZ, 
+  ArrowUpDown, 
   X,
   Eye,
   EyeOff
@@ -20,6 +19,7 @@ interface ColumnEditPopoverProps {
 
 export const ColumnEditPopover: React.FC<ColumnEditPopoverProps> = ({ field }) => {
   const { toggleFieldVisibility, deleteField } = useContacts();
+  const [dialogOpen, setDialogOpen] = React.useState(false);
 
   const handleDelete = () => {
     if (!field.required) {
@@ -29,10 +29,10 @@ export const ColumnEditPopover: React.FC<ColumnEditPopoverProps> = ({ field }) =
 
   return (
     <div className="w-48 space-y-2">
-      <Dialog>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" className="w-full justify-start" size="sm">
-            <Pencil size={16} className="mr-2" />
+            <Edit size={16} className="mr-2" />
             Edit field
           </Button>
         </DialogTrigger>
@@ -40,7 +40,7 @@ export const ColumnEditPopover: React.FC<ColumnEditPopoverProps> = ({ field }) =
           <DialogHeader>
             <DialogTitle>Edit Field</DialogTitle>
           </DialogHeader>
-          <FieldEditDialog field={field} mode="edit" />
+          <FieldEditDialog field={field} mode="edit" onClose={() => setDialogOpen(false)} />
         </DialogContent>
       </Dialog>
 
@@ -50,13 +50,8 @@ export const ColumnEditPopover: React.FC<ColumnEditPopoverProps> = ({ field }) =
       </Button>
 
       <Button variant="ghost" className="w-full justify-start" size="sm">
-        <ArrowUpAZ size={16} className="mr-2" />
-        Sort ascending
-      </Button>
-
-      <Button variant="ghost" className="w-full justify-start" size="sm">
-        <ArrowDownAZ size={16} className="mr-2" />
-        Sort descending
+        <ArrowUpDown size={16} className="mr-2" />
+        Sort
       </Button>
 
       <Button 
