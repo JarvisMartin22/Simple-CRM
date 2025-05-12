@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -19,12 +19,17 @@ import {
   Plus, 
   UserPlus 
 } from 'lucide-react';
+import TaskForm from '@/components/dashboard/TaskForm';
+import ContactDetail from '@/components/dashboard/ContactDetail';
+import MetricDetail from '@/components/dashboard/MetricDetail';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // Sample data for the dashboard
 const recentContacts = [
-  { id: 1, name: 'Sarah Johnson', email: 'sarah@example.com', company: 'Acme Inc', lastContact: '2 days ago', avatar: '/avatars/sarah.jpg' },
-  { id: 2, name: 'Michael Brown', email: 'michael@example.com', company: 'TechCorp', lastContact: '5 days ago', avatar: '/avatars/michael.jpg' },
-  { id: 3, name: 'Emma Davis', email: 'emma@example.com', company: 'Design Studio', lastContact: 'Today', avatar: '/avatars/emma.jpg' },
+  { id: 1, name: 'Sarah Johnson', email: 'sarah@example.com', company: 'Acme Inc', lastContact: '2 days ago', avatar: '/avatars/sarah.jpg', phone: '+1 (555) 123-4567' },
+  { id: 2, name: 'Michael Brown', email: 'michael@example.com', company: 'TechCorp', lastContact: '5 days ago', avatar: '/avatars/michael.jpg', phone: '+1 (555) 987-6543' },
+  { id: 3, name: 'Emma Davis', email: 'emma@example.com', company: 'Design Studio', lastContact: 'Today', avatar: '/avatars/emma.jpg', phone: '+1 (555) 456-7890' },
 ];
 
 const upcomingTasks = [
@@ -53,11 +58,65 @@ const Dashboard: React.FC = () => {
   // Calculate pipeline total value
   const pipelineTotal = pipelineStages.reduce((sum, stage) => sum + stage.value, 0);
   
+  const navigate = useNavigate();
+  
+  // State for dialogs
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<null | typeof recentContacts[0]>(null);
+  const [selectedMetric, setSelectedMetric] = useState<null | {
+    title: string;
+    value: string | number;
+    change?: string;
+    changeValue?: string;
+    changeType?: 'positive' | 'negative' | 'neutral';
+  }>(null);
+  
+  // Handle clicking on a card
+  const handleMetricClick = (title: string, value: string | number, changeValue?: string, change?: string, changeType?: 'positive' | 'negative' | 'neutral') => {
+    setSelectedMetric({
+      title,
+      value,
+      changeValue,
+      change,
+      changeType
+    });
+  };
+
+  // Handle contact interactions
+  const handleContactClick = (contact: typeof recentContacts[0]) => {
+    setSelectedContact(contact);
+  };
+  
+  const handleContactAction = (action: 'email' | 'phone', contact: typeof recentContacts[0]) => {
+    if (action === 'email') {
+      toast.info(`Opening email to ${contact.email}`);
+      window.open(`mailto:${contact.email}`);
+    } else if (action === 'phone' && contact.phone) {
+      toast.info(`Calling ${contact.name}`);
+      window.open(`tel:${contact.phone}`);
+    }
+  };
+  
+  // Navigate to calendar
+  const handleOpenCalendar = () => {
+    navigate('/calendar');
+  };
+  
+  // Handle task actions
+  const handleTaskClick = (task: typeof upcomingTasks[0]) => {
+    toast.info(`Viewing details for task: ${task.title}`);
+  };
+  
+  // Handle pipeline view
+  const handleViewPipeline = () => {
+    navigate('/pipelines');
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-h1 font-medium">Dashboard</h1>
-        <Button className="bg-primary">
+        <Button className="bg-primary" onClick={() => setTaskFormOpen(true)}>
           <Plus size={16} className="mr-2" />
           <span>Add Task</span>
         </Button>
@@ -65,7 +124,10 @@ const Dashboard: React.FC = () => {
       
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card 
+          className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => handleMetricClick("Total Contacts", "1,234", "+5.2%", "vs last month", "positive")}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Total Contacts</CardDescription>
             <CardTitle className="text-2xl">1,234</CardTitle>
@@ -78,7 +140,10 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card 
+          className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => handleMetricClick("Open Deals", "34", "$291,100", "total value", "neutral")}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Open Deals</CardDescription>
             <CardTitle className="text-2xl">34</CardTitle>
@@ -91,7 +156,10 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card 
+          className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => handleMetricClick("This Month's Revenue", "$67,500", "-2.3%", "vs last month", "negative")}
+        >
           <CardHeader className="pb-2">
             <CardDescription>This Month's Revenue</CardDescription>
             <CardTitle className="text-2xl">$67,500</CardTitle>
@@ -104,7 +172,10 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card 
+          className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => handleMetricClick("Active Campaigns", "8", "22.5%", "open rate", "positive")}
+        >
           <CardHeader className="pb-2">
             <CardDescription>Active Campaigns</CardDescription>
             <CardTitle className="text-2xl">8</CardTitle>
@@ -130,7 +201,7 @@ const Dashboard: React.FC = () => {
                   <CardTitle>Tasks</CardTitle>
                   <CardDescription>Your upcoming tasks and priorities</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => setTaskFormOpen(true)}>
                   <Plus size={16} className="mr-1" /> New Task
                 </Button>
               </div>
@@ -138,7 +209,11 @@ const Dashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-4">
                 {upcomingTasks.map((task) => (
-                  <div key={task.id} className="flex items-start space-x-4 py-2 border-b border-gray-100 last:border-0">
+                  <div 
+                    key={task.id} 
+                    className="flex items-start space-x-4 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 px-2 rounded-md"
+                    onClick={() => handleTaskClick(task)}
+                  >
                     <div className="flex-shrink-0 pt-0.5">
                       <CheckCircle size={18} className="text-gray-400" />
                     </div>
@@ -172,7 +247,7 @@ const Dashboard: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="pt-0">
-              <Button variant="link" className="ml-auto">View All Tasks</Button>
+              <Button variant="link" className="ml-auto" onClick={() => setTaskFormOpen(true)}>View All Tasks</Button>
             </CardFooter>
           </Card>
 
@@ -237,7 +312,7 @@ const Dashboard: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="pt-0">
-              <Button variant="link" className="ml-auto">View Pipeline</Button>
+              <Button variant="link" className="ml-auto" onClick={handleViewPipeline}>View Pipeline</Button>
             </CardFooter>
           </Card>
 
@@ -249,7 +324,7 @@ const Dashboard: React.FC = () => {
                   <CardTitle>Recent Contacts</CardTitle>
                   <CardDescription>Recently added or updated</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => navigate('/contacts')}>
                   <UserPlus size={16} className="mr-1" /> Add
                 </Button>
               </div>
@@ -257,7 +332,11 @@ const Dashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-4">
                 {recentContacts.map((contact) => (
-                  <div key={contact.id} className="flex items-center space-x-3 py-2 border-b border-gray-100 last:border-0">
+                  <div 
+                    key={contact.id} 
+                    className="flex items-center space-x-3 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded-md px-2"
+                    onClick={() => handleContactClick(contact)}
+                  >
                     <Avatar className="h-10 w-10">
                       <AvatarFallback>{contact.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                     </Avatar>
@@ -266,10 +345,16 @@ const Dashboard: React.FC = () => {
                       <p className="text-xs text-gray-500 truncate">{contact.company}</p>
                     </div>
                     <div className="flex space-x-2">
-                      <Button size="icon" variant="ghost" className="h-7 w-7">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => {
+                        e.stopPropagation();
+                        handleContactAction('email', contact);
+                      }}>
                         <Mail size={14} />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => {
+                        e.stopPropagation();
+                        handleContactAction('phone', contact);
+                      }}>
                         <Phone size={14} />
                       </Button>
                     </div>
@@ -278,7 +363,7 @@ const Dashboard: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="pt-0">
-              <Button variant="link" className="ml-auto">View All Contacts</Button>
+              <Button variant="link" className="ml-auto" onClick={() => navigate('/contacts')}>View All Contacts</Button>
             </CardFooter>
           </Card>
 
@@ -322,11 +407,16 @@ const Dashboard: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="pt-0">
-              <Button variant="link" className="ml-auto">Open Calendar</Button>
+              <Button variant="link" className="ml-auto" onClick={handleOpenCalendar}>Open Calendar</Button>
             </CardFooter>
           </Card>
         </div>
       </div>
+
+      {/* Dialogs */}
+      {taskFormOpen && <TaskForm isOpen={taskFormOpen} onClose={() => setTaskFormOpen(false)} />}
+      {selectedContact && <ContactDetail isOpen={!!selectedContact} onClose={() => setSelectedContact(null)} contact={selectedContact} />}
+      {selectedMetric && <MetricDetail isOpen={!!selectedMetric} onClose={() => setSelectedMetric(null)} metric={selectedMetric} />}
     </div>
   );
 };
