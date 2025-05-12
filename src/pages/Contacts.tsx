@@ -1,28 +1,37 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, UserPlus, MoreHorizontal } from 'lucide-react';
+import { Search, Filter, UserPlus, Settings } from 'lucide-react';
+import { ContactsTable } from '@/components/contacts/ContactsTable';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ContactsFieldManager } from '@/components/contacts/ContactsFieldManager';
 
 const Contacts: React.FC = () => {
-  const contacts = [
-    { id: 1, name: 'Sarah Johnson', email: 'sarah.johnson@example.com', company: 'Acme Inc', position: 'Marketing Director', tags: ['Client', 'Marketing'] },
-    { id: 2, name: 'Michael Brown', email: 'michael.brown@example.com', company: 'TechCorp', position: 'CTO', tags: ['Prospect', 'Tech'] },
-    { id: 3, name: 'Emma Davis', email: 'emma.davis@example.com', company: 'Design Studio', position: 'Creative Director', tags: ['Client', 'Design'] },
-    { id: 4, name: 'James Wilson', email: 'james.wilson@example.com', company: 'InnoTech', position: 'CEO', tags: ['Lead', 'Executive'] },
-    { id: 5, name: 'Olivia Martinez', email: 'olivia.martinez@example.com', company: 'Global Services', position: 'Account Manager', tags: ['Partner'] },
-    { id: 6, name: 'William Taylor', email: 'william.taylor@example.com', company: 'Finance Plus', position: 'Financial Advisor', tags: ['Client', 'Finance'] },
-  ];
+  const [showFieldManager, setShowFieldManager] = useState(false);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-h1 font-semibold">Contacts</h1>
-        <Button className="bg-primary">
-          <UserPlus size={18} className="mr-2" />
-          <span>Add Contact</span>
-        </Button>
+        <div className="flex space-x-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="flex items-center">
+                <Settings size={18} className="mr-2" />
+                <span>Properties</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <ContactsFieldManager />
+            </SheetContent>
+          </Sheet>
+          <Button className="bg-primary">
+            <UserPlus size={18} className="mr-2" />
+            <span>Add Contact</span>
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-card p-6">
@@ -44,51 +53,7 @@ const Contacts: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead className="bg-muted border-y border-gray-200">
-              <tr>
-                <th className="text-left py-3 px-4 font-semibold text-small">Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-small">Email</th>
-                <th className="text-left py-3 px-4 font-semibold text-small">Company</th>
-                <th className="text-left py-3 px-4 font-semibold text-small">Position</th>
-                <th className="text-left py-3 px-4 font-semibold text-small">Tags</th>
-                <th className="text-right py-3 px-4 font-semibold text-small">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contacts.map((contact) => (
-                <tr key={contact.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3">
-                        {contact.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      {contact.name}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground">{contact.email}</td>
-                  <td className="py-3 px-4">{contact.company}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{contact.position}</td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-2">
-                      {contact.tags.map((tag, index) => (
-                        <span key={index} className="bg-muted px-2 py-1 rounded text-micro">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal size={18} />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ContactsTable />
       </Card>
     </div>
   );
