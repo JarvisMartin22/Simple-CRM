@@ -4,6 +4,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import { Toaster } from './components/ui/toaster';
 import { ContactsProvider } from './contexts/ContactsContext';
+import { AuthProvider } from './contexts/AuthContext';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 // Import pages
 import Dashboard from './pages/Dashboard';
@@ -17,10 +21,18 @@ import NotFound from './pages/NotFound';
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/" element={<Layout />}>
+        <Route path="/auth">
+          <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
+        </Route>
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="contacts" element={
             <ContactsProvider>
@@ -36,7 +48,7 @@ function App() {
         </Route>
       </Routes>
       <Toaster />
-    </>
+    </AuthProvider>
   );
 }
 
