@@ -1,50 +1,26 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  ContactField, 
-  FieldType, 
-  SelectOption, 
-  useContacts 
-} from '@/contexts/ContactsContext';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { useForm } from 'react-hook-form';
-import { DialogFooter } from '@/components/ui/dialog';
-import { Plus, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Cross2Icon, PlusCircledIcon } from '@radix-ui/react-icons';
+import { ContactField, FieldType, SelectOption, useContacts } from '@/contexts/ContactsContext';
 
-interface FieldEditDialogProps {
-  field?: ContactField;
-  mode: 'create' | 'edit';
-  onComplete?: () => void;
-}
-
-interface FormValues {
-  name: string;
-  type: FieldType;
-}
-
-const fieldTypeOptions: { value: FieldType; label: string }[] = [
+// Field types available for selection
+const fieldTypes: { value: FieldType; label: string }[] = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
-  { value: 'select', label: 'Select' },
+  { value: 'select', label: 'Select (Single Choice)' },
   { value: 'multi-select', label: 'Multi-select' },
   { value: 'status', label: 'Status' },
   { value: 'date', label: 'Date' },
-  { value: 'files-media', label: 'Files & media' },
+  { value: 'files-media', label: 'Files & Media' },
   { value: 'checkbox', label: 'Checkbox' },
   { value: 'url', label: 'URL' },
   { value: 'email', label: 'Email' },
@@ -57,184 +33,175 @@ const fieldTypeOptions: { value: FieldType; label: string }[] = [
   { value: 'button', label: 'Button' }
 ];
 
-// Predefined colors for select options
-const predefinedColors = [
-  '#9b87f5', // Primary Purple
-  '#F97316', // Bright Orange
-  '#0EA5E9', // Ocean Blue
-  '#8B5CF6', // Vivid Purple
-  '#D946EF', // Magenta Pink
-  '#10B981', // Green
-  '#6366F1', // Indigo
-  '#F43F5E', // Red
-  '#F59E0B', // Amber
+// Predefined colors for options
+const colorOptions = [
+  '#0EA5E9', // blue
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#EF4444', // red
+  '#F97316', // orange
+  '#EAB308', // yellow
+  '#22C55E', // green
+  '#6B7280', // gray
 ];
 
-export const FieldEditDialog: React.FC<FieldEditDialogProps> = ({ 
-  field, 
-  mode, 
-  onComplete 
-}) => {
+interface FieldEditDialogProps {
+  field?: ContactField;
+  mode: 'create' | 'edit';
+  onClose?: () => void;
+}
+
+export const FieldEditDialog: React.FC<FieldEditDialogProps> = ({ field, mode, onClose }) => {
   const { addField, updateField } = useContacts();
+  
+  // State for field properties
+  const [name, setName] = useState(field?.name || '');
+  const [type, setType] = useState<FieldType>(field?.type || 'text');
   const [options, setOptions] = useState<SelectOption[]>(field?.options || []);
-  
-  const form = useForm<FormValues>({
-    defaultValues: {
-      name: field?.name || '',
-      type: field?.type || 'text'
+
+  // Reset form when field changes
+  useEffect(() => {
+    if (field) {
+      setName(field.name);
+      setType(field.type);
+      setOptions(field.options || []);
     }
-  });
+  }, [field]);
 
-  const { watch } = form;
-  const selectedType = watch('type');
-  
-  const needsOptions = ['select', 'multi-select', 'status'].includes(selectedType);
-
-  const handleAddOption = () => {
-    const newOption: SelectOption = {
+  // Add a new option to select/multi-select field
+  const addOption = () => {
+    const newOption = {
       label: `Option ${options.length + 1}`,
       value: `option-${options.length + 1}`,
-      color: predefinedColors[options.length % predefinedColors.length]
+      color: colorOptions[options.length % colorOptions.length]
     };
     setOptions([...options, newOption]);
   };
 
-  const handleRemoveOption = (index: number) => {
-    setOptions(options.filter((_, i) => i !== index));
+  // Remove an option
+  const removeOption = (index: number) => {
+    const newOptions = [...options];
+    newOptions.splice(index, 1);
+    setOptions(newOptions);
   };
 
-  const handleOptionChange = (index: number, field: keyof SelectOption, value: string) => {
-    const updatedOptions = [...options];
-    updatedOptions[index] = {
-      ...updatedOptions[index],
-      [field]: value
+  // Update an option's property
+  const updateOption = (index: number, key: keyof SelectOption, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = { ...newOptions[index], [key]: value };
+    setOptions(newOptions);
+  };
+
+  // Handle form submission
+  const handleSubmit = () => {
+    if (!name.trim()) return; // Prevent empty field names
+    
+    const fieldData = {
+      name,
+      type,
+      visible: true,
+      required: false,
+      ...((['select', 'multi-select', 'status'].includes(type)) ? { options } : {})
     };
-    setOptions(updatedOptions);
-  };
-
-  const handleSubmit = (values: FormValues) => {
+    
     if (mode === 'create') {
-      addField({
-        name: values.name,
-        type: values.type,
-        visible: true,
-        required: false,
-        options: needsOptions ? options : undefined
-      });
+      addField(fieldData);
     } else if (field) {
-      updateField(field.id, {
-        name: values.name,
-        type: values.type,
-        options: needsOptions ? options : undefined
-      });
+      updateField(field.id, fieldData);
     }
     
-    if (onComplete) onComplete();
+    if (onClose) onClose();
   };
 
+  // Determine if options are available for this field type
+  const showOptionsEditor = ['select', 'multi-select', 'status'].includes(type);
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Field Name</FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="Enter field name" />
-              </FormControl>
-            </FormItem>
-          )}
+    <div className="space-y-4 py-2">
+      <div className="space-y-2">
+        <label htmlFor="field-name" className="text-sm font-medium">Field Name</label>
+        <Input 
+          id="field-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter field name"
         />
+      </div>
 
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Field Type</FormLabel>
-              <Select 
-                onValueChange={field.onChange} 
-                defaultValue={field.value}
-                disabled={mode === 'edit' && field.value === 'name'} // Can't change name field type
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a field type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {fieldTypeOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
+      <div className="space-y-2">
+        <label htmlFor="field-type" className="text-sm font-medium">Field Type</label>
+        <Select
+          value={type}
+          onValueChange={(value) => setType(value as FieldType)}
+          disabled={field?.id === 'name'} // Disable type change for name field
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select field type" />
+          </SelectTrigger>
+          <SelectContent>
+            {fieldTypes.map((type) => (
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-        {needsOptions && (
-          <div className="space-y-3 pt-2">
-            <div className="flex justify-between items-center">
-              <h4 className="font-medium text-sm">Options</h4>
-              <Button 
-                type="button" 
-                size="sm" 
-                variant="outline" 
-                onClick={handleAddOption}
-              >
-                <Plus size={16} className="mr-1" /> Add Option
-              </Button>
-            </div>
-            
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-              {options.map((option, index) => (
-                <div 
-                  key={index} 
-                  className="flex items-center space-x-2 p-2 border rounded-md"
-                >
+      {showOptionsEditor && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-sm font-medium">Options</label>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              type="button" 
+              onClick={addOption}
+              className="h-8 px-2"
+            >
+              <PlusCircledIcon className="mr-1 h-4 w-4" />
+              Add Option
+            </Button>
+          </div>
+          
+          <div className="space-y-2">
+            {options.length === 0 ? (
+              <div className="text-sm text-muted-foreground p-2 border border-dashed rounded-md text-center">
+                No options defined. Add some options.
+              </div>
+            ) : (
+              options.map((option, index) => (
+                <div key={index} className="flex items-center space-x-2">
                   <div 
                     className="w-4 h-4 rounded-full" 
-                    style={{ backgroundColor: option.color }} 
+                    style={{ backgroundColor: option.color }}
                   />
-                  
                   <Input 
-                    value={option.label} 
-                    onChange={(e) => handleOptionChange(index, 'label', e.target.value)}
-                    placeholder="Label"
-                    className="flex-1 h-8"
+                    value={option.label}
+                    onChange={(e) => updateOption(index, 'label', e.target.value)}
+                    placeholder="Option name"
+                    className="flex-1"
                   />
-                  
-                  <Button
-                    type="button" 
+                  <Button 
                     variant="ghost" 
-                    size="icon" 
-                    onClick={() => handleRemoveOption(index)}
-                    className="h-8 w-8"
+                    size="sm"
+                    type="button" 
+                    onClick={() => removeOption(index)}
+                    className="h-8 w-8 p-0"
                   >
-                    <X size={16} />
+                    <Cross2Icon className="h-4 w-4" />
                   </Button>
                 </div>
-              ))}
-              
-              {options.length === 0 && (
-                <div className="text-center text-sm text-muted-foreground p-2">
-                  No options defined. Click "Add Option" to start.
-                </div>
-              )}
-            </div>
+              ))
+            )}
           </div>
-        )}
-
-        <DialogFooter className="pt-4">
-          <Button type="submit">
-            {mode === 'create' ? 'Create Field' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Form>
+        </div>
+      )}
+      
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button onClick={handleSubmit}>{mode === 'create' ? 'Create' : 'Save'}</Button>
+      </div>
+    </div>
   );
 };
