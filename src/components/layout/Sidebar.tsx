@@ -13,7 +13,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const location = useLocation();
 
   const navigationItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }, // Fixed: Changed from '/' to '/dashboard'
     { name: 'Contacts', path: '/contacts', icon: Users },
     { name: 'Pipelines', path: '/pipelines', icon: Briefcase },
     { name: 'Campaigns', path: '/campaigns', icon: Mail },
