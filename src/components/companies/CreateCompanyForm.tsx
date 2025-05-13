@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { useCompanies } from '@/contexts/CompaniesContext';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { flexibleUrlSchema } from '@/lib/utils';
 
 const formSchema = z.object({
@@ -36,6 +36,7 @@ export const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({
   onOpenChange,
 }) => {
   const { companies, fields } = useCompanies();
+  const companiesContext = useCompanies();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -54,9 +55,6 @@ export const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({
         ...values,
       };
       
-      // Get the context to access its methods
-      const companiesContext = useCompanies();
-      
       // Update the companies array with the new company
       companiesContext.companies.push(newCompany);
       
@@ -65,10 +63,17 @@ export const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({
       onOpenChange(false);
       
       // Show success toast
-      toast.success("Company created successfully");
+      toast({
+        title: "Success",
+        description: "Company created successfully",
+      });
     } catch (error) {
       console.error("Error creating company:", error);
-      toast.error("Failed to create company");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create company",
+      });
     }
   };
 

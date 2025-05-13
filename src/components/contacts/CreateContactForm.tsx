@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { useContacts } from '@/contexts/ContactsContext';
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { flexibleUrlSchema } from '@/lib/utils';
 
 const formSchema = z.object({
@@ -38,7 +38,8 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { contacts, fields } = useContacts();
+  const { contacts } = useContacts();
+  const contactsContext = useContacts();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -60,9 +61,6 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
         ...values,
       };
       
-      // Get the contacts context to access its methods
-      const contactsContext = useContacts();
-      
       // Update the contacts array with the new contact
       contactsContext.contacts.push(newContact);
       
@@ -71,10 +69,17 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
       onOpenChange(false);
       
       // Show success toast
-      toast.success("Contact created successfully");
+      toast({
+        title: "Success",
+        description: "Contact created successfully",
+      });
     } catch (error) {
       console.error("Error creating contact:", error);
-      toast.error("Failed to create contact");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create contact",
+      });
     }
   };
 
