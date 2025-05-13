@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/layout/Layout';
 import { Toaster } from './components/ui/toaster';
 import { ContactsProvider } from './contexts/ContactsContext';
+import { CompaniesProvider } from './contexts/CompaniesContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -13,6 +14,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 // Import pages
 import Dashboard from './pages/Dashboard';
 import Contacts from './pages/Contacts';
+import Companies from './pages/Companies';
 import Pipelines from './pages/Pipelines';
 import Campaigns from './pages/Campaigns';
 import Calendar from './pages/Calendar';
@@ -43,6 +45,11 @@ function App() {
               <ContactsProvider>
                 <Contacts />
               </ContactsProvider>
+            } />
+            <Route path="companies" element={
+              <CompaniesProvider>
+                <Companies />
+              </CompaniesProvider>
             } />
             <Route path="pipelines" element={<Pipelines />} />
             <Route path="campaigns" element={<Campaigns />} />
