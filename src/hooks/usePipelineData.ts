@@ -64,8 +64,8 @@ export const usePipelineData = () => {
           p_pipeline_id: string;
         }
         
-        // We're defining 'any' as the return type since we'll map it to our Opportunity interface
-        const { data, error } = await supabase.rpc<any, GetOpportunitiesParams>(
+        // Specify both type parameters correctly - {} as the return type schema is allowed
+        const { data, error } = await supabase.rpc<Record<string, any>, GetOpportunitiesParams>(
           'get_opportunities_by_pipeline', 
           { p_pipeline_id: pipelineId }
         );
