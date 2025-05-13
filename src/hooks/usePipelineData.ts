@@ -102,7 +102,7 @@ export const usePipelineData = () => {
       }
 
       // Map deals to opportunities - explicit typing to fix the TypeScript error
-      const dealsData = data as unknown as Array<DatabaseDeal & { company_id?: string | null }>;
+      const dealsData = data as DatabaseDeal[];
       
       const mappedOpportunities = dealsData.map(deal => ({
         id: deal.id,

@@ -37,7 +37,7 @@ export const PipelineTableRows: React.FC<PipelineTableRowsProps> = ({
   getContactName,
   getStageName
 }) => {
-  const formatCellValue = (opportunity: Opportunity, columnId: string) => {
+  const formatCellValue = (opportunity: Opportunity, columnId: string): React.ReactNode => {
     switch(columnId) {
       case 'stage':
         return getStageName(opportunity.stage);
@@ -58,7 +58,8 @@ export const PipelineTableRows: React.FC<PipelineTableRowsProps> = ({
       case 'updated_at':
         return format(new Date(opportunity.updated_at), 'MMM d, yyyy');
       default:
-        return opportunity[columnId as keyof Opportunity] || 'N/A';
+        const value = opportunity[columnId as keyof Opportunity];
+        return value !== undefined && value !== null ? String(value) : 'N/A';
     }
   };
 

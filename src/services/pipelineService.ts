@@ -138,22 +138,23 @@ export const pipelineService = {
         throw new Error(error.message);
       }
 
-      // Convert back to opportunity format
+      // Convert back to opportunity format using DatabaseDeal type
+      const dbDeal = data as DatabaseDeal;
       const newOpportunity: Opportunity = {
-        id: data.id,
-        name: data.name,
-        pipeline_id: data.pipeline_id,
-        stage: data.stage_id,
-        value: data.value,
-        probability: data.probability,
-        expected_close_date: data.close_date,
-        company_id: data.company_id,
-        contact_id: data.contact_id,
-        details: data.notes,
+        id: dbDeal.id,
+        name: dbDeal.name,
+        pipeline_id: dbDeal.pipeline_id,
+        stage: dbDeal.stage_id || '',
+        value: dbDeal.value || null,
+        probability: dbDeal.probability || null,
+        expected_close_date: dbDeal.close_date || null,
+        company_id: dbDeal.company_id || null,
+        contact_id: dbDeal.contact_id || null,
+        details: dbDeal.notes || null,
         custom_fields: {},
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        user_id: data.user_id
+        created_at: dbDeal.created_at,
+        updated_at: dbDeal.updated_at,
+        user_id: dbDeal.user_id
       };
 
       return newOpportunity;
@@ -192,22 +193,23 @@ export const pipelineService = {
         throw new Error(error.message);
       }
 
-      // Need to convert the data back to opportunity format
+      // Need to convert the data back to opportunity format using DatabaseDeal type
+      const dbDeal = data as DatabaseDeal;
       return {
-        id: data.id,
-        name: data.name,
-        pipeline_id: data.pipeline_id,
-        stage: data.stage_id,
-        value: data.value,
-        probability: data.probability,
-        expected_close_date: data.close_date,
-        company_id: data.company_id,
-        contact_id: data.contact_id,
-        details: data.notes,
+        id: dbDeal.id,
+        name: dbDeal.name,
+        pipeline_id: dbDeal.pipeline_id,
+        stage: dbDeal.stage_id || '',
+        value: dbDeal.value || null,
+        probability: dbDeal.probability || null,
+        expected_close_date: dbDeal.close_date || null,
+        company_id: dbDeal.company_id || null,
+        contact_id: dbDeal.contact_id || null,
+        details: dbDeal.notes || null,
         custom_fields: {},
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        user_id: data.user_id
+        created_at: dbDeal.created_at,
+        updated_at: dbDeal.updated_at,
+        user_id: dbDeal.user_id
       };
     } catch (err: any) {
       console.error('Error updating opportunity:', err);
