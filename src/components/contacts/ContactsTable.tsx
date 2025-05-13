@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -14,30 +14,40 @@ import { ColumnEditPopover } from './ColumnEditPopover';
 import TableCellRenderer from './cells/TableCellRenderer';
 
 export const ContactsTable: React.FC = () => {
-  const { contacts, visibleFields, updateContact, updateField } = useContacts();
+  const { contacts, visibleFields, updateContact } = useContacts();
   const [editingCell, setEditingCell] = useState<{ contactId: string; fieldId: string } | null>(null);
+  
+  // For debugging
+  useEffect(() => {
+    console.log("ContactsTable rendered with contacts:", contacts);
+  }, [contacts]);
   
   // Handle cell click to begin editing
   const handleCellClick = (contactId: string, fieldId: string) => {
+    console.log("Cell clicked:", { contactId, fieldId });
     setEditingCell({ contactId, fieldId });
   };
 
-  // Handle saving edited value
+  // Handle saving edited value with improved logging
   const handleSaveEdit = (contactId: string, fieldId: string, value: any) => {
-    console.log("Saving edit:", { contactId, fieldId, value });
+    console.log("ContactsTable saving edit:", { contactId, fieldId, value });
     
     // Make sure we're handling both select and multi-select values correctly
     const field = visibleFields.find(f => f.id === fieldId);
+    console.log("Field type:", field?.type);
     
     if (field?.type === 'multi-select') {
       // Ensure multi-select values are always arrays
       const arrayValue = Array.isArray(value) ? value : value ? [value] : [];
+      console.log("Saving multi-select value as:", arrayValue);
       updateContact(contactId, fieldId, arrayValue);
     } else if (field?.type === 'select') {
       // For select fields, just pass the value directly
+      console.log("Saving select value as:", value);
       updateContact(contactId, fieldId, value);
     } else {
       // For other field types
+      console.log("Saving standard value as:", value);
       updateContact(contactId, fieldId, value);
     }
     
@@ -46,6 +56,7 @@ export const ContactsTable: React.FC = () => {
 
   // Handle cancelling edit
   const handleCancelEdit = () => {
+    console.log("Edit cancelled");
     setEditingCell(null);
   };
 

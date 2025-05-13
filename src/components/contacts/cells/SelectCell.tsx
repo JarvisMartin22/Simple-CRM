@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Plus } from "lucide-react";
 import { ContactField, SelectOption } from '@/contexts/ContactsContext';
@@ -13,6 +13,11 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
   const [editValue, setEditValue] = useState<string>(value || '');
   const [newOption, setNewOption] = useState<string>('');
   const newOptionInputRef = useRef<HTMLInputElement>(null);
+  
+  // Log the initial value for debugging
+  useEffect(() => {
+    console.log("SelectCellEdit initialized with value:", value, "type:", typeof value);
+  }, [value]);
   
   const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && newOption.trim()) {
@@ -34,6 +39,7 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
       
       // Set the value in the editor
       setEditValue(newOptionObj.value);
+      console.log("New option created and selected:", newOptionObj.value);
       
       // Clear the input
       setNewOption('');
@@ -41,8 +47,9 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
   };
   
   const handleSave = () => {
+    console.log("SelectCellEdit saving value:", editValue);
     // Only call onSave if a value is selected
-    onSave(editValue);
+    onSave(editValue || null);
   };
   
   return (
@@ -64,6 +71,7 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
             key={option.value} 
             className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${editValue === option.value ? 'bg-coral-50' : ''}`}
             onClick={() => {
+              console.log("Selected option:", option.value);
               setEditValue(option.value);
             }}
           >
@@ -97,6 +105,9 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
 };
 
 export const SelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick }) => {
+  // Log the value in view mode for debugging
+  console.log("SelectCellView rendering with value:", value, "type:", typeof value);
+  
   if (!value) return <div onClick={onClick} className="cursor-pointer"></div>;
   
   const selectOption = field.options?.find(opt => opt.value === value);

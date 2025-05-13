@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Check, X } from "lucide-react";
 import { ContactField, SelectOption } from '@/contexts/ContactsContext';
@@ -15,6 +15,12 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
   const [selectedValues, setSelectedValues] = useState<string[]>(initialValues);
   const [newOption, setNewOption] = useState<string>('');
   const newOptionInputRef = useRef<HTMLInputElement>(null);
+  
+  // Log initial values for debugging
+  useEffect(() => {
+    console.log("MultiSelectCellEdit initialized with value:", value);
+    console.log("Initial selected values:", selectedValues);
+  }, []);
   
   const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && newOption.trim()) {
@@ -37,6 +43,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
       // Add to selected values if not already selected
       if (!selectedValues.includes(newOptionObj.value)) {
         setSelectedValues([...selectedValues, newOptionObj.value]);
+        console.log("Added new option to selection:", newOptionObj.value);
       }
       
       // Clear the input
@@ -45,6 +52,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
   };
   
   const handleSave = () => {
+    console.log("MultiSelectCellEdit saving values:", selectedValues);
     // Always save as an array, even if empty
     onSave(selectedValues);
   };
@@ -80,6 +88,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedValues(selectedValues.filter(v => v !== value));
+                    console.log("Removed from selection:", value);
                   }} 
                 />
               </Badge>
@@ -97,6 +106,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
                 ? selectedValues.filter(v => v !== option.value)
                 : [...selectedValues, option.value];
               setSelectedValues(newValues);
+              console.log("Selected values updated:", newValues);
             }}
           >
             <div 
@@ -129,6 +139,9 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
 };
 
 export const MultiSelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick }) => {
+  // Log the value in view mode for debugging
+  console.log("MultiSelectCellView rendering with value:", value);
+  
   if (!Array.isArray(value) || value.length === 0) {
     return <div onClick={onClick} className="cursor-pointer"></div>;
   }

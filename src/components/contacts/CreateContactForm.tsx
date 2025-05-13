@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -38,8 +37,7 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { contacts } = useContacts();
-  const contactsContext = useContacts();
+  const { addContact } = useContacts();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -55,14 +53,8 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
 
   const onSubmit = (values: FormValues) => {
     try {
-      // Create new contact with the form values
-      const newContact = {
-        id: uuidv4(),
-        ...values,
-      };
-      
-      // Update the contacts array with the new contact
-      contactsContext.contacts.push(newContact);
+      // Use the addContact function from context
+      addContact(values);
       
       // Reset form and close dialog
       form.reset();
