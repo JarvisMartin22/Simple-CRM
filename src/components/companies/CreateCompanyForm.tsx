@@ -16,10 +16,11 @@ import {
 import { useCompanies } from '@/contexts/CompaniesContext';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import { flexibleUrlSchema } from '@/lib/utils';
 
 const formSchema = z.object({
   company_name: z.string().min(1, { message: 'Company name is required' }),
-  websites: z.string().url().optional().or(z.literal('')),
+  websites: flexibleUrlSchema.optional().or(z.literal('')),
   assigned_to: z.string().optional(),
 });
 
@@ -47,16 +48,16 @@ export const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({
 
   const onSubmit = (values: FormValues) => {
     try {
-      // Get the context directly to access the setCompanies function
-      const companiesContext = useCompanies();
-      
       // Create new company with the form values
       const newCompany = {
         id: uuidv4(),
         ...values,
       };
       
-      // Add the company to the context
+      // Get the context to access its methods
+      const companiesContext = useCompanies();
+      
+      // Update the companies array with the new company
       companiesContext.companies.push(newCompany);
       
       // Reset form and close dialog
@@ -101,7 +102,7 @@ export const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({
                 <FormItem>
                   <FormLabel>Website</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com" {...field} />
+                    <Input placeholder="example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -16,6 +16,7 @@ import {
 import { useContacts } from '@/contexts/ContactsContext';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import { flexibleUrlSchema } from '@/lib/utils';
 
 const formSchema = z.object({
   name: z.string().min(1, { message: 'Name is required' }),
@@ -23,7 +24,7 @@ const formSchema = z.object({
   title: z.string().optional(),
   phone_number: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  website: z.string().url({ message: 'Please enter a valid URL starting with http:// or https://' }).optional().or(z.literal('')),
+  website: flexibleUrlSchema.optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -160,7 +161,7 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
                 <FormItem>
                   <FormLabel>Website</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com" {...field} />
+                    <Input placeholder="example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
