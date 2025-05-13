@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,13 +60,13 @@ export const usePipelineData = () => {
     try {
       // First attempt using RPC if configured
       try {
-        // Define the parameter and return types explicitly to fix TypeScript error
+        // Define the parameter type only
         interface GetOpportunitiesParams {
           p_pipeline_id: string;
         }
         
-        // Specify both type parameters correctly - {} as the return type schema is allowed
-        const { data, error } = await supabase.rpc<Record<string, any>, GetOpportunitiesParams>(
+        // Remove type parameters completely to avoid TypeScript errors
+        const { data, error } = await supabase.rpc(
           'get_opportunities_by_pipeline', 
           { p_pipeline_id: pipelineId }
         );
