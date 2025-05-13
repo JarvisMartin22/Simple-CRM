@@ -60,90 +60,11 @@ const defaultFields: ContactField[] = [
   { id: 'number_of_times_contacted', name: 'Number of Times Contacted', type: 'number', visible: true, required: false }
 ];
 
-// Mock contacts data for demo
-const mockContacts: Contact[] = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    company: 'Acme Inc',
-    title: 'Marketing Director',
-    tags: ['Client', 'Marketing'],
-    type_of_contact: 'client',
-    phone_number: '+1 555-123-4567',
-    details: 'Key decision maker for marketing strategies',
-    website: 'https://acme.example.com',
-    last_contacted: '2023-05-10',
-    number_of_times_contacted: 8
-  },
-  {
-    id: '2',
-    name: 'Michael Brown',
-    company: 'TechCorp',
-    title: 'CTO',
-    tags: ['Prospect', 'Tech'],
-    type_of_contact: 'lead',
-    phone_number: '+1 555-987-6543',
-    details: 'Interested in our enterprise solution',
-    website: 'https://techcorp.example.com',
-    last_contacted: '2023-05-15',
-    number_of_times_contacted: 3
-  },
-  {
-    id: '3',
-    name: 'Emma Davis',
-    company: 'Design Studio',
-    title: 'Creative Director',
-    tags: ['Client', 'Design'],
-    type_of_contact: 'client',
-    phone_number: '+1 555-456-7890',
-    details: 'Looking for long-term partnership',
-    website: 'https://designstudio.example.com',
-    last_contacted: '2023-05-08',
-    number_of_times_contacted: 12
-  },
-  {
-    id: '4',
-    name: 'James Wilson',
-    company: 'InnoTech',
-    title: 'CEO',
-    tags: ['Lead', 'Executive'],
-    type_of_contact: 'lead',
-    phone_number: '+1 555-789-0123',
-    details: 'Follow up on proposal',
-    website: 'https://innotech.example.com',
-    last_contacted: '2023-05-18',
-    number_of_times_contacted: 2
-  },
-  {
-    id: '5',
-    name: 'Olivia Martinez',
-    company: 'Global Services',
-    title: 'Account Manager',
-    tags: ['Partner'],
-    type_of_contact: 'partner',
-    phone_number: '+1 555-234-5678',
-    details: 'Coordinating joint venture',
-    website: 'https://globalservices.example.com',
-    last_contacted: '2023-05-05',
-    number_of_times_contacted: 15
-  },
-  {
-    id: '6',
-    name: 'William Taylor',
-    company: 'Finance Plus',
-    title: 'Financial Advisor',
-    tags: ['Client', 'Finance'],
-    type_of_contact: 'client',
-    phone_number: '+1 555-345-6789',
-    details: 'Quarterly review scheduled',
-    website: 'https://financeplus.example.com',
-    last_contacted: '2023-05-12',
-    number_of_times_contacted: 6
-  }
-];
+// No mock contacts - starting with empty array
+const emptyContacts: Contact[] = [];
 
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
+  const [contacts, setContacts] = useState<Contact[]>(emptyContacts);
   const [fields, setFields] = useState<ContactField[]>(defaultFields);
 
   // Get visible fields

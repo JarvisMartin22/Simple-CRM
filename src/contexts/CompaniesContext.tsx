@@ -57,62 +57,11 @@ const defaultFields: CompanyField[] = [
   { id: 'last_modified_date', name: 'Last Modified Date', type: 'date', visible: true, required: false }
 ];
 
-// Mock companies data for demo
-const mockCompanies: Company[] = [
-  {
-    id: '1',
-    company_name: 'Acme Inc',
-    websites: 'https://acme.example.com',
-    customer_type: 'client',
-    assigned_to: 'John Doe',
-    tags: ['Tech', 'Manufacturing'],
-    created_date: '2023-05-10',
-    last_modified_date: '2023-05-15'
-  },
-  {
-    id: '2',
-    company_name: 'TechCorp',
-    websites: 'https://techcorp.example.com',
-    customer_type: 'lead',
-    assigned_to: 'Jane Smith',
-    tags: ['Tech', 'Software'],
-    created_date: '2023-04-12',
-    last_modified_date: '2023-05-18'
-  },
-  {
-    id: '3',
-    company_name: 'Design Studio',
-    websites: 'https://designstudio.example.com',
-    customer_type: 'client',
-    assigned_to: 'Mike Johnson',
-    tags: ['Design', 'Creative'],
-    created_date: '2023-03-22',
-    last_modified_date: '2023-05-05'
-  },
-  {
-    id: '4',
-    company_name: 'Global Services',
-    websites: 'https://globalservices.example.com',
-    customer_type: 'partner',
-    assigned_to: 'Sarah Williams',
-    tags: ['Consulting', 'International'],
-    created_date: '2023-01-08',
-    last_modified_date: '2023-04-30'
-  },
-  {
-    id: '5',
-    company_name: 'Finance Plus',
-    websites: 'https://financeplus.example.com',
-    customer_type: 'client',
-    assigned_to: 'Robert Taylor',
-    tags: ['Finance', 'Banking'],
-    created_date: '2023-02-15',
-    last_modified_date: '2023-05-08'
-  }
-];
+// No mock companies data - starting with empty array
+const emptyCompanies: Company[] = [];
 
 export const CompaniesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [companies, setCompanies] = useState<Company[]>(mockCompanies);
+  const [companies, setCompanies] = useState<Company[]>(emptyCompanies);
   const [fields, setFields] = useState<CompanyField[]>(defaultFields);
 
   // Get visible fields
