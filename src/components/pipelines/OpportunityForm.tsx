@@ -1,19 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePipelines, Opportunity } from '@/contexts/PipelinesContext';
 import { useContacts } from '@/contexts/ContactsContext';
 import { useCompanies } from '@/contexts/CompaniesContext';
-import { cn } from '@/lib/utils';
+import { FormField } from './forms/FormField';
+import { DatePickerField } from './forms/DatePickerField';
+import { SelectField } from './forms/SelectField';
+import { OpportunityFormActions } from './forms/OpportunityFormActions';
 
 interface OpportunityFormProps {
   open: boolean;
@@ -29,7 +27,6 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
   const { currentPipeline, opportunities, addOpportunity, updateOpportunity } = usePipelines();
   const { contacts } = useContacts();
   const { companies } = useCompanies();
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   
   const isEditing = !!opportunityId;
   const currentOpportunity = isEditing ? opportunities.find(o => o.id === opportunityId) : null;
@@ -86,12 +83,27 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
     }
   };
 
-  const handleSelectDate = (date: Date | undefined) => {
+  const handleDateChange = (date: Date | undefined) => {
     setValue('expected_close_date', date ? format(date, 'yyyy-MM-dd') : undefined);
-    setDatePickerOpen(false);
   };
 
   if (!currentPipeline) return null;
+
+  // Prepare data for select fields
+  const stageOptions = currentPipeline.stages.map(stage => ({
+    value: stage.id,
+    label: stage.name
+  }));
+
+  const companyOptions = companies.map(company => ({
+    value: company.id,
+    label: company.name
+  }));
+
+  const contactOptions = contacts.map(contact => ({
+    value: contact.id,
+    label: `${contact.first_name} ${contact.last_name}`
+  }));
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -102,44 +114,34 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-4 py-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-1">
-                Deal Name *
-              </label>
+            <FormField 
+              id="name" 
+              label="Deal Name" 
+              required
+              error={errors.name?.message}
+            >
               <Input
                 id="name"
                 {...register('name', { required: 'Deal name is required' })}
                 placeholder="Enter deal name"
               />
-              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="stage" className="block text-sm font-medium mb-1">
-                Stage *
-              </label>
-              <Select 
-                defaultValue={currentOpportunity?.stage || currentPipeline.stages[0]?.id}
+            <FormField id="stage" label="Stage" required>
+              <SelectField
+                options={stageOptions}
+                value={currentOpportunity?.stage || currentPipeline.stages[0]?.id}
                 onValueChange={(value) => setValue('stage', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a stage" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currentPipeline.stages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                placeholder="Select a stage"
+              />
+            </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="value" className="block text-sm font-medium mb-1">
-                  Value
-                </label>
+              <FormField 
+                id="value" 
+                label="Value"
+                error={errors.value?.message}
+              >
                 <Input
                   id="value"
                   type="number"
@@ -149,13 +151,13 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
                   })}
                   placeholder="0.00"
                 />
-                {errors.value && <p className="text-red-500 text-sm mt-1">{errors.value.message}</p>}
-              </div>
+              </FormField>
 
-              <div>
-                <label htmlFor="probability" className="block text-sm font-medium mb-1">
-                  Probability (%)
-                </label>
+              <FormField 
+                id="probability" 
+                label="Probability (%)"
+                error={errors.probability?.message}
+              >
                 <Input
                   id="probability"
                   type="number"
@@ -166,104 +168,51 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
                   })}
                   placeholder="0"
                 />
-                {errors.probability && <p className="text-red-500 text-sm mt-1">{errors.probability.message}</p>}
-              </div>
+              </FormField>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Expected Close Date
-              </label>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", 
-                    !currentOpportunity?.expected_close_date && "text-muted-foreground")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {currentOpportunity?.expected_close_date ? 
-                      format(new Date(currentOpportunity.expected_close_date), "PPP") : 
-                      "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={currentOpportunity?.expected_close_date ? 
-                      new Date(currentOpportunity.expected_close_date) : undefined}
-                    onSelect={handleSelectDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+            <FormField id="expected_close_date" label="Expected Close Date">
+              <DatePickerField
+                selectedDate={currentOpportunity?.expected_close_date}
+                onDateChange={handleDateChange}
+                label="Expected Close Date"
+              />
+            </FormField>
 
-            <div>
-              <label htmlFor="company_id" className="block text-sm font-medium mb-1">
-                Company
-              </label>
-              <Select 
-                defaultValue={currentOpportunity?.company_id || undefined}
+            <FormField id="company_id" label="Company">
+              <SelectField
+                options={companyOptions}
+                value={currentOpportunity?.company_id || ''}
                 onValueChange={(value) => setValue('company_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a company" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                placeholder="Select a company"
+                emptyOption
+              />
+            </FormField>
 
-            <div>
-              <label htmlFor="contact_id" className="block text-sm font-medium mb-1">
-                Contact
-              </label>
-              <Select 
-                defaultValue={currentOpportunity?.contact_id || undefined}
+            <FormField id="contact_id" label="Contact">
+              <SelectField
+                options={contactOptions}
+                value={currentOpportunity?.contact_id || ''}
                 onValueChange={(value) => setValue('contact_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a contact" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {contacts.map((contact) => (
-                    <SelectItem key={contact.id} value={contact.id}>
-                      {contact.first_name} {contact.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                placeholder="Select a contact"
+                emptyOption
+              />
+            </FormField>
 
-            <div>
-              <label htmlFor="details" className="block text-sm font-medium mb-1">
-                Details
-              </label>
+            <FormField id="details" label="Details">
               <Textarea
                 id="details"
                 {...register('details')}
                 placeholder="Enter deal details"
                 className="min-h-[100px]"
               />
-            </div>
+            </FormField>
           </div>
           
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {isEditing ? 'Update' : 'Create'} Deal
-            </Button>
-          </DialogFooter>
+          <OpportunityFormActions
+            onCancel={onClose}
+            isEditing={isEditing}
+          />
         </form>
       </DialogContent>
     </Dialog>

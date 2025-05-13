@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -101,10 +100,8 @@ export const usePipelineData = () => {
         throw new Error(error.message);
       }
 
-      // Map deals to opportunities - explicit typing to fix the TypeScript error
-      const dealsData = data as DatabaseDeal[];
-      
-      const mappedOpportunities = dealsData.map(deal => ({
+      // Map deals to opportunities with proper type checking
+      const mappedOpportunities = (data as any[]).map(deal => ({
         id: deal.id,
         name: deal.name,
         pipeline_id: deal.pipeline_id,
