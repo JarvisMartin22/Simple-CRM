@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ interface CreatePipelineFormProps {
   onClose: () => void;
 }
 
-export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = true, onClose }) => {
+export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = false, onClose }) => {
   const { addPipeline } = usePipelines();
   
   const [name, setName] = useState('');
@@ -88,6 +88,18 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = t
       
       const result = await addPipeline(newPipeline);
       if (result) {
+        // Reset form
+        setName('');
+        setDescription('');
+        setStages([
+          { id: uuidv4(), name: 'Lead' },
+          { id: uuidv4(), name: 'Qualified' },
+          { id: uuidv4(), name: 'Proposal' },
+          { id: uuidv4(), name: 'Negotiation' },
+          { id: uuidv4(), name: 'Closed Won' }
+        ]);
+        setErrors({});
+        
         onClose();
       }
     } catch (error) {
@@ -96,27 +108,8 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = t
       setSubmitting(false);
     }
   };
-  
-  // For inline form (no dialog)
-  if (!open) {
-    return (
-      <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto">
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold mb-3">Create New Pipeline</h2>
-          
-          {renderFormFields()}
-          
-          <div className="flex justify-end mt-4 space-x-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create Pipeline'}
-            </Button>
-          </div>
-        </div>
-      </form>
-    );
-  }
 
-  // Helper function to render form fields (used in both dialog and inline form)
+  // Helper function to render form fields
   function renderFormFields() {
     return (
       <>
@@ -195,9 +188,9 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = t
     );
   }
 
-  // Dialog form
+  // Only render the Dialog form and don't render anything when not open
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create New Pipeline</DialogTitle>
