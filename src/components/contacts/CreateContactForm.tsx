@@ -23,7 +23,7 @@ const formSchema = z.object({
   title: z.string().optional(),
   phone_number: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
-  website: z.string().url().optional().or(z.literal('')),
+  website: z.string().url({ message: 'Please enter a valid URL starting with http:// or https://' }).optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -53,16 +53,16 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
 
   const onSubmit = (values: FormValues) => {
     try {
-      // Get the context directly to access the setContacts function
-      const contactsContext = useContacts();
-      
       // Create new contact with the form values
       const newContact = {
         id: uuidv4(),
         ...values,
       };
       
-      // Add the contact to the context
+      // Get the contacts context to access its methods
+      const contactsContext = useContacts();
+      
+      // Update the contacts array with the new contact
       contactsContext.contacts.push(newContact);
       
       // Reset form and close dialog
