@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,46 +57,7 @@ export const usePipelineData = () => {
     setLoading(true);
     setError(null);
     try {
-      // First attempt using RPC if configured
-      try {
-        // Define the parameter type only
-        interface GetOpportunitiesParams {
-          p_pipeline_id: string;
-        }
-        
-        // Remove type parameters completely to avoid TypeScript errors
-        const { data, error } = await supabase.rpc(
-          'get_opportunities_by_pipeline', 
-          { p_pipeline_id: pipelineId }
-        );
-        
-        if (!error && data) {
-          // Map the data to our Opportunity interface
-          const mappedOpportunities = (data as any[]).map(item => ({
-            id: item.id,
-            name: item.name,
-            pipeline_id: item.pipeline_id,
-            stage: item.stage_id || item.stage, // Handle either format
-            value: item.value,
-            probability: item.probability,
-            expected_close_date: item.close_date || item.expected_close_date,
-            company_id: item.company_id,
-            contact_id: item.contact_id,
-            details: item.notes || item.details,
-            custom_fields: item.custom_fields || {},
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-            user_id: item.user_id
-          }));
-          
-          setOpportunities(mappedOpportunities);
-          return;
-        }
-      } catch (rpcError) {
-        console.log('RPC not available, falling back to direct query', rpcError);
-      }
-
-      // Fallback to direct query from deals table
+      // Direct query from deals table - removed the problematic RPC attempt
       const { data, error } = await supabase
         .from('deals')
         .select('*')
@@ -109,7 +69,7 @@ export const usePipelineData = () => {
       }
 
       // Map deals to opportunities with proper type checking
-      const mappedOpportunities = (data as any[]).map(deal => ({
+      const mappedOpportunities = (data as DatabaseDeal[]).map(deal => ({
         id: deal.id,
         name: deal.name,
         pipeline_id: deal.pipeline_id,
