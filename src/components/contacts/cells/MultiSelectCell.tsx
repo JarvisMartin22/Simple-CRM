@@ -10,7 +10,8 @@ interface MultiSelectCellEditProps extends BaseCellProps {
 }
 
 export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value, field, onSave, onCancel }) => {
-  const initialValues = Array.isArray(value) ? value : [];
+  // Ensure we have an array of values
+  const initialValues = Array.isArray(value) ? value : value ? [value] : [];
   const [selectedValues, setSelectedValues] = useState<string[]>(initialValues);
   const [newOption, setNewOption] = useState<string>('');
   const newOptionInputRef = useRef<HTMLInputElement>(null);
@@ -27,17 +28,25 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
         color: '#F97316' // Default coral color
       };
       
-      // Add to field options
-      const updatedOptions = [...(field.options || []), newOptionObj];
-      // This just updates the component state, the actual field will be updated by the parent
-      field.options = updatedOptions;
+      // Add to field options if not already present
+      if (!field.options?.some(option => option.value === newOptionObj.value)) {
+        const updatedOptions = [...(field.options || []), newOptionObj];
+        field.options = updatedOptions;
+      }
       
-      // Add to selected values
-      setSelectedValues([...selectedValues, newOptionObj.value]);
+      // Add to selected values if not already selected
+      if (!selectedValues.includes(newOptionObj.value)) {
+        setSelectedValues([...selectedValues, newOptionObj.value]);
+      }
       
       // Clear the input
       setNewOption('');
     }
+  };
+  
+  const handleSave = () => {
+    // Always save as an array, even if empty
+    onSave(selectedValues);
   };
   
   return (
@@ -103,7 +112,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
       </div>
       <div className="flex mt-2">
         <button 
-          onClick={() => onSave(selectedValues)}
+          onClick={handleSave}
           className="p-1 bg-coral-500 text-white rounded-md text-xs"
         >
           <Check size={14} />

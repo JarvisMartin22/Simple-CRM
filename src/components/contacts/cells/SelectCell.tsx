@@ -26,10 +26,11 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
         color: '#F97316' // Default coral color
       };
       
-      // Add to field options
-      const updatedOptions = [...(field.options || []), newOptionObj];
-      // This just updates the component state, the actual field will be updated by the parent
-      field.options = updatedOptions;
+      // Add to field options if not already present
+      if (!field.options?.some(option => option.value === newOptionObj.value)) {
+        const updatedOptions = [...(field.options || []), newOptionObj];
+        field.options = updatedOptions;
+      }
       
       // Set the value in the editor
       setEditValue(newOptionObj.value);
@@ -37,6 +38,11 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
       // Clear the input
       setNewOption('');
     }
+  };
+  
+  const handleSave = () => {
+    // Only call onSave if a value is selected
+    onSave(editValue);
   };
   
   return (
@@ -74,7 +80,7 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
       </div>
       <div className="flex mt-2">
         <button 
-          onClick={() => onSave(editValue)}
+          onClick={handleSave}
           className="p-1 bg-coral-500 text-white rounded-md text-xs"
         >
           <Check size={14} />

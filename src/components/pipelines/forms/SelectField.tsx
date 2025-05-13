@@ -42,7 +42,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   error,
 }) => {
   // Ensure we have a non-null string value for the component
-  const displayValue = value === null ? "" : value;
+  const displayValue = value === null ? "none" : value;
   
   const handleValueChange = (newValue: string) => {
     // Convert "none" back to null for the parent component
@@ -52,7 +52,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   return (
     <FormField id={id} label={label} required={required} error={error}>
       <Select
-        value={displayValue || "none"}
+        value={displayValue}
         onValueChange={handleValueChange}
         disabled={disabled}
       >
