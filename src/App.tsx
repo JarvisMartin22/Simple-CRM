@@ -52,7 +52,11 @@ function App() {
                 <Companies />
               </CompaniesProvider>
             } />
-            <Route path="pipelines" element={<Pipelines />} />
+            <Route path="pipelines" element={
+              <PipelinesProvider>
+                <Pipelines />
+              </PipelinesProvider>
+            } />
             <Route path="campaigns" element={<Campaigns />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="integrations" element={<Integrations />} />
