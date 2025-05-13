@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Settings, Plus, BarChart3, Table as TableIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -7,10 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PipelineStagesEditor } from '@/components/pipelines/PipelineStagesEditor';
 import { PipelineTableView } from '@/components/pipelines/PipelineTableView';
-import { PipelinesProvider, usePipelines } from '@/contexts/PipelinesContext';
+import { PipelinesProvider } from '@/contexts/PipelinesContext';
+import { CompaniesProvider } from '@/contexts/CompaniesContext';
+import { ContactsProvider } from '@/contexts/ContactsContext';
 import { CreatePipelineForm } from '@/components/pipelines/forms/CreatePipelineForm';
 
-const PipelinesContent: React.FC = () => {
+const PipelinesContent = () => {
   const { pipelines, currentPipeline, setCurrentPipeline, loading } = usePipelines();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [stagesEditorOpen, setStagesEditorOpen] = useState(false);
@@ -138,9 +139,13 @@ const PipelinesContent: React.FC = () => {
 
 const PipelinesPage: React.FC = () => {
   return (
-    <PipelinesProvider>
-      <PipelinesContent />
-    </PipelinesProvider>
+    <CompaniesProvider>
+      <ContactsProvider>
+        <PipelinesProvider>
+          <PipelinesContent />
+        </PipelinesProvider>
+      </ContactsProvider>
+    </CompaniesProvider>
   );
 };
 

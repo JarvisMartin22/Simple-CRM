@@ -9,11 +9,12 @@ import { OpportunityForm } from './OpportunityForm';
 import { PipelineTableSearch } from './table/PipelineTableSearch';
 import { PipelineTableColumns, ColumnConfig } from './table/PipelineTableColumns';
 import { PipelineTableContent } from './table/PipelineTableContent';
+import { toast } from '@/hooks/use-toast';
 
 export const PipelineTableView: React.FC = () => {
   const { currentPipeline, opportunities, deleteOpportunity } = usePipelines();
-  const { companies } = useCompanies();
-  const { contacts } = useContacts();
+  const { companies = [] } = useCompanies();
+  const { contacts = [] } = useContacts();
   const [formOpen, setFormOpen] = useState(false);
   const [editingOpportunityId, setEditingOpportunityId] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +46,20 @@ export const PipelineTableView: React.FC = () => {
 
   const handleDeleteDeal = async (opportunityId: string) => {
     if (confirm('Are you sure you want to delete this deal?')) {
-      await deleteOpportunity(opportunityId);
+      try {
+        await deleteOpportunity(opportunityId);
+        toast({
+          title: "Success",
+          description: "Deal deleted successfully",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete deal",
+          variant: "destructive",
+        });
+        console.error("Error deleting deal:", error);
+      }
     }
   };
 
@@ -70,7 +84,8 @@ export const PipelineTableView: React.FC = () => {
   };
   
   const getStageName = (stageId: string) => {
-    const stage = currentPipeline?.stages.find(s => s.id === stageId);
+    if (!currentPipeline || !currentPipeline.stages) return stageId;
+    const stage = currentPipeline.stages.find(s => s.id === stageId);
     return stage ? stage.name : stageId;
   };
 
