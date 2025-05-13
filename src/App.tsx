@@ -7,6 +7,8 @@ import { Toaster } from './components/ui/toaster';
 import { ContactsProvider } from './contexts/ContactsContext';
 import { CompaniesProvider } from './contexts/CompaniesContext';
 import { PipelinesProvider } from './contexts/PipelinesContext';
+import { TasksProvider } from './contexts/TasksContext';
+import { NotesProvider } from './contexts/NotesContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -17,6 +19,8 @@ import Dashboard from './pages/Dashboard';
 import Contacts from './pages/Contacts';
 import Companies from './pages/Companies';
 import Pipelines from './pages/Pipelines';
+import Tasks from './pages/Tasks';
+import Notes from './pages/Notes';
 import Campaigns from './pages/Campaigns';
 import Calendar from './pages/Calendar';
 import Integrations from './pages/Integrations';
@@ -56,6 +60,16 @@ function App() {
               <PipelinesProvider>
                 <Pipelines />
               </PipelinesProvider>
+            } />
+            <Route path="tasks" element={
+              <TasksProvider>
+                <Tasks />
+              </TasksProvider>
+            } />
+            <Route path="notes" element={
+              <NotesProvider>
+                <Notes />
+              </NotesProvider>
             } />
             <Route path="campaigns" element={<Campaigns />} />
             <Route path="calendar" element={<Calendar />} />

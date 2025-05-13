@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Briefcase, Mail, Calendar, Settings, Link2, Building } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, Mail, Calendar, Settings, Link2, Building, ClipboardList, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -17,6 +17,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
     { name: 'Contacts', path: '/contacts', icon: Users },
     { name: 'Companies', path: '/companies', icon: Building },
     { name: 'Pipelines', path: '/pipelines', icon: Briefcase },
+    { name: 'Tasks', path: '/tasks', icon: ClipboardList },
+    { name: 'Notes', path: '/notes', icon: FileText },
     { name: 'Campaigns', path: '/campaigns', icon: Mail },
     { name: 'Calendar', path: '/calendar', icon: Calendar },
     { name: 'Integrations', path: '/integrations', icon: Link2 },
