@@ -10,14 +10,14 @@ interface SelectCellEditProps extends BaseCellProps {
 }
 
 export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, onSave, onCancel }) => {
-  const [editValue, setEditValue] = useState<string>(value || '');
+  // Initialize editValue from the provided value
+  const [editValue, setEditValue] = useState<string | null>(value || null);
   const [newOption, setNewOption] = useState<string>('');
-  const newOptionInputRef = useRef<HTMLInputElement>(null);
   
   // Log the initial value for debugging
   useEffect(() => {
     console.log("SelectCellEdit initialized with value:", value, "type:", typeof value);
-  }, [value]);
+  }, []);
   
   const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && newOption.trim()) {
@@ -47,19 +47,18 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
   };
   
   const handleSave = () => {
-    console.log("SelectCellEdit saving value:", editValue);
-    // Only call onSave if a value is selected
-    onSave(editValue || null);
+    console.log("SelectCellEdit saving value:", editValue, "type:", typeof editValue);
+    // Save the string value or null
+    onSave(editValue);
   };
   
   return (
     <div className="min-w-[220px]">
       <div className="relative">
         <input
-          ref={newOptionInputRef}
           value={newOption}
           onChange={(e) => setNewOption(e.target.value)}
-          onKeyDown={(e) => handleNewOptionKeyDown(e)}
+          onKeyDown={handleNewOptionKeyDown}
           className="h-8 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-coral-300 w-full"
           placeholder={`Type and press Enter to add...`}
           autoFocus
@@ -106,9 +105,11 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
 
 export const SelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick }) => {
   // Log the value in view mode for debugging
-  console.log("SelectCellView rendering with value:", value, "type:", typeof value);
+  useEffect(() => {
+    console.log("SelectCellView rendering with value:", value, "type:", typeof value);
+  }, [value]);
   
-  if (!value) return <div onClick={onClick} className="cursor-pointer"></div>;
+  if (!value) return <div onClick={onClick} className="cursor-pointer h-full w-full">&nbsp;</div>;
   
   const selectOption = field.options?.find(opt => opt.value === value);
   return (

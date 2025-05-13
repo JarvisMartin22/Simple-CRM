@@ -10,15 +10,16 @@ interface MultiSelectCellEditProps extends BaseCellProps {
 }
 
 export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value, field, onSave, onCancel }) => {
-  // Ensure we have an array of values
+  // Make sure we always work with arrays for multi-select
   const initialValues = Array.isArray(value) ? value : value ? [value] : [];
   const [selectedValues, setSelectedValues] = useState<string[]>(initialValues);
   const [newOption, setNewOption] = useState<string>('');
-  const newOptionInputRef = useRef<HTMLInputElement>(null);
   
   // Log initial values for debugging
   useEffect(() => {
     console.log("MultiSelectCellEdit initialized with value:", value);
+    console.log("Type of value:", typeof value);
+    console.log("Is array?", Array.isArray(value));
     console.log("Initial selected values:", selectedValues);
   }, []);
   
@@ -53,6 +54,7 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
   
   const handleSave = () => {
     console.log("MultiSelectCellEdit saving values:", selectedValues);
+    console.log("Is array?", Array.isArray(selectedValues));
     // Always save as an array, even if empty
     onSave(selectedValues);
   };
@@ -61,10 +63,9 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
     <div className="min-w-[220px]">
       <div className="relative">
         <input
-          ref={newOptionInputRef}
           value={newOption}
           onChange={(e) => setNewOption(e.target.value)}
-          onKeyDown={(e) => handleNewOptionKeyDown(e)}
+          onKeyDown={handleNewOptionKeyDown}
           className="h-8 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-coral-300 w-full"
           placeholder={`Type and press Enter to add...`}
           autoFocus
@@ -140,16 +141,23 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
 
 export const MultiSelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick }) => {
   // Log the value in view mode for debugging
-  console.log("MultiSelectCellView rendering with value:", value);
+  useEffect(() => {
+    console.log("MultiSelectCellView rendering with value:", value);
+    console.log("Type of value:", typeof value);
+    console.log("Is array?", Array.isArray(value));
+  }, [value]);
   
-  if (!Array.isArray(value) || value.length === 0) {
-    return <div onClick={onClick} className="cursor-pointer"></div>;
+  if (!value || (Array.isArray(value) && value.length === 0)) {
+    return <div onClick={onClick} className="cursor-pointer h-full w-full">&nbsp;</div>;
   }
+  
+  // Ensure we're working with an array
+  const valueArray = Array.isArray(value) ? value : [value];
   
   return (
     <div onClick={onClick} className="cursor-pointer">
       <div className="flex flex-wrap gap-1">
-        {value.map((tag, i) => {
+        {valueArray.map((tag, i) => {
           const option = field.options?.find(opt => opt.value === tag);
           return (
             <Badge 

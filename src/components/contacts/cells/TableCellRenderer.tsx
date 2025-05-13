@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Contact, ContactField } from '@/contexts/ContactsContext';
 import { Company, CompanyField } from '@/contexts/CompaniesContext';
 import { TextCellEdit, TextCellView } from './TextCell';
@@ -32,6 +32,18 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   // Get the value from either contact or company
   const item = contact || company;
   const value = item ? item[field.id] : null;
+  
+  // Debug log
+  useEffect(() => {
+    if (isEditing) {
+      console.log(`TableCellRenderer (edit mode) for field ${field.id}:`, {
+        fieldType: field.type,
+        value,
+        valueType: typeof value,
+        isArray: Array.isArray(value)
+      });
+    }
+  }, [isEditing, field.id, value]);
   
   if (isEditing) {
     switch (field.type) {

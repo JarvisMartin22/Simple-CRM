@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Define types for our contact fields
@@ -46,7 +47,11 @@ const defaultFields: ContactField[] = [
   { id: 'name', name: 'Name', type: 'text', visible: true, required: true },
   { id: 'company', name: 'Company', type: 'text', visible: true, required: false },
   { id: 'title', name: 'Title', type: 'text', visible: true, required: false },
-  { id: 'tags', name: 'Tags', type: 'multi-select', visible: true, required: false, options: [] },
+  { id: 'tags', name: 'Tags', type: 'multi-select', visible: true, required: false, options: [
+    { label: 'Customer', value: 'customer', color: '#10B981' },
+    { label: 'Prospect', value: 'prospect', color: '#F59E0B' },
+    { label: 'VIP', value: 'vip', color: '#8B5CF6' },
+  ] },
   { id: 'type_of_contact', name: 'Type of Contact', type: 'select', visible: true, required: false, options: [
     { label: 'Client', value: 'client', color: '#9b87f5' },
     { label: 'Lead', value: 'lead', color: '#F97316' },
@@ -103,42 +108,66 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Add new contact
   const addContact = (contact: Omit<Contact, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9); // Simple ID generation
-    setContacts(prevContacts => [...prevContacts, { ...contact, id }]);
+    
+    // Ensure multi-select fields are arrays
+    const processedContact = { ...contact };
+    
+    fields.forEach(field => {
+      if (field.type === 'multi-select' && processedContact[field.id]) {
+        if (!Array.isArray(processedContact[field.id])) {
+          processedContact[field.id] = [processedContact[field.id]];
+        }
+      }
+    });
+    
+    setContacts(prev => [...prev, { ...processedContact, id }]);
+    console.log("Added new contact:", { ...processedContact, id });
   };
 
   // Update contact field value with enhanced debugging
   const updateContact = (id: string, fieldId: string, value: any) => {
-    console.log("Context updating contact:", { id, fieldId, value });
+    console.log("ContactsContext updating contact:", { id, fieldId, value, type: typeof value, isArray: Array.isArray(value) });
     
     // Get the field definition to determine how to handle the value
     const fieldDef = fields.find(field => field.id === fieldId);
     console.log("Field definition:", fieldDef);
     
-    setContacts(prevContacts => prevContacts.map(contact => {
-      if (contact.id === id) {
-        // Create a new contact object with the updated field
-        const updatedContact = { ...contact };
-        
-        // Handle special field types
-        if (fieldDef?.type === 'multi-select') {
-          // Ensure multi-select values are always arrays
-          updatedContact[fieldId] = Array.isArray(value) ? value : value ? [value] : [];
-          console.log("Multi-select value set to:", updatedContact[fieldId]);
-        } else if (fieldDef?.type === 'select') {
-          // For select fields
-          updatedContact[fieldId] = value;
-          console.log("Select value set to:", updatedContact[fieldId]);
-        } else {
-          // For all other field types
-          updatedContact[fieldId] = value;
-          console.log("Standard value set to:", updatedContact[fieldId]);
+    setContacts(prevContacts => {
+      // Create a new contacts array with the updated contact
+      const updatedContacts = prevContacts.map(contact => {
+        if (contact.id === id) {
+          // Create a new contact object with the updated field
+          const updatedContact = { ...contact };
+          
+          // Handle special field types
+          if (fieldDef?.type === 'multi-select') {
+            // Always ensure multi-select values are arrays
+            updatedContact[fieldId] = Array.isArray(value) ? value : value ? [value] : [];
+            console.log("Multi-select value saved as:", updatedContact[fieldId]);
+          } else {
+            // For all other field types, use the value directly
+            updatedContact[fieldId] = value;
+            console.log("Standard value saved as:", updatedContact[fieldId]);
+          }
+          
+          return updatedContact;
         }
-        
-        return updatedContact;
-      }
-      return contact;
-    }));
+        return contact;
+      });
+      
+      console.log("Updated contacts array:", updatedContacts);
+      return updatedContacts;
+    });
   };
+
+  // Debug current state
+  useEffect(() => {
+    console.log("ContactsContext state:", {
+      contacts,
+      fields,
+      visibleFields
+    });
+  }, [contacts, fields, visibleFields]);
 
   return (
     <ContactsContext.Provider 

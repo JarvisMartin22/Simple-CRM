@@ -20,7 +20,8 @@ export const ContactsTable: React.FC = () => {
   // For debugging
   useEffect(() => {
     console.log("ContactsTable rendered with contacts:", contacts);
-  }, [contacts]);
+    console.log("Visible fields:", visibleFields);
+  }, [contacts, visibleFields]);
   
   // Handle cell click to begin editing
   const handleCellClick = (contactId: string, fieldId: string) => {
@@ -30,25 +31,29 @@ export const ContactsTable: React.FC = () => {
 
   // Handle saving edited value with improved logging
   const handleSaveEdit = (contactId: string, fieldId: string, value: any) => {
-    console.log("ContactsTable saving edit:", { contactId, fieldId, value });
+    console.log("ContactsTable saving edit:", { contactId, fieldId, value, type: typeof value });
     
-    // Make sure we're handling both select and multi-select values correctly
+    // Get the field definition to determine how to handle the value
     const field = visibleFields.find(f => f.id === fieldId);
-    console.log("Field type:", field?.type);
     
-    if (field?.type === 'multi-select') {
-      // Ensure multi-select values are always arrays
-      const arrayValue = Array.isArray(value) ? value : value ? [value] : [];
-      console.log("Saving multi-select value as:", arrayValue);
-      updateContact(contactId, fieldId, arrayValue);
-    } else if (field?.type === 'select') {
-      // For select fields, just pass the value directly
-      console.log("Saving select value as:", value);
-      updateContact(contactId, fieldId, value);
+    if (field) {
+      console.log(`Handling save for field type: ${field.type}`);
+      
+      if (field.type === 'multi-select') {
+        // For multi-select fields, ensure we're saving an array
+        const arrayValue = Array.isArray(value) ? value : value ? [value] : [];
+        console.log("Saving multi-select as array:", arrayValue);
+        updateContact(contactId, fieldId, arrayValue);
+      } else if (field.type === 'select') {
+        // For select fields, store the single value
+        console.log("Saving select value:", value);
+        updateContact(contactId, fieldId, value);
+      } else {
+        // Standard field types
+        updateContact(contactId, fieldId, value);
+      }
     } else {
-      // For other field types
-      console.log("Saving standard value as:", value);
-      updateContact(contactId, fieldId, value);
+      console.error("Field not found:", fieldId);
     }
     
     setEditingCell(null);
@@ -59,6 +64,14 @@ export const ContactsTable: React.FC = () => {
     console.log("Edit cancelled");
     setEditingCell(null);
   };
+
+  if (contacts.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No contacts found. Add your first contact using the "Add Contact" button.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
