@@ -8,11 +8,13 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PipelineStagesEditor } from '@/components/pipelines/PipelineStagesEditor';
 import { PipelineTableView } from '@/components/pipelines/PipelineTableView';
 import { PipelinesProvider, usePipelines } from '@/contexts/PipelinesContext';
+import { CreatePipelineForm } from '@/components/pipelines/forms/CreatePipelineForm';
 
 const PipelinesContent: React.FC = () => {
-  const { pipelines, currentPipeline, setCurrentPipeline } = usePipelines();
+  const { pipelines, currentPipeline, setCurrentPipeline, loading } = usePipelines();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [stagesEditorOpen, setStagesEditorOpen] = useState(false);
+  const [createFormOpen, setCreateFormOpen] = useState(false);
 
   const handlePipelineChange = (pipelineId: string) => {
     const pipeline = pipelines.find(p => p.id === pipelineId);
@@ -21,7 +23,8 @@ const PipelinesContent: React.FC = () => {
     }
   };
 
-  if (!currentPipeline) {
+  // Show loading state only if we're actually still loading
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <p>Loading pipelines...</p>
@@ -29,6 +32,38 @@ const PipelinesContent: React.FC = () => {
     );
   }
 
+  // If no pipelines exist and we're not loading, show the create form or button
+  if (pipelines.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-h1 font-medium">Pipelines</h1>
+            <p className="text-gray-500 mt-1">Manage and track your sales pipeline</p>
+          </div>
+        </div>
+        
+        <Card className="shadow-sm p-8 flex flex-col items-center justify-center text-center">
+          {createFormOpen ? (
+            <CreatePipelineForm onClose={() => setCreateFormOpen(false)} />
+          ) : (
+            <div className="max-w-md mx-auto">
+              <h2 className="text-xl font-semibold mb-3">Create Your First Pipeline</h2>
+              <p className="text-gray-500 mb-6">
+                Set up your first sales pipeline to start tracking opportunities and deals.
+              </p>
+              <Button onClick={() => setCreateFormOpen(true)}>
+                <Plus size={16} className="mr-2" />
+                Create Pipeline
+              </Button>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // If we have pipelines, show the regular UI
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -37,6 +72,10 @@ const PipelinesContent: React.FC = () => {
           <p className="text-gray-500 mt-1">Manage and track your sales pipeline</p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button onClick={() => setCreateFormOpen(true)}>
+            <Plus size={16} className="mr-2" />
+            New Pipeline
+          </Button>
           <Button className="bg-primary" onClick={() => setStagesEditorOpen(true)}>
             <Settings size={16} className="mr-2" />
             <span>Manage Stages</span>
@@ -87,6 +126,11 @@ const PipelinesContent: React.FC = () => {
       <PipelineStagesEditor 
         open={stagesEditorOpen} 
         onClose={() => setStagesEditorOpen(false)}
+      />
+      
+      <CreatePipelineForm
+        open={createFormOpen}
+        onClose={() => setCreateFormOpen(false)}
       />
     </div>
   );
