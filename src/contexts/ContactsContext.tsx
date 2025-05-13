@@ -37,6 +37,7 @@ interface ContactsContextType {
   toggleFieldVisibility: (id: string) => void;
   deleteField: (id: string) => void;
   updateContact: (id: string, field: string, value: any) => void;
+  addContact: (contact: Omit<Contact, 'id'>) => void;
 }
 
 const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
@@ -60,11 +61,38 @@ const defaultFields: ContactField[] = [
   { id: 'number_of_times_contacted', name: 'Number of Times Contacted', type: 'number', visible: true, required: false }
 ];
 
-// No mock contacts - starting with empty array
-const emptyContacts: Contact[] = [];
+// Start with some sample contacts
+const sampleContacts: Contact[] = [
+  {
+    id: '1',
+    name: 'John Doe',
+    company: 'Acme Inc.',
+    title: 'CEO',
+    tags: ['important', 'client'],
+    type_of_contact: 'client',
+    phone_number: '555-1234',
+    details: 'Met at conference',
+    website: 'https://example.com',
+    last_contacted: '2023-04-15',
+    number_of_times_contacted: 5
+  },
+  {
+    id: '2',
+    name: 'Jane Smith',
+    company: 'Tech Solutions',
+    title: 'CTO',
+    tags: ['tech', 'partner'],
+    type_of_contact: 'partner',
+    phone_number: '555-5678',
+    details: 'Interested in collaboration',
+    website: 'https://techsolutions.example',
+    last_contacted: '2023-05-20',
+    number_of_times_contacted: 3
+  }
+];
 
 export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [contacts, setContacts] = useState<Contact[]>(emptyContacts);
+  const [contacts, setContacts] = useState<Contact[]>(sampleContacts);
   const [fields, setFields] = useState<ContactField[]>(defaultFields);
 
   // Get visible fields
@@ -100,11 +128,37 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
+  // Add new contact
+  const addContact = (contact: Omit<Contact, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9); // Simple ID generation
+    setContacts([...contacts, { ...contact, id }]);
+  };
+
   // Update contact field value
   const updateContact = (id: string, fieldId: string, value: any) => {
-    setContacts(contacts.map(contact => 
-      contact.id === id ? { ...contact, [fieldId]: value } : contact
-    ));
+    console.log("Context updating contact:", { id, fieldId, value });
+    
+    // Get the field definition to determine how to handle the value
+    const fieldDef = fields.find(field => field.id === fieldId);
+    
+    setContacts(contacts.map(contact => {
+      if (contact.id === id) {
+        // Create a new contact object with the updated field
+        const updatedContact = { ...contact };
+        
+        // Handle special field types
+        if (fieldDef?.type === 'multi-select') {
+          // Ensure multi-select values are always arrays
+          updatedContact[fieldId] = Array.isArray(value) ? value : value ? [value] : [];
+        } else {
+          // For all other field types
+          updatedContact[fieldId] = value;
+        }
+        
+        return updatedContact;
+      }
+      return contact;
+    }));
   };
 
   return (
@@ -117,7 +171,8 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         updateField, 
         toggleFieldVisibility, 
         deleteField,
-        updateContact 
+        updateContact,
+        addContact 
       }}
     >
       {children}

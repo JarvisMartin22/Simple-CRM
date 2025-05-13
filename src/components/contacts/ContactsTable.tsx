@@ -24,7 +24,23 @@ export const ContactsTable: React.FC = () => {
 
   // Handle saving edited value
   const handleSaveEdit = (contactId: string, fieldId: string, value: any) => {
-    updateContact(contactId, fieldId, value);
+    console.log("Saving edit:", { contactId, fieldId, value });
+    
+    // Make sure we're handling both select and multi-select values correctly
+    const field = visibleFields.find(f => f.id === fieldId);
+    
+    if (field?.type === 'multi-select') {
+      // Ensure multi-select values are always arrays
+      const arrayValue = Array.isArray(value) ? value : value ? [value] : [];
+      updateContact(contactId, fieldId, arrayValue);
+    } else if (field?.type === 'select') {
+      // For select fields, just pass the value directly
+      updateContact(contactId, fieldId, value);
+    } else {
+      // For other field types
+      updateContact(contactId, fieldId, value);
+    }
+    
     setEditingCell(null);
   };
 
