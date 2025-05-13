@@ -42,8 +42,8 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
         setValue('value', currentOpportunity.value || undefined);
         setValue('probability', currentOpportunity.probability || undefined);
         setValue('expected_close_date', currentOpportunity.expected_close_date || undefined);
-        setValue('company_id', currentOpportunity.company_id || 'none');
-        setValue('contact_id', currentOpportunity.contact_id || 'none');
+        setValue('company_id', currentOpportunity.company_id || null);
+        setValue('contact_id', currentOpportunity.contact_id || null);
         setValue('details', currentOpportunity.details || '');
       } else {
         // Reset form for new opportunity
@@ -53,8 +53,8 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
           value: undefined,
           probability: undefined,
           expected_close_date: undefined,
-          company_id: 'none',
-          contact_id: 'none',
+          company_id: null,
+          contact_id: null,
           details: '',
         });
       }
@@ -64,10 +64,6 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
   const onSubmit = async (data: any) => {
     try {
       if (!currentPipeline) return;
-      
-      // Convert 'none' values to null before submission
-      if (data.company_id === 'none') data.company_id = null;
-      if (data.contact_id === 'none') data.contact_id = null;
       
       if (isEditing && currentOpportunity) {
         await updateOpportunity({
@@ -133,10 +129,13 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
 
             <FormField id="stage" label="Stage" required>
               <SelectField
+                id="stage"
+                label="Stage"
                 options={stageOptions}
                 value={currentOpportunity?.stage || (currentPipeline.stages && currentPipeline.stages[0]?.id)}
-                onValueChange={(value) => setValue('stage', value)}
+                onChange={(value) => setValue('stage', value || '')}
                 placeholder="Select a stage"
+                required
               />
             </FormField>
 
@@ -183,25 +182,25 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
               />
             </FormField>
 
-            <FormField id="company_id" label="Company">
-              <SelectField
-                options={companyOptions}
-                value={currentOpportunity?.company_id || 'none'}
-                onValueChange={(value) => setValue('company_id', value)}
-                placeholder="Select a company"
-                emptyOption
-              />
-            </FormField>
+            <SelectField
+              id="company_id"
+              label="Company"
+              options={companyOptions}
+              value={currentOpportunity?.company_id}
+              onChange={(value) => setValue('company_id', value)}
+              placeholder="Select a company"
+              emptyOptionLabel="None"
+            />
 
-            <FormField id="contact_id" label="Contact">
-              <SelectField
-                options={contactOptions}
-                value={currentOpportunity?.contact_id || 'none'}
-                onValueChange={(value) => setValue('contact_id', value)}
-                placeholder="Select a contact"
-                emptyOption
-              />
-            </FormField>
+            <SelectField
+              id="contact_id"
+              label="Contact"
+              options={contactOptions}
+              value={currentOpportunity?.contact_id}
+              onChange={(value) => setValue('contact_id', value)}
+              placeholder="Select a contact"
+              emptyOptionLabel="None"
+            />
 
             <FormField id="details" label="Details">
               <Textarea

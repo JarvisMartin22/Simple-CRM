@@ -132,6 +132,7 @@ const PipelinesContent = () => {
         onClose={() => setStagesEditorOpen(false)}
       />
       
+      {/* Modal form for creating pipeline - this is the only instance we should have */}
       <CreatePipelineForm
         open={createFormOpen}
         onClose={() => setCreateFormOpen(false)}
