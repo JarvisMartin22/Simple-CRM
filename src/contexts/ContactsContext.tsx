@@ -5,8 +5,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 export type FieldType = 
   | 'text' | 'number' | 'select' | 'multi-select' | 'status' 
   | 'date' | 'files-media' | 'checkbox' | 'url' | 'email' 
-  | 'phone' | 'formula' | 'relation' | 'rollup' | 'created-time' 
-  | 'last-edited-time' | 'button';
+  | 'phone' | 'formula' | 'relation' | 'created-time' 
+  | 'last-edited-time';
 
 export interface SelectOption {
   label: string;
@@ -36,6 +36,7 @@ interface ContactsContextType {
   updateField: (id: string, updates: Partial<ContactField>) => void;
   toggleFieldVisibility: (id: string) => void;
   deleteField: (id: string) => void;
+  updateContact: (id: string, field: string, value: any) => void;
 }
 
 const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
@@ -178,8 +179,12 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
 
-  // In a real implementation, we would persist changes to localStorage or a database
-  // and also update all contacts when fields change
+  // Update contact field value
+  const updateContact = (id: string, fieldId: string, value: any) => {
+    setContacts(contacts.map(contact => 
+      contact.id === id ? { ...contact, [fieldId]: value } : contact
+    ));
+  };
 
   return (
     <ContactsContext.Provider 
@@ -190,7 +195,8 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         addField, 
         updateField, 
         toggleFieldVisibility, 
-        deleteField 
+        deleteField,
+        updateContact 
       }}
     >
       {children}

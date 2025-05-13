@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,10 +26,8 @@ const fieldTypes: { value: FieldType; label: string }[] = [
   { value: 'phone', label: 'Phone' },
   { value: 'formula', label: 'Formula' },
   { value: 'relation', label: 'Relation' },
-  { value: 'rollup', label: 'Rollup' },
   { value: 'created-time', label: 'Created time' },
-  { value: 'last-edited-time', label: 'Last edited time' },
-  { value: 'button', label: 'Button' }
+  { value: 'last-edited-time', label: 'Last edited time' }
 ];
 
 // Predefined colors for options
