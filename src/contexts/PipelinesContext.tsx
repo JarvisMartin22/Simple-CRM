@@ -18,6 +18,17 @@ export interface Pipeline {
   user_id: string;
 }
 
+// Define the shape of the database pipeline object
+interface DatabasePipeline {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  // Note: stages is stored as a JSONB column in Postgres, but not recognized by TypeScript
+}
+
 export interface Opportunity {
   id: string;
   name: string;
@@ -33,6 +44,24 @@ export interface Opportunity {
   created_at: string;
   updated_at: string;
   user_id: string;
+}
+
+// Define the shape of the database deal object (for opportunities)
+interface DatabaseDeal {
+  id: string;
+  name: string;
+  pipeline_id: string;
+  stage_id?: string;
+  value?: number | null;
+  probability?: number | null;
+  close_date?: string | null;
+  company_id?: string | null;
+  contact_id?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  status?: string | null;
 }
 
 interface PipelinesContextType {
@@ -79,10 +108,10 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Ensure each pipeline has the correct structure with stages
-      const formattedPipelines: Pipeline[] = data.map(pipeline => ({
+      const formattedPipelines: Pipeline[] = (data as DatabasePipeline[]).map(pipeline => ({
         ...pipeline,
-        stages: pipeline.stages || [],
-      })) as Pipeline[];
+        stages: (pipeline as any).stages || [],
+      }));
 
       setPipelines(formattedPipelines);
       if (formattedPipelines.length > 0 && !currentPipeline) {
@@ -105,29 +134,68 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setLoading(true);
     setError(null);
     try {
-      // Using a raw query approach since the opportunities table isn't in the TypeScript definitions yet
-      const { data, error } = await supabase.rpc('get_opportunities_by_pipeline', {
-        p_pipeline_id: pipelineId
-      });
-
-      // Fallback to direct query if RPC isn't available
-      const fallbackQuery = async () => {
-        const { data: oppData, error: oppError } = await supabase
-          .from('opportunities')
-          .select('*')
-          .eq('pipeline_id', pipelineId)
-          .order('created_at', { ascending: false }) as any;
+      // First attempt using RPC if configured
+      try {
+        const { data, error } = await supabase.rpc('get_opportunities_by_pipeline', {
+          p_pipeline_id: pipelineId
+        });
+        
+        if (!error && data) {
+          // Map the data to our Opportunity interface
+          const mappedOpportunities = (data as any[]).map(item => ({
+            id: item.id,
+            name: item.name,
+            pipeline_id: item.pipeline_id,
+            stage: item.stage_id || item.stage, // Handle either format
+            value: item.value,
+            probability: item.probability,
+            expected_close_date: item.close_date || item.expected_close_date,
+            company_id: item.company_id,
+            contact_id: item.contact_id,
+            details: item.notes || item.details,
+            custom_fields: item.custom_fields || {},
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            user_id: item.user_id
+          }));
           
-        return { data: oppData, error: oppError };
-      };
-
-      const result = data ? { data, error } : await fallbackQuery();
-      
-      if (result.error) {
-        throw new Error(result.error.message);
+          setOpportunities(mappedOpportunities);
+          return;
+        }
+      } catch (rpcError) {
+        console.log('RPC not available, falling back to direct query', rpcError);
       }
 
-      setOpportunities(result.data as unknown as Opportunity[]);
+      // Fallback to direct query from deals table
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*')
+        .eq('pipeline_id', pipelineId)
+        .order('created_at', { ascending: false });
+          
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Map deals to opportunities
+      const mappedOpportunities = (data as DatabaseDeal[]).map(deal => ({
+        id: deal.id,
+        name: deal.name,
+        pipeline_id: deal.pipeline_id,
+        stage: deal.stage_id || '', // Use stage_id from deal
+        value: deal.value || null,
+        probability: deal.probability || null,
+        expected_close_date: deal.close_date || null,
+        company_id: deal.company_id || null,
+        contact_id: deal.contact_id || null,
+        details: deal.notes || null,
+        custom_fields: {},
+        created_at: deal.created_at,
+        updated_at: deal.updated_at,
+        user_id: deal.user_id
+      }));
+
+      setOpportunities(mappedOpportunities);
     } catch (err: any) {
       console.error('Error fetching opportunities:', err);
       setError(err.message);
@@ -149,9 +217,8 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       // Add the user_id to the pipeline data
       const pipelineData = {
-        ...pipeline,
-        stages: pipeline.stages || [],
         name: pipeline.name,
+        description: pipeline.description || null,
         user_id: (await supabase.auth.getUser()).data.user?.id,
       };
 
@@ -166,10 +233,10 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Ensure the returned data has the correct structure
-      const formattedPipeline = {
-        ...data,
-        stages: data.stages || [],
-      } as Pipeline;
+      const formattedPipeline: Pipeline = {
+        ...data as DatabasePipeline,
+        stages: (pipeline.stages || []) as PipelineStage[]
+      };
 
       setPipelines(prev => [formattedPipeline, ...prev]);
       toast({
@@ -194,9 +261,15 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('Pipeline ID is required');
       }
 
+      // Prepare data for update - remove stages as they're handled separately
+      const updateData = {
+        name: pipeline.name,
+        description: pipeline.description
+      };
+
       const { data, error } = await supabase
         .from('pipelines')
-        .update(pipeline as any)
+        .update(updateData)
         .eq('id', pipeline.id)
         .select()
         .single();
@@ -206,14 +279,15 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Ensure the returned data has the correct structure
-      const formattedPipeline = {
-        ...data,
-        stages: data.stages || [],
-      } as Pipeline;
+      const formattedPipeline: Pipeline = {
+        ...data as DatabasePipeline,
+        stages: pipeline.stages || (currentPipeline?.id === pipeline.id ? currentPipeline.stages : [])
+      };
 
       setPipelines(prev => 
         prev.map(item => (item.id === pipeline.id ? formattedPipeline : item))
       );
+      
       if (currentPipeline && currentPipeline.id === pipeline.id) {
         setCurrentPipeline(formattedPipeline);
       }
@@ -280,29 +354,55 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('Stage is required');
       }
       
-      // Add the user_id to the opportunity data
-      const opportunityData = {
-        ...opportunity,
+      // Convert to deal format for database
+      const dealData = {
+        name: opportunity.name,
+        pipeline_id: opportunity.pipeline_id,
+        stage_id: opportunity.stage,
+        value: opportunity.value,
+        probability: opportunity.probability,
+        close_date: opportunity.expected_close_date,
+        company_id: opportunity.company_id,
+        contact_id: opportunity.contact_id,
+        notes: opportunity.details,
         user_id: (await supabase.auth.getUser()).data.user?.id,
       };
 
-      // Use a direct query approach since the opportunities table isn't in the types
+      // Insert into deals table
       const { data, error } = await supabase
-        .from('opportunities')
-        .insert([opportunityData as any])
+        .from('deals')
+        .insert([dealData])
         .select()
-        .single() as any;
+        .single();
 
       if (error) {
         throw new Error(error.message);
       }
 
-      setOpportunities(prev => [data as Opportunity, ...prev]);
+      // Convert back to opportunity format
+      const newOpportunity: Opportunity = {
+        id: data.id,
+        name: data.name,
+        pipeline_id: data.pipeline_id,
+        stage: data.stage_id,
+        value: data.value,
+        probability: data.probability,
+        expected_close_date: data.close_date,
+        company_id: data.company_id,
+        contact_id: data.contact_id,
+        details: data.notes,
+        custom_fields: {},
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        user_id: data.user_id
+      };
+
+      setOpportunities(prev => [newOpportunity, ...prev]);
       toast({
         title: 'Success',
         description: 'Deal created successfully',
       });
-      return data as Opportunity;
+      return newOpportunity;
     } catch (err: any) {
       console.error('Error adding opportunity:', err);
       toast({
@@ -320,26 +420,44 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('Opportunity ID is required');
       }
 
+      // Convert to deal format for database
+      const dealData: any = {};
+      if (opportunity.name) dealData.name = opportunity.name;
+      if (opportunity.stage) dealData.stage_id = opportunity.stage;
+      if (opportunity.value !== undefined) dealData.value = opportunity.value;
+      if (opportunity.probability !== undefined) dealData.probability = opportunity.probability;
+      if (opportunity.expected_close_date !== undefined) dealData.close_date = opportunity.expected_close_date;
+      if (opportunity.company_id !== undefined) dealData.company_id = opportunity.company_id;
+      if (opportunity.contact_id !== undefined) dealData.contact_id = opportunity.contact_id;
+      if (opportunity.details !== undefined) dealData.notes = opportunity.details;
+
+      // Update the deal
       const { data, error } = await supabase
-        .from('opportunities')
-        .update(opportunity as any)
+        .from('deals')
+        .update(dealData)
         .eq('id', opportunity.id)
         .select()
-        .single() as any;
+        .single();
 
       if (error) {
         throw new Error(error.message);
       }
 
+      // Convert back to opportunity format for state update
+      const updatedOpportunity: Opportunity = {
+        ...opportunities.find(o => o.id === opportunity.id)!,
+        ...opportunity
+      } as Opportunity;
+
       setOpportunities(prev => 
-        prev.map(item => (item.id === opportunity.id ? { ...item, ...data } as Opportunity : item))
+        prev.map(item => (item.id === opportunity.id ? updatedOpportunity : item))
       );
 
       toast({
         title: 'Success',
         description: 'Deal updated successfully',
       });
-      return data as Opportunity;
+      return updatedOpportunity;
     } catch (err: any) {
       console.error('Error updating opportunity:', err);
       toast({
@@ -354,9 +472,9 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const deleteOpportunity = async (id: string) => {
     try {
       const { error } = await supabase
-        .from('opportunities')
+        .from('deals')
         .delete()
-        .eq('id', id) as any;
+        .eq('id', id);
 
       if (error) {
         throw new Error(error.message);
@@ -388,9 +506,14 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const newStages = [...pipeline.stages, stage];
       
+      // Update the pipeline in the database
+      const updateData = {
+        stages: newStages
+      };
+      
       const { error } = await supabase
         .from('pipelines')
-        .update({ stages: newStages })
+        .update(updateData as any)
         .eq('id', pipelineId);
 
       if (error) {
@@ -432,9 +555,14 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         s.id === stage.id ? stage : s
       );
       
+      // Update the pipeline in the database
+      const updateData = {
+        stages: newStages
+      };
+      
       const { error } = await supabase
         .from('pipelines')
-        .update({ stages: newStages })
+        .update(updateData as any)
         .eq('id', pipelineId);
 
       if (error) {
@@ -480,9 +608,14 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const newStages = pipeline.stages.filter(s => s.id !== stageId);
       
+      // Update the pipeline in the database
+      const updateData = {
+        stages: newStages
+      };
+      
       const { error } = await supabase
         .from('pipelines')
-        .update({ stages: newStages })
+        .update(updateData as any)
         .eq('id', pipelineId);
 
       if (error) {
