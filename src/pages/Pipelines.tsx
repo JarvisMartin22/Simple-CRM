@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Settings, Plus, BarChart3, Table as TableIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PipelineStagesEditor } from '@/components/pipelines/PipelineStagesEditor';
 import { PipelineTableView } from '@/components/pipelines/PipelineTableView';
-import { PipelinesProvider } from '@/contexts/PipelinesContext';
+import { PipelinesProvider, usePipelines } from '@/contexts/PipelinesContext';
 import { CompaniesProvider } from '@/contexts/CompaniesContext';
 import { ContactsProvider } from '@/contexts/ContactsContext';
 import { CreatePipelineForm } from '@/components/pipelines/forms/CreatePipelineForm';
