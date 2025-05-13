@@ -1,14 +1,15 @@
 
 import * as React from "react"
-import { toast as sonnerToast, type ToastT } from 'sonner'
+import { toast as sonnerToast } from 'sonner'
 
-export type ToastProps = ToastT & {
+export type ToastProps = {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
-  variant?: "default" | "destructive" // Add variant property for compatibility
-  open?: boolean // Add open property for compatibility
+  variant?: "default" | "destructive"
+  open?: boolean
+  type?: "foreground" | "background" // Ensure this matches the expected Radix UI toast types
 }
 
 const TOAST_LIMIT = 5
@@ -150,9 +151,6 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
     },
   })
 
