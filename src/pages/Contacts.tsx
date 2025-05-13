@@ -7,9 +7,10 @@ import { Search, Filter, UserPlus, Settings } from 'lucide-react';
 import { ContactsTable } from '@/components/contacts/ContactsTable';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ContactsFieldManager } from '@/components/contacts/ContactsFieldManager';
+import { CreateContactForm } from '@/components/contacts/CreateContactForm';
 
 const Contacts: React.FC = () => {
-  const [showFieldManager, setShowFieldManager] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -27,7 +28,10 @@ const Contacts: React.FC = () => {
               <ContactsFieldManager />
             </SheetContent>
           </Sheet>
-          <Button className="bg-primary">
+          <Button 
+            className="bg-primary"
+            onClick={() => setShowAddContactModal(true)}
+          >
             <UserPlus size={18} className="mr-2" />
             <span>Add Contact</span>
           </Button>
@@ -55,6 +59,12 @@ const Contacts: React.FC = () => {
 
         <ContactsTable />
       </Card>
+
+      {/* Add Contact Form Modal */}
+      <CreateContactForm
+        open={showAddContactModal}
+        onOpenChange={setShowAddContactModal}
+      />
     </div>
   );
 };

@@ -7,8 +7,11 @@ import { Search, Filter, Building, Settings } from 'lucide-react';
 import { CompaniesTable } from '@/components/companies/CompaniesTable';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { CompaniesFieldManager } from '@/components/companies/CompaniesFieldManager';
+import { CreateCompanyForm } from '@/components/companies/CreateCompanyForm';
 
 const Companies: React.FC = () => {
+  const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -25,7 +28,10 @@ const Companies: React.FC = () => {
               <CompaniesFieldManager />
             </SheetContent>
           </Sheet>
-          <Button className="bg-primary">
+          <Button 
+            className="bg-primary"
+            onClick={() => setShowAddCompanyModal(true)}
+          >
             <Building size={18} className="mr-2" />
             <span>Add Company</span>
           </Button>
@@ -53,6 +59,12 @@ const Companies: React.FC = () => {
 
         <CompaniesTable />
       </Card>
+
+      {/* Add Company Form Modal */}
+      <CreateCompanyForm
+        open={showAddCompanyModal}
+        onOpenChange={setShowAddCompanyModal}
+      />
     </div>
   );
 };
