@@ -105,18 +105,29 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setLoading(true);
     setError(null);
     try {
-      // Use a raw SQL query to get around type issues with the opportunities table
-      const { data, error } = await supabase
-        .from('opportunities')
-        .select('*')
-        .eq('pipeline_id', pipelineId)
-        .order('created_at', { ascending: false });
+      // Using a raw query approach since the opportunities table isn't in the TypeScript definitions yet
+      const { data, error } = await supabase.rpc('get_opportunities_by_pipeline', {
+        p_pipeline_id: pipelineId
+      });
 
-      if (error) {
-        throw new Error(error.message);
+      // Fallback to direct query if RPC isn't available
+      const fallbackQuery = async () => {
+        const { data: oppData, error: oppError } = await supabase
+          .from('opportunities')
+          .select('*')
+          .eq('pipeline_id', pipelineId)
+          .order('created_at', { ascending: false }) as any;
+          
+        return { data: oppData, error: oppError };
+      };
+
+      const result = data ? { data, error } : await fallbackQuery();
+      
+      if (result.error) {
+        throw new Error(result.error.message);
       }
 
-      setOpportunities(data as unknown as Opportunity[]);
+      setOpportunities(result.data as unknown as Opportunity[]);
     } catch (err: any) {
       console.error('Error fetching opportunities:', err);
       setError(err.message);
@@ -132,15 +143,21 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const addPipeline = async (pipeline: Partial<Pipeline>) => {
     try {
+      if (!pipeline.name) {
+        throw new Error('Pipeline name is required');
+      }
+      
       // Add the user_id to the pipeline data
       const pipelineData = {
         ...pipeline,
+        stages: pipeline.stages || [],
+        name: pipeline.name,
         user_id: (await supabase.auth.getUser()).data.user?.id,
       };
 
       const { data, error } = await supabase
         .from('pipelines')
-        .insert([pipelineData])
+        .insert([pipelineData as any])
         .select()
         .single();
 
@@ -179,7 +196,7 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const { data, error } = await supabase
         .from('pipelines')
-        .update(pipeline)
+        .update(pipeline as any)
         .eq('id', pipeline.id)
         .select()
         .single();
@@ -251,34 +268,46 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const addOpportunity = async (opportunity: Partial<Opportunity>) => {
     try {
+      if (!opportunity.name) {
+        throw new Error('Opportunity name is required');
+      }
+      
+      if (!opportunity.pipeline_id) {
+        throw new Error('Pipeline ID is required');
+      }
+      
+      if (!opportunity.stage) {
+        throw new Error('Stage is required');
+      }
+      
       // Add the user_id to the opportunity data
       const opportunityData = {
         ...opportunity,
         user_id: (await supabase.auth.getUser()).data.user?.id,
       };
 
-      // Use a raw SQL query to get around type issues with the opportunities table
+      // Use a direct query approach since the opportunities table isn't in the types
       const { data, error } = await supabase
         .from('opportunities')
-        .insert([opportunityData])
+        .insert([opportunityData as any])
         .select()
-        .single();
+        .single() as any;
 
       if (error) {
         throw new Error(error.message);
       }
 
-      setOpportunities(prev => [data as unknown as Opportunity, ...prev]);
+      setOpportunities(prev => [data as Opportunity, ...prev]);
       toast({
         title: 'Success',
-        description: 'Opportunity created successfully',
+        description: 'Deal created successfully',
       });
-      return data as unknown as Opportunity;
+      return data as Opportunity;
     } catch (err: any) {
       console.error('Error adding opportunity:', err);
       toast({
         title: 'Error',
-        description: 'Failed to create opportunity',
+        description: 'Failed to create deal',
         variant: 'destructive',
       });
       return null;
@@ -291,32 +320,31 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('Opportunity ID is required');
       }
 
-      // Use a raw SQL query to get around type issues with the opportunities table
       const { data, error } = await supabase
         .from('opportunities')
-        .update(opportunity)
+        .update(opportunity as any)
         .eq('id', opportunity.id)
         .select()
-        .single();
+        .single() as any;
 
       if (error) {
         throw new Error(error.message);
       }
 
       setOpportunities(prev => 
-        prev.map(item => (item.id === opportunity.id ? { ...item, ...data } as unknown as Opportunity : item))
+        prev.map(item => (item.id === opportunity.id ? { ...item, ...data } as Opportunity : item))
       );
 
       toast({
         title: 'Success',
-        description: 'Opportunity updated successfully',
+        description: 'Deal updated successfully',
       });
-      return data as unknown as Opportunity;
+      return data as Opportunity;
     } catch (err: any) {
       console.error('Error updating opportunity:', err);
       toast({
         title: 'Error',
-        description: 'Failed to update opportunity',
+        description: 'Failed to update deal',
         variant: 'destructive',
       });
       return null;
@@ -328,7 +356,7 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const { error } = await supabase
         .from('opportunities')
         .delete()
-        .eq('id', id);
+        .eq('id', id) as any;
 
       if (error) {
         throw new Error(error.message);
@@ -337,14 +365,14 @@ export const PipelinesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setOpportunities(prev => prev.filter(o => o.id !== id));
       toast({
         title: 'Success',
-        description: 'Opportunity deleted successfully',
+        description: 'Deal deleted successfully',
       });
       return true;
     } catch (err: any) {
       console.error('Error deleting opportunity:', err);
       toast({
         title: 'Error',
-        description: 'Failed to delete opportunity',
+        description: 'Failed to delete deal',
         variant: 'destructive',
       });
       return false;
