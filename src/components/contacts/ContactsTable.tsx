@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, KeyboardEvent } from 'react';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ColumnEditPopover } from './ColumnEditPopover';
 import { Input } from "@/components/ui/input";
-import { Check, Calendar as CalendarIcon, X } from "lucide-react";
+import { Check, Calendar as CalendarIcon, X, Plus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { 
@@ -32,9 +32,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const ContactsTable: React.FC = () => {
-  const { contacts, visibleFields, updateContact } = useContacts();
+  const { contacts, visibleFields, updateContact, updateField } = useContacts();
   const [editingCell, setEditingCell] = useState<{ contactId: string; fieldId: string } | null>(null);
   const [editValue, setEditValue] = useState<string | string[] | boolean | Date | null>('');
+  const [newOption, setNewOption] = useState<string>('');
+  const newOptionInputRef = useRef<HTMLInputElement>(null);
   
   // Helper function to render cell content based on field type
   const renderCellContent = (contact: Contact, field: ContactField) => {
@@ -51,7 +53,7 @@ export const ContactsTable: React.FC = () => {
         case 'phone':
         case 'number':
           return (
-            <div className="flex items-center min-w-[200px]">
+            <div className="flex items-center min-w-[220px]">
               <Input 
                 type={field.type === 'number' ? 'number' : 'text'}
                 value={editValue as string || ''} 
@@ -83,10 +85,10 @@ export const ContactsTable: React.FC = () => {
         
         case 'date':
           return (
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-[220px]">
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="flex items-center h-8 px-3 border rounded-md bg-white justify-between min-w-[200px]">
+                  <button className="flex items-center h-8 px-3 border rounded-md bg-white justify-between w-full">
                     {editValue ? format(editValue as Date, 'PP') : 'Select date'}
                     <CalendarIcon className="ml-2 h-4 w-4" />
                   </button>
@@ -125,7 +127,7 @@ export const ContactsTable: React.FC = () => {
         
         case 'checkbox':
           return (
-            <div className="flex items-center">
+            <div className="flex items-center min-w-[220px]">
               <Checkbox 
                 checked={Boolean(editValue)} 
                 onCheckedChange={(checked) => {
@@ -152,35 +154,42 @@ export const ContactsTable: React.FC = () => {
         
         case 'select':
           return (
-            <div>
-              <Select 
-                value={(editValue as string) || ''} 
-                onValueChange={(value) => {
-                  setEditValue(value);
-                  setTimeout(() => handleSaveEdit(contact.id, field.id), 100);
-                }}
-              >
-                <SelectTrigger className="h-8 min-w-[200px]">
-                  <SelectValue placeholder="Select option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {field.options?.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center">
-                        <div 
-                          className="w-3 h-3 rounded-full mr-2" 
-                          style={{ backgroundColor: option.color }} 
-                        />
-                        {option.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex mt-1">
+            <div className="min-w-[220px]">
+              <div className="relative">
+                <input
+                  ref={newOptionInputRef}
+                  value={newOption}
+                  onChange={(e) => setNewOption(e.target.value)}
+                  onKeyDown={(e) => handleNewOptionKeyDown(e, field, 'select')}
+                  className="h-8 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-coral-300 w-full"
+                  placeholder={`Type and press Enter to add...`}
+                />
+              </div>
+              <div className="mt-2 max-h-[150px] overflow-y-auto">
+                {field.options?.map((option) => (
+                  <div 
+                    key={option.value} 
+                    className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${(editValue as string) === option.value ? 'bg-coral-50' : ''}`}
+                    onClick={() => {
+                      setEditValue(option.value);
+                      setTimeout(() => handleSaveEdit(contact.id, field.id), 100);
+                    }}
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: option.color }} 
+                    />
+                    <span>{option.label}</span>
+                    {(editValue as string) === option.value && (
+                      <Check size={14} className="ml-auto text-coral-500" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex mt-2">
                 <button 
                   onClick={() => handleSaveEdit(contact.id, field.id)}
-                  className="p-1 bg-green-500 text-white rounded-md text-xs"
+                  className="p-1 bg-coral-500 text-white rounded-md text-xs"
                 >
                   <Check size={14} />
                 </button>
@@ -197,56 +206,70 @@ export const ContactsTable: React.FC = () => {
         case 'multi-select':
           const selectedValues = (editValue as string[]) || [];
           return (
-            <div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center h-8 px-3 border rounded-md bg-white min-w-[200px] justify-between">
-                    <div className="flex flex-wrap gap-1 max-w-[180px] overflow-hidden">
-                      {selectedValues.length > 0 ? (
-                        selectedValues.map((value) => {
-                          const option = field.options?.find((o) => o.value === value);
-                          return (
-                            <Badge key={value} variant="secondary" className="bg-muted text-muted-foreground">
-                              {option?.label || value}
-                            </Badge>
-                          );
-                        })
-                      ) : (
-                        <span className="text-gray-400">Select options</span>
-                      )}
-                    </div>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="min-w-[200px]">
-                  {field.options?.map((option) => (
-                    <DropdownMenuCheckboxItem
-                      key={option.value}
-                      checked={selectedValues.includes(option.value)}
-                      onCheckedChange={(checked) => {
-                        let newValues = [...selectedValues];
-                        if (checked) {
-                          newValues.push(option.value);
-                        } else {
-                          newValues = newValues.filter((v) => v !== option.value);
-                        }
-                        setEditValue(newValues);
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <div 
-                          className="w-3 h-3 rounded-full mr-2" 
-                          style={{ backgroundColor: option.color }} 
+            <div className="min-w-[220px]">
+              <div className="relative">
+                <input
+                  ref={newOptionInputRef}
+                  value={newOption}
+                  onChange={(e) => setNewOption(e.target.value)}
+                  onKeyDown={(e) => handleNewOptionKeyDown(e, field, 'multi-select')}
+                  className="h-8 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-coral-300 w-full"
+                  placeholder={`Type and press Enter to add...`}
+                />
+              </div>
+              {selectedValues.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2 mb-1">
+                  {selectedValues.map((value) => {
+                    const option = field.options?.find((o) => o.value === value);
+                    return (
+                      <Badge 
+                        key={value} 
+                        variant="secondary" 
+                        className="flex items-center gap-1"
+                        style={{ backgroundColor: option?.color || '#F97316', color: 'white' }}
+                      >
+                        {option?.label || value}
+                        <X 
+                          size={12}
+                          className="cursor-pointer hover:text-coral-100" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newValues = selectedValues.filter(v => v !== value);
+                            setEditValue(newValues);
+                          }} 
                         />
-                        {option.label}
-                      </div>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <div className="flex mt-1">
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="mt-1 max-h-[120px] overflow-y-auto">
+                {field.options?.map((option) => (
+                  <div 
+                    key={option.value} 
+                    className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${selectedValues.includes(option.value) ? 'bg-coral-50' : ''}`}
+                    onClick={() => {
+                      const newValues = selectedValues.includes(option.value)
+                        ? selectedValues.filter(v => v !== option.value)
+                        : [...selectedValues, option.value];
+                      setEditValue(newValues);
+                    }}
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: option.color }} 
+                    />
+                    <span>{option.label}</span>
+                    {selectedValues.includes(option.value) && (
+                      <Check size={14} className="ml-auto text-coral-500" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex mt-2">
                 <button 
                   onClick={() => handleSaveEdit(contact.id, field.id)}
-                  className="p-1 bg-green-500 text-white rounded-md text-xs"
+                  className="p-1 bg-coral-500 text-white rounded-md text-xs"
                 >
                   <Check size={14} />
                 </button>
@@ -266,7 +289,7 @@ export const ContactsTable: React.FC = () => {
               <Input 
                 value={String(editValue || '')} 
                 onChange={(e) => setEditValue(e.target.value)}
-                className="h-8 w-full min-w-[200px]"
+                className="h-8 w-full min-w-[220px]"
                 autoFocus
               />
               <button 
@@ -316,8 +339,7 @@ export const ContactsTable: React.FC = () => {
                 <Badge 
                   key={i} 
                   variant="secondary" 
-                  className="bg-muted text-muted-foreground"
-                  style={option ? { backgroundColor: option.color, color: '#fff' } : {}}
+                  style={option ? { backgroundColor: option.color, color: '#fff' } : { backgroundColor: '#F97316', color: '#fff' }}
                 >
                   {option?.label || tag}
                 </Badge>
@@ -332,7 +354,7 @@ export const ContactsTable: React.FC = () => {
             href={value} 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="text-primary hover:underline"
+            className="text-coral-500 hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             {value}
@@ -347,9 +369,40 @@ export const ContactsTable: React.FC = () => {
     }
   };
 
+  // Handle new option key down for select and multi-select
+  const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>, field: ContactField, type: 'select' | 'multi-select') => {
+    if (e.key === 'Enter' && newOption.trim()) {
+      e.preventDefault();
+      
+      // Create a new option
+      const newOptionValue = newOption.trim();
+      const newOptionObj: SelectOption = {
+        label: newOptionValue,
+        value: newOptionValue.toLowerCase().replace(/\s+/g, '-'),
+        color: '#F97316' // Default coral color
+      };
+      
+      // Add to field options
+      const updatedOptions = [...(field.options || []), newOptionObj];
+      updateField(field.id, { options: updatedOptions });
+      
+      // Set the value in the editor
+      if (type === 'select') {
+        setEditValue(newOptionObj.value);
+      } else if (type === 'multi-select') {
+        const currentValues = Array.isArray(editValue) ? editValue : [];
+        setEditValue([...currentValues, newOptionObj.value]);
+      }
+      
+      // Clear the input
+      setNewOption('');
+    }
+  };
+
   // Handle cell click to begin editing
   const handleCellClick = (contact: Contact, field: ContactField) => {
     setEditingCell({ contactId: contact.id, fieldId: field.id });
+    setNewOption('');
     
     // Initialize edit value based on field type
     let initialValue;
@@ -368,6 +421,13 @@ export const ContactsTable: React.FC = () => {
     }
     
     setEditValue(initialValue);
+    
+    // Focus new option input if it's a select or multi-select
+    setTimeout(() => {
+      if (field.type === 'select' || field.type === 'multi-select') {
+        newOptionInputRef.current?.focus();
+      }
+    }, 100);
   };
 
   // Handle saving edited value
@@ -384,7 +444,7 @@ export const ContactsTable: React.FC = () => {
             {visibleFields.map((field) => (
               <TableHead key={field.id} className="whitespace-nowrap">
                 <Popover>
-                  <PopoverTrigger className="cursor-pointer hover:text-primary flex items-center">
+                  <PopoverTrigger className="cursor-pointer hover:text-coral-500 flex items-center">
                     {field.name}
                   </PopoverTrigger>
                   <PopoverContent>

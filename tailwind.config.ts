@@ -53,6 +53,18 @@ export default {
 					DEFAULT: '#E5E7EB', // Light gray accent
 					foreground: '#111827'
 				},
+				coral: {
+					50: '#FFF5F2',
+					100: '#FFEAE5',
+					200: '#FFDAD1',
+					300: '#FFC5B8',
+					400: '#FFAD99',
+					500: '#F97316', // Main coral color
+					600: '#E25F27',
+					700: '#C8451E',
+					800: '#A43116',
+					900: '#832710',
+				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
 					foreground: 'hsl(var(--popover-foreground))'
