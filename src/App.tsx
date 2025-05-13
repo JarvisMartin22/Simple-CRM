@@ -6,6 +6,7 @@ import Layout from './components/layout/Layout';
 import { Toaster } from './components/ui/toaster';
 import { ContactsProvider } from './contexts/ContactsContext';
 import { CompaniesProvider } from './contexts/CompaniesContext';
+import { PipelinesProvider } from './contexts/PipelinesContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
