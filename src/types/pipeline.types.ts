@@ -51,7 +51,7 @@ export interface DatabaseDeal {
   value?: number | null;
   probability?: number | null;
   close_date?: string | null;
-  company_id?: string | null; // Added this field
+  company_id?: string | null;
   contact_id?: string | null;
   notes?: string | null;
   created_at: string;
