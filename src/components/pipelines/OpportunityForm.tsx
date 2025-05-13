@@ -42,8 +42,8 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
         setValue('value', currentOpportunity.value || undefined);
         setValue('probability', currentOpportunity.probability || undefined);
         setValue('expected_close_date', currentOpportunity.expected_close_date || undefined);
-        setValue('company_id', currentOpportunity.company_id || undefined);
-        setValue('contact_id', currentOpportunity.contact_id || undefined);
+        setValue('company_id', currentOpportunity.company_id || 'none');
+        setValue('contact_id', currentOpportunity.contact_id || 'none');
         setValue('details', currentOpportunity.details || '');
       } else {
         // Reset form for new opportunity
@@ -53,8 +53,8 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
           value: undefined,
           probability: undefined,
           expected_close_date: undefined,
-          company_id: undefined,
-          contact_id: undefined,
+          company_id: 'none',
+          contact_id: 'none',
           details: '',
         });
       }
@@ -64,6 +64,10 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
   const onSubmit = async (data: any) => {
     try {
       if (!currentPipeline) return;
+      
+      // Convert 'none' values to null before submission
+      if (data.company_id === 'none') data.company_id = null;
+      if (data.contact_id === 'none') data.contact_id = null;
       
       if (isEditing && currentOpportunity) {
         await updateOpportunity({
@@ -90,10 +94,10 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
   if (!currentPipeline) return null;
 
   // Prepare data for select fields
-  const stageOptions = currentPipeline.stages.map(stage => ({
+  const stageOptions = currentPipeline.stages?.map(stage => ({
     value: stage.id,
     label: stage.name
-  }));
+  })) || [];
 
   const companyOptions = companies.map(company => ({
     value: company.id,
@@ -130,7 +134,7 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
             <FormField id="stage" label="Stage" required>
               <SelectField
                 options={stageOptions}
-                value={currentOpportunity?.stage || currentPipeline.stages[0]?.id}
+                value={currentOpportunity?.stage || (currentPipeline.stages && currentPipeline.stages[0]?.id)}
                 onValueChange={(value) => setValue('stage', value)}
                 placeholder="Select a stage"
               />
@@ -182,7 +186,7 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
             <FormField id="company_id" label="Company">
               <SelectField
                 options={companyOptions}
-                value={currentOpportunity?.company_id || ''}
+                value={currentOpportunity?.company_id || 'none'}
                 onValueChange={(value) => setValue('company_id', value)}
                 placeholder="Select a company"
                 emptyOption
@@ -192,7 +196,7 @@ export const OpportunityForm: React.FC<OpportunityFormProps> = ({
             <FormField id="contact_id" label="Contact">
               <SelectField
                 options={contactOptions}
-                value={currentOpportunity?.contact_id || ''}
+                value={currentOpportunity?.contact_id || 'none'}
                 onValueChange={(value) => setValue('contact_id', value)}
                 placeholder="Select a contact"
                 emptyOption

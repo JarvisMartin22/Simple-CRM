@@ -7,6 +7,8 @@ export type ToastProps = ToastT & {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
+  variant?: "default" | "destructive" // Add variant property for compatibility
+  open?: boolean // Add open property for compatibility
 }
 
 const TOAST_LIMIT = 5

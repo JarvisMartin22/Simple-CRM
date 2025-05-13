@@ -34,7 +34,7 @@ const PipelinesContent = () => {
     );
   }
 
-  // If no pipelines exist and we're not loading, show the create form or button
+  // If no pipelines exist and we're not loading, show the create button
   if (pipelines.length === 0) {
     return (
       <div className="space-y-6">
@@ -46,21 +46,23 @@ const PipelinesContent = () => {
         </div>
         
         <Card className="shadow-sm p-8 flex flex-col items-center justify-center text-center">
-          {createFormOpen ? (
-            <CreatePipelineForm onClose={() => setCreateFormOpen(false)} />
-          ) : (
-            <div className="max-w-md mx-auto">
-              <h2 className="text-xl font-semibold mb-3">Create Your First Pipeline</h2>
-              <p className="text-gray-500 mb-6">
-                Set up your first sales pipeline to start tracking opportunities and deals.
-              </p>
-              <Button onClick={() => setCreateFormOpen(true)}>
-                <Plus size={16} className="mr-2" />
-                Create Pipeline
-              </Button>
-            </div>
-          )}
+          <div className="max-w-md mx-auto">
+            <h2 className="text-xl font-semibold mb-3">Create Your First Pipeline</h2>
+            <p className="text-gray-500 mb-6">
+              Set up your first sales pipeline to start tracking opportunities and deals.
+            </p>
+            <Button onClick={() => setCreateFormOpen(true)}>
+              <Plus size={16} className="mr-2" />
+              Create Pipeline
+            </Button>
+          </div>
         </Card>
+
+        {/* Modal form for creating pipeline */}
+        <CreatePipelineForm
+          open={createFormOpen}
+          onClose={() => setCreateFormOpen(false)}
+        />
       </div>
     );
   }

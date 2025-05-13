@@ -15,7 +15,7 @@ interface SelectOption {
 
 interface SelectFieldProps {
   options: SelectOption[];
-  value?: string;
+  value?: string | null;
   onValueChange: (value: string) => void;
   placeholder: string;
   emptyOption?: boolean;
@@ -24,22 +24,25 @@ interface SelectFieldProps {
 
 export const SelectField: React.FC<SelectFieldProps> = ({
   options,
-  value,
+  value = '',
   onValueChange,
   placeholder,
   emptyOption = false,
   emptyOptionLabel = "None"
 }) => {
+  // Ensure value is never null or undefined
+  const safeValue = value || '';
+  
   return (
     <Select 
-      defaultValue={value}
+      value={safeValue}
       onValueChange={onValueChange}
     >
       <SelectTrigger>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {emptyOption && <SelectItem value="">{emptyOptionLabel}</SelectItem>}
+        {emptyOption && <SelectItem value="none">{emptyOptionLabel}</SelectItem>}
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
