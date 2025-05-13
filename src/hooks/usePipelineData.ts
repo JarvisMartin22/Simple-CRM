@@ -59,10 +59,15 @@ export const usePipelineData = () => {
     try {
       // First attempt using RPC if configured
       try {
-        // Fix the TypeScript error by using a properly typed parameters object
-        const { data, error } = await supabase.rpc('get_opportunities_by_pipeline', {
-          p_pipeline_id: pipelineId
-        } as { p_pipeline_id: string });
+        // Define the parameter type explicitly to fix TypeScript error
+        interface GetOpportunitiesParams {
+          p_pipeline_id: string;
+        }
+
+        const { data, error } = await supabase.rpc<any>(
+          'get_opportunities_by_pipeline', 
+          { p_pipeline_id: pipelineId } as GetOpportunitiesParams
+        );
         
         if (!error && data) {
           // Map the data to our Opportunity interface
