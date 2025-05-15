@@ -9,11 +9,143 @@ let isMessageListenerAttached = false;
 let activeAuthPopup: Window | null = null;
 let authPromiseResolve: ((value: boolean) => void) | null = null;
 
+// Function to check localStorage for auth code
+async function processStoredAuthCode(user: any, queryClient: any, toast: any): Promise<boolean> {
+  try {
+    const storedCode = localStorage.getItem('gmail_auth_code');
+    const timestamp = localStorage.getItem('gmail_auth_timestamp');
+    
+    if (!storedCode || !timestamp) return false;
+    
+    // Only process codes that are less than 10 minutes old
+    const codeTime = new Date(timestamp).getTime();
+    const now = new Date().getTime();
+    const tenMinutes = 10 * 60 * 1000;
+    
+    if (now - codeTime > tenMinutes) {
+      // Code is too old, remove it
+      localStorage.removeItem('gmail_auth_code');
+      localStorage.removeItem('gmail_auth_timestamp');
+      return false;
+    }
+    
+    console.log('Found stored auth code, processing...');
+    
+    // Call Gmail auth endpoint with the code
+    const tokenResponse = await supabase.functions.invoke('gmail-auth', {
+      body: { code: storedCode }
+    });
+    
+    if (tokenResponse.error) {
+      console.error('Error processing stored auth code:', tokenResponse.error);
+      return false;
+    }
+    
+    console.log('Token response data from stored code:', JSON.stringify(tokenResponse.data));
+    console.log('Token response structure check:', {
+      hasProvider: 'provider' in tokenResponse.data,
+      hasAccessToken: 'access_token' in tokenResponse.data,
+      dataType: typeof tokenResponse.data,
+      hasUrl: 'url' in tokenResponse.data // Check if we're getting an auth URL instead of tokens
+    });
+    
+    // Add full token response debugging
+    console.log('Full token response (stored code):', JSON.stringify(tokenResponse));
+    
+    // Extract only the fields that exist in the user_integrations table
+    // Use default values for required fields to prevent null constraint errors
+    const integrationData = {
+      user_id: user?.id,
+      provider: tokenResponse.data.provider || "gmail", // Default to "gmail" if not provided
+      provider_user_id: tokenResponse.data.provider_user_id || null,
+      email: tokenResponse.data.email || null,
+      access_token: tokenResponse.data.access_token || "",
+      refresh_token: tokenResponse.data.refresh_token || null,
+      expires_at: tokenResponse.data.expires_at || null,
+      scope: tokenResponse.data.scope || null
+    };
+    
+    console.log('Integration data constructed (stored code):', {
+      provider: integrationData.provider,
+      access_token_exists: !!integrationData.access_token,
+      email: integrationData.email
+    });
+    
+    // Validate required fields are present
+    if (!integrationData.provider || !integrationData.access_token) {
+      console.error('Missing required fields for integration from stored code', integrationData);
+      return false;
+    }
+    
+    // Save integration data to database
+    console.log('Saving integration data to database');
+    console.log('Integration data being saved:', JSON.stringify(integrationData));
+    
+    const { error: integrationError, data: savedData } = await supabase
+      .from('user_integrations')
+      .upsert(integrationData)
+      .select();
+      
+    if (integrationError) {
+      console.error('Error saving integration:', integrationError);
+      console.error('Error details:', JSON.stringify(integrationError));
+      
+      // If we get a error, try to save to localStorage as fallback
+      console.log('Got database error, saving to localStorage as fallback');
+      localStorage.setItem('gmail_integration', JSON.stringify({
+        ...integrationData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      // Check if localStorage has the integration data
+      const storedIntegration = localStorage.getItem('gmail_integration');
+      console.log('Checking localStorage fallback data:', storedIntegration ? 'Found data' : 'No data found');
+      
+      // Don't throw, continue with toast notification
+      console.log('Integration data saved to localStorage');
+    } else {
+      console.log('Integration data saved successfully to database');
+    }
+    
+    toast({
+      title: "Gmail connected successfully",
+      description: `Connected as ${tokenResponse.data.email}`,
+    });
+    
+    // Invalidate all queries that might depend on email connection
+    queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
+    queryClient.invalidateQueries({ queryKey: ['email-integration'] });
+    queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
+    queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+    
+    // Remove the stored code since it's been used
+    localStorage.removeItem('gmail_auth_code');
+    localStorage.removeItem('gmail_auth_timestamp');
+    
+    return true;
+  } catch (error) {
+    console.error('Error processing stored auth code:', error);
+    return false;
+  }
+}
+
 export function useGmailConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Check for stored auth code on component mount
+  useEffect(() => {
+    if (user?.id) {
+      processStoredAuthCode(user, queryClient, toast).then(success => {
+        if (success) {
+          console.log('Successfully processed stored auth code');
+        }
+      });
+    }
+  }, [user?.id]);
 
   // Define message handler function
   const handleAuthMessage = async (event: MessageEvent) => {
@@ -42,34 +174,69 @@ export function useGmailConnect() {
         }
         
         console.log('Token response received:', tokenResponse);
+        console.log('Token response data:', JSON.stringify(tokenResponse.data));
+        console.log('Token response structure check:', {
+          hasProvider: 'provider' in tokenResponse.data,
+          hasAccessToken: 'access_token' in tokenResponse.data,
+          dataType: typeof tokenResponse.data,
+          hasUrl: 'url' in tokenResponse.data // Check if we're getting an auth URL instead of tokens
+        });
+        
+        // Add full token response debugging
+        console.log('Full token response (popup):', JSON.stringify(tokenResponse));
+        
+        // Extract only the fields that exist in the user_integrations table
+        // Use default values for required fields to prevent null constraint errors
+        const integrationData = {
+          user_id: user?.id,
+          provider: tokenResponse.data.provider || "gmail", // Default to "gmail" if not provided
+          provider_user_id: tokenResponse.data.provider_user_id || null,
+          email: tokenResponse.data.email || null,
+          access_token: tokenResponse.data.access_token || "",
+          refresh_token: tokenResponse.data.refresh_token || null,
+          expires_at: tokenResponse.data.expires_at || null,
+          scope: tokenResponse.data.scope || null
+        };
+        
+        console.log('Integration data constructed (popup):', {
+          provider: integrationData.provider,
+          access_token_exists: !!integrationData.access_token,
+          email: integrationData.email
+        });
+        
+        // Validate required fields are present
+        if (!integrationData.provider || !integrationData.access_token) {
+          console.error('Missing required fields for integration', integrationData);
+          throw new Error('Missing required fields for integration');
+        }
         
         // Save integration data to database
         console.log('Saving integration data to database');
-        const { error: integrationError } = await supabase
+        console.log('Integration data being saved:', JSON.stringify(integrationData));
+        
+        const { error: integrationError, data: savedData } = await supabase
           .from('user_integrations')
-          .upsert({
-            user_id: user?.id,
-            ...tokenResponse.data
-          });
+          .upsert(integrationData)
+          .select();
           
         if (integrationError) {
           console.error('Error saving integration:', integrationError);
+          console.error('Error details:', JSON.stringify(integrationError));
           
-          // If we get a 406 error, try to save to localStorage as fallback
-          if ((integrationError as any).status === 406) {
-            console.log('Got 406 error, saving to localStorage as fallback');
-            localStorage.setItem('gmail_integration', JSON.stringify({
-              user_id: user?.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              ...tokenResponse.data
-            }));
-            
-            // Don't throw, continue with toast notification
-            console.log('Integration data saved to localStorage');
-          } else {
-            throw integrationError;
-          }
+          // If we get a error, try to save to localStorage as fallback
+          console.log('Got database error, saving to localStorage as fallback');
+          localStorage.setItem('gmail_integration', JSON.stringify({
+            ...integrationData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }));
+          
+          // Check if localStorage has the integration data
+          const storedIntegration = localStorage.getItem('gmail_integration');
+          console.log('Checking localStorage fallback data:', storedIntegration ? 'Found data' : 'No data found');
+          
+          // Don't throw, continue with toast notification
+          console.log('Integration data saved to localStorage');
         } else {
           console.log('Integration data saved successfully to database');
         }
@@ -185,12 +352,26 @@ export function useGmailConnect() {
             console.log('Popup closed by user without completing auth');
             clearInterval(checkClosed);
             
-            // If the popup was closed without completing auth
-            if (authPromiseResolve) {
-              setIsConnecting(false);
-              authPromiseResolve(false);
-              authPromiseResolve = null;
-            }
+            // Check if we have a stored auth code as a fallback
+            processStoredAuthCode(user, queryClient, toast).then(success => {
+              if (success) {
+                console.log('Successfully processed stored auth code after popup closed');
+                // If we have successfully processed the stored auth code, resolve the promise
+                if (authPromiseResolve) {
+                  setIsConnecting(false);
+                  authPromiseResolve(true);
+                  authPromiseResolve = null;
+                  return;
+                }
+              }
+              
+              // If there's no stored auth code or processing failed, just resolve the promise as failed
+              if (authPromiseResolve) {
+                setIsConnecting(false);
+                authPromiseResolve(false);
+                authPromiseResolve = null;
+              }
+            });
           }
         }, 1000);
       });

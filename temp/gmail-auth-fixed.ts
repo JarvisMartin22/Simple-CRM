@@ -137,7 +137,7 @@ serve(async (req) => {
     // Exchange authorization code for tokens
     if (params.has("code")) {
       const code = params.get("code");
-      console.log("Code received:", code);
+      console.log("Code received from URL params:", code);
       console.log("Using redirect URI:", REDIRECT_URI);
       console.log("Client ID (first 4 chars):", GOOGLE_CLIENT_ID.substring(0, 4) + "...");
       
@@ -172,7 +172,6 @@ serve(async (req) => {
       
       const userInfo = await userInfoResponse.json();
       
-      // Store integration data in Supabase
       // Return tokens and user info to the client
       return new Response(
         JSON.stringify({
@@ -217,4 +216,4 @@ serve(async (req) => {
       }
     );
   }
-});
+}); 
