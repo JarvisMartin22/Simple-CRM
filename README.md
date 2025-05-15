@@ -71,3 +71,53 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Feature Highlights
+
+### Contact Management
+- Create and manage contacts with customizable fields
+- In-line editing for all contact fields
+- Field types: text, number, date, select, multi-select, boolean
+- Add, edit, and remove custom fields
+
+### Company Management
+- Track companies with custom fields
+- Associate contacts with companies
+- View company activity
+
+### Deal Pipeline
+- Visual pipeline board for tracking deals
+- Drag and drop deals between stages
+- Custom pipeline stages and deal properties
+
+### Tasks & Notes
+- Create tasks associated with contacts, companies or deals
+- Take notes and attach them to records
+- Set due dates and reminders
+
+### Email Integration
+- Connect Gmail accounts via OAuth
+- Track email opens and clicks
+- Two-way sync with Gmail contacts
+- Send emails directly from the CRM
+- View email history for contacts
+- Compose emails with rich text editor
+
+### Gmail OAuth Configuration
+To properly configure the Gmail OAuth integration:
+
+1. Set up a Google OAuth Client ID and Client Secret in the [Google Cloud Console](https://console.cloud.google.com/)
+2. Configure the Supabase Edge Function environment variables:
+   ```
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GMAIL_REDIRECT_URI=https://your-domain.com/auth-callback.html
+   ```
+3. Ensure the redirect URI points to the `auth-callback.html` page in your domain
+
+**Important**: For local development, set the GMAIL_REDIRECT_URI to `http://localhost:5173/auth-callback.html` (or your local dev server URL).
+
+### Campaign Management
+- Create and track email campaigns
+- View campaign performance metrics
+- Monitor open and click rates

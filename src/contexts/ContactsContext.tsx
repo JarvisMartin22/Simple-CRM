@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Define types for our contact fields
@@ -79,6 +78,13 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const addField = (field: Omit<ContactField, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9); // Simple ID generation
     setFields([...fields, { ...field, id }]);
+    // Add the new field to all existing contacts
+    setContacts(prevContacts =>
+      prevContacts.map(contact => ({
+        ...contact,
+        [id]: field.type === 'multi-select' ? [] : ''
+      }))
+    );
   };
 
   // Update existing field
@@ -108,55 +114,52 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Add new contact
   const addContact = (contact: Omit<Contact, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9); // Simple ID generation
-    
-    // Ensure multi-select fields are arrays
-    const processedContact = { ...contact };
-    
+    // Initialize all fields for the new contact
+    const initializedContact: Contact = { id };
     fields.forEach(field => {
-      if (field.type === 'multi-select' && processedContact[field.id]) {
-        if (!Array.isArray(processedContact[field.id])) {
-          processedContact[field.id] = [processedContact[field.id]];
-        }
+      if (contact[field.id] !== undefined) {
+        initializedContact[field.id] = contact[field.id];
+      } else if (field.type === 'multi-select') {
+        initializedContact[field.id] = [];
+      } else {
+        initializedContact[field.id] = '';
       }
     });
-    
-    setContacts(prev => [...prev, { ...processedContact, id }]);
-    console.log("Added new contact:", { ...processedContact, id });
+    setContacts(prev => [...prev, initializedContact]);
   };
 
   // Update contact field value with enhanced debugging
   const updateContact = (id: string, fieldId: string, value: any) => {
-    console.log("ContactsContext updating contact:", { id, fieldId, value, type: typeof value, isArray: Array.isArray(value) });
-    
     // Get the field definition to determine how to handle the value
     const fieldDef = fields.find(field => field.id === fieldId);
-    console.log("Field definition:", fieldDef);
-    
     setContacts(prevContacts => {
-      // Create a new contacts array with the updated contact
-      const updatedContacts = prevContacts.map(contact => {
+      return prevContacts.map(contact => {
         if (contact.id === id) {
-          // Create a new contact object with the updated field
           const updatedContact = { ...contact };
-          
-          // Handle special field types
-          if (fieldDef?.type === 'multi-select') {
-            // Always ensure multi-select values are arrays
-            updatedContact[fieldId] = Array.isArray(value) ? value : value ? [value] : [];
-            console.log("Multi-select value saved as:", updatedContact[fieldId]);
-          } else {
-            // For all other field types, use the value directly
-            updatedContact[fieldId] = value;
-            console.log("Standard value saved as:", updatedContact[fieldId]);
+          switch (fieldDef?.type) {
+            case 'multi-select':
+              updatedContact[fieldId] = Array.isArray(value) ? value : value ? [value] : [];
+              break;
+            case 'number':
+              updatedContact[fieldId] = value === '' ? null : Number(value);
+              break;
+            case 'date':
+              updatedContact[fieldId] = value ? (typeof value === 'string' ? value : value.toISOString()) : null;
+              break;
+            case 'checkbox':
+              updatedContact[fieldId] = Boolean(value);
+              break;
+            case 'select':
+            case 'status':
+              updatedContact[fieldId] = value || null;
+              break;
+            default:
+              updatedContact[fieldId] = value;
           }
-          
           return updatedContact;
         }
         return contact;
       });
-      
-      console.log("Updated contacts array:", updatedContacts);
-      return updatedContacts;
     });
   };
 

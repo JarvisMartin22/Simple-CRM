@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,12 +8,16 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useGmailConnect } from "@/hooks/useGmailConnect";
+import { useGmailDisconnect } from "@/hooks/useGmailDisconnect";
+import { ConfirmDisconnect } from "./ConfirmDisconnect";
 
 interface Integration {
   id: string;
   provider: string;
   email: string;
   access_token: string;
+  created_at: string;
   refresh_token: string | null;
   expires_at: string | null;
 }
@@ -27,32 +30,98 @@ interface EmailStats {
 
 const GmailIntegration = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { connectGmail, isConnecting, resetConnectionState } = useGmailConnect();
+  const { disconnectGmail, isDisconnecting } = useGmailDisconnect();
+  const [localStorageIntegration, setLocalStorageIntegration] = useState<Integration | null>(null);
+  
+  // Check localStorage for integration data
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        const storedData = localStorage.getItem('gmail_integration');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          if (parsedData.user_id === user.id) {
+            setLocalStorageIntegration(parsedData as Integration);
+            console.log('GmailIntegration: Found integration data in localStorage');
+          }
+        }
+      } catch (e) {
+        console.error("GmailIntegration: Error reading from localStorage:", e);
+      }
+    }
+  }, [user?.id]);
+  
+  // Handle connection timeout
+  useEffect(() => {
+    let timeoutId: number | null = null;
+    
+    if (isConnecting) {
+      console.log('GmailIntegration: Connection started, setting timeout');
+      // If connecting takes more than 2 minutes, reset the state
+      timeoutId = window.setTimeout(() => {
+        console.log('GmailIntegration: Connection timeout - resetting state');
+        resetConnectionState();
+        toast({
+          title: "Connection timeout",
+          description: "The connection attempt took too long. Please try again.",
+          variant: "destructive"
+        });
+      }, 2 * 60 * 1000);
+    }
+    
+    return () => {
+      if (timeoutId) {
+        console.log('GmailIntegration: Clearing timeout');
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [isConnecting, resetConnectionState, toast]);
   
   // Fetch integration data
-  const { data: integration, isLoading, error, refetch } = useQuery<Integration | null>({
+  const { data: dbIntegration, isLoading, error, refetch } = useQuery<Integration | null>({
     queryKey: ['gmail-integration', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       
-      const { data, error } = await supabase
-        .from('user_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('provider', 'gmail')
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('user_integrations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('provider', 'gmail')
+          .single();
+          
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No integration found, this is expected for new users
+            console.log("GmailIntegration: No integration found (PGRST116)");
+            return null;
+          } else if ((error as any).status === 406) {
+            // 406 Not Acceptable error - likely header issue
+            console.error("GmailIntegration: 406 error fetching integration:", error);
+            // Return null instead of throwing to prevent app crash
+            return null;
+          } else {
+            console.error("GmailIntegration: Error fetching integration:", error);
+            throw error;
+          }
+        }
         
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "Row Not Found"
-        console.error("Error fetching integration:", error);
-        throw error;
+        return data as Integration | null;
+      } catch (e) {
+        console.error("GmailIntegration: Unexpected error:", e);
+        // Return null to prevent app from crashing on unexpected errors
+        return null;
       }
-      
-      return data as Integration | null;
     },
     enabled: !!user?.id,
   });
+  
+  // Get effective integration (prioritize database, fallback to localStorage)
+  const integration = dbIntegration || localStorageIntegration;
   
   // Fetch email stats if connected
   const { data: emailStats } = useQuery<EmailStats>({
@@ -80,137 +149,42 @@ const GmailIntegration = () => {
   });
   
   const handleConnect = async () => {
+    console.log('GmailIntegration: initiating connection');
     try {
-      setIsConnecting(true);
-      
-      // Call the Gmail auth Edge Function to get OAuth URL
-      const response = await supabase.functions.invoke('gmail-auth');
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      // Open OAuth URL in a popup window
-      const authUrl = response.data.url;
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      
-      const popup = window.open(
-        authUrl,
-        'Gmail Authorization',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-      
-      if (!popup) {
-        throw new Error('Popup blocked. Please enable popups for this site.');
-      }
-      
-      // Poll for popup closure or redirect
-      const pollTimer = setInterval(async () => {
-        try {
-          if (popup.closed) {
-            clearInterval(pollTimer);
-            setIsConnecting(false);
-            return;
-          }
-          
-          const currentUrl = popup.location.href;
-          
-          if (currentUrl.includes('code=')) {
-            clearInterval(pollTimer);
-            popup.close();
-            
-            // Extract code from URL
-            const url = new URL(currentUrl);
-            const code = url.searchParams.get('code');
-            
-            if (code) {
-              // Call Gmail auth endpoint with the code
-              const tokenResponse = await supabase.functions.invoke('gmail-auth', {
-                body: { code }
-              });
-              
-              if (tokenResponse.error) {
-                throw new Error(tokenResponse.error);
-              }
-              
-              // Save integration data to database
-              const { error: integrationError } = await supabase
-                .from('user_integrations')
-                .upsert({
-                  user_id: user?.id,
-                  ...tokenResponse.data
-                });
-                
-              if (integrationError) {
-                throw integrationError;
-              }
-              
-              toast({
-                title: "Gmail connected successfully",
-                description: `Connected as ${tokenResponse.data.email}`,
-              });
-              
-              refetch();
-              setIsDialogOpen(false);
-            }
-          }
-        } catch (e) {
-          console.error("Error in OAuth flow:", e);
-          clearInterval(pollTimer);
-          setIsConnecting(false);
-          
-          toast({
-            title: "Connection failed",
-            description: "There was an error connecting to Gmail.",
-            variant: "destructive"
-          });
+      const success = await connectGmail();
+      console.log('GmailIntegration: connection result:', success);
+      if (success) {
+        setIsDialogOpen(false);
+        await refetch();
+        // Check localStorage too
+        const storedData = localStorage.getItem('gmail_integration');
+        if (storedData) {
+          setLocalStorageIntegration(JSON.parse(storedData) as Integration);
         }
-      }, 1000);
-      
+      }
     } catch (error) {
-      console.error("Error initiating OAuth flow:", error);
-      setIsConnecting(false);
-      
-      toast({
-        title: "Connection failed",
-        description: "There was an error connecting to Gmail.",
-        variant: "destructive"
-      });
+      console.error('GmailIntegration: connection error:', error);
     }
   };
   
   const handleDisconnect = async () => {
     if (!integration) return;
-    
+    console.log('GmailIntegration: disconnecting');
     try {
-      // Delete the integration from the database
-      const { error } = await supabase
-        .from('user_integrations')
-        .delete()
-        .eq('id', integration.id);
-        
-      if (error) {
-        throw error;
+      // If we have a DB integration, disconnect it
+      if (dbIntegration?.id) {
+        await disconnectGmail(dbIntegration.id);
       }
       
-      toast({
-        title: "Gmail disconnected",
-        description: "Your Gmail account has been disconnected from the CRM.",
-      });
+      // Also remove from localStorage if present
+      if (localStorageIntegration) {
+        localStorage.removeItem('gmail_integration');
+        setLocalStorageIntegration(null);
+      }
       
-      refetch();
-      
+      await refetch();
     } catch (error) {
-      console.error("Error disconnecting Gmail:", error);
-      
-      toast({
-        title: "Disconnection failed",
-        description: "There was an error disconnecting from Gmail.",
-        variant: "destructive"
-      });
+      console.error('GmailIntegration: disconnection error:', error);
     }
   };
   
@@ -224,176 +198,139 @@ const GmailIntegration = () => {
       variant: "destructive"
     });
   }
-
+  
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div className="flex items-center space-x-2">
-            <Mail className="h-5 w-5 text-red-500" />
-            <CardTitle>Gmail Integration</CardTitle>
-            {isLoading ? (
-              <Badge className="ml-2 bg-gray-300">
-                <Loader2 size={12} className="mr-1 animate-spin" />
-                Loading
-              </Badge>
-            ) : isConnected ? (
-              <Badge className="ml-2 bg-green-500">
-                <Check size={12} className="mr-1" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge className="ml-2 bg-gray-400">Not Connected</Badge>
-            )}
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>Gmail</CardTitle>
+            <CardDescription>
+              Send emails and import contacts from Gmail
+            </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent>
-          <CardDescription className="pb-4">
-            Connect your Gmail account to sync emails and contacts with the CRM.
-          </CardDescription>
-          
           {isConnected ? (
-            <div className="space-y-4">
-              <div className="flex flex-col space-y-1">
-                <span className="font-medium">Account</span>
-                <span className="text-sm text-gray-500">{integration.email}</span>
-              </div>
-              
-              <div className="flex flex-col space-y-1">
-                <span className="font-medium">Sync Status</span>
-                <div className="flex items-center space-x-2">
-                  <Badge className="bg-blue-500">Syncing</Badge>
-                  <span className="text-sm text-gray-500">Last synced 5 minutes ago</span>
-                </div>
-              </div>
-              
-              <div className="flex flex-col space-y-1">
-                <span className="font-medium">Email Tracking</span>
-                <div className="flex items-center space-x-2">
-                  <Badge className="bg-green-500">Active</Badge>
+            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
+              <Check className="w-3 h-3 mr-1" /> Connected
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isConnected ? (
+          <>
+            <div className="bg-gray-50 p-3 rounded-md mb-4">
+              <div className="flex items-center">
+                <Mail className="text-gray-500 mr-2 h-5 w-5" />
+                <div>
+                  <div className="font-medium">{integration.email}</div>
+                  <div className="text-gray-500 text-sm">
+                    Connected {new Date(integration.created_at).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">
-              Connecting Gmail allows you to track emails, sync contacts, and automate workflows based on email interactions.
-            </p>
-          )}
-        </CardContent>
-        <CardFooter>
-          {isConnected ? (
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleDisconnect}>Disconnect</Button>
-              <Button>Configure Settings</Button>
+            
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-blue-50 p-3 rounded-md text-center">
+                <div className="text-blue-600 font-medium text-xl">{emailStats.sent}</div>
+                <div className="text-gray-500 text-sm">Emails Sent</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-md text-center">
+                <div className="text-green-600 font-medium text-xl">{emailStats.opened}</div>
+                <div className="text-gray-500 text-sm">Opened</div>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-md text-center">
+                <div className="text-purple-600 font-medium text-xl">{emailStats.replied}</div>
+                <div className="text-gray-500 text-sm">Replies</div>
+              </div>
             </div>
-          ) : (
+            
+            {isDisconnecting ? (
+              <Button disabled className="w-full">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Disconnecting...
+              </Button>
+            ) : (
+              <ConfirmDisconnect 
+                onConfirm={handleDisconnect}
+                isDisconnecting={isDisconnecting}
+                serviceName="Gmail"
+              >
+                <Button variant="outline" className="w-full text-gray-600 border-gray-300">
+                  Disconnect Gmail
+                </Button>
+              </ConfirmDisconnect>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 flex items-start mb-4">
+              <AlertCircle className="text-yellow-600 mr-2 h-5 w-5 mt-0.5" />
+              <div>
+                <p className="text-sm text-yellow-800">
+                  Connect your Gmail account to enable email tracking, sending, and contact import features.
+                </p>
+              </div>
+            </div>
+            
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>Connect Gmail</Button>
+                <Button className="w-full">
+                  Connect Gmail
+                </Button>
               </DialogTrigger>
+              
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Connect to Gmail</DialogTitle>
+                  <DialogTitle>Connect Gmail</DialogTitle>
                   <DialogDescription>
-                    This will allow the CRM to access your Gmail account to sync emails and contacts.
+                    Connect your Gmail account to import contacts and send emails directly from the CRM.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                  <div className="rounded-md bg-amber-50 p-4 mb-4">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <AlertCircle className="h-5 w-5 text-amber-400" aria-hidden="true" />
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-amber-800">
-                          You will be redirected to Google to authorize this application.
-                        </p>
-                      </div>
-                    </div>
+                <div className="space-y-4 py-4">
+                  <div className="bg-gray-50 p-4 rounded-md text-sm">
+                    <p className="font-medium mb-2">What permissions will be requested:</p>
+                    <ul className="list-disc list-inside text-gray-700 text-sm space-y-1">
+                      <li>Read your Gmail contacts</li>
+                      <li>Send emails on your behalf</li>
+                      <li>View your email address</li>
+                      <li>View your basic profile info</li>
+                    </ul>
+                    <p className="mt-4 text-xs text-gray-500">
+                      We only use these permissions to provide the features you request. 
+                      Your data is never shared with third parties.
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    The CRM requires the following permissions:
-                  </p>
-                  <ul className="list-disc pl-5 mt-2 text-sm text-gray-500 space-y-1">
-                    <li>Read and send emails</li>
-                    <li>Access contact information</li>
-                    <li>Manage labels and folders</li>
-                  </ul>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                    disabled={isConnecting}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleConnect} disabled={isConnecting}>
-                    {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Continue with Google
+                  <Button 
+                    onClick={handleConnect}
+                    disabled={isConnecting}
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      "Connect Gmail"
+                    )}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          )}
-        </CardFooter>
-      </Card>
-
-      {isConnected && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Email Tracking</CardTitle>
-              <CardDescription>
-                Configure how email tracking works with your Gmail account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">{emailStats.sent}</div>
-                    <div className="text-gray-500 text-sm">Emails Sent</div>
-                  </div>
-                  <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">{emailStats.opened}</div>
-                    <div className="text-gray-500 text-sm">Opens</div>
-                  </div>
-                  <div className="bg-white p-4 rounded-md border border-gray-100 text-center">
-                    <div className="text-2xl font-semibold">{emailStats.replied}</div>
-                    <div className="text-gray-500 text-sm">Replies</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Workflow Automation</CardTitle>
-              <CardDescription>
-                Set up automated workflows based on email interactions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-md border border-gray-100">
-                  <h3 className="font-medium mb-2">On Email Open</h3>
-                  <p className="text-sm text-gray-500">
-                    When a contact opens an email, create a follow-up task
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-md border border-gray-100">
-                  <h3 className="font-medium mb-2">On Email Reply</h3>
-                  <p className="text-sm text-gray-500">
-                    When a contact replies to an email, move to next pipeline stage
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline">Add New Workflow</Button>
-            </CardFooter>
-          </Card>
-        </>
-      )}
-    </>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

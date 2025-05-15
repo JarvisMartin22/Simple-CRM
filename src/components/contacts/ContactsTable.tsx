@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Table,
@@ -12,10 +11,19 @@ import { useContacts } from '@/contexts/ContactsContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ColumnEditPopover } from './ColumnEditPopover';
 import TableCellRenderer from './cells/TableCellRenderer';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useEmail } from '@/contexts/EmailContext';
+import { EmailComposer } from '@/components/email/EmailComposer';
+import { Mail } from 'lucide-react';
 
 export const ContactsTable: React.FC = () => {
-  const { contacts, visibleFields, updateContact } = useContacts();
+  const { contacts, fields, visibleFields, updateContact } = useContacts();
   const [editingCell, setEditingCell] = useState<{ contactId: string; fieldId: string } | null>(null);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [emailContact, setEmailContact] = useState<{ id: string, email: string, name: string } | null>(null);
+  const { isEmailConnected } = useEmail();
   
   // For debugging
   useEffect(() => {
@@ -26,6 +34,22 @@ export const ContactsTable: React.FC = () => {
   // Handle cell click to begin editing
   const handleCellClick = (contactId: string, fieldId: string) => {
     console.log("Cell clicked:", { contactId, fieldId });
+    
+    // Get the field to check if it exists
+    const field = visibleFields.find(f => f.id === fieldId);
+    if (!field) {
+      console.error("Field not found in visibleFields:", fieldId);
+      return;
+    }
+    
+    // Get the contact to check if it exists
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact) {
+      console.error("Contact not found:", contactId);
+      return;
+    }
+    
+    console.log("Setting editing cell:", { contactId, fieldId, value: contact[fieldId] });
     setEditingCell({ contactId, fieldId });
   };
 
@@ -65,6 +89,9 @@ export const ContactsTable: React.FC = () => {
     setEditingCell(null);
   };
 
+  // Find email field
+  const emailField = fields.find(field => field.id === 'email' || field.name.toLowerCase() === 'email');
+  
   if (contacts.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -74,52 +101,96 @@ export const ContactsTable: React.FC = () => {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
+    <div className="rounded-md border">
+      <table className="w-full caption-bottom">
+        <thead className="bg-muted/50">
+          <tr>
+            <th className="h-12 px-2">
+              <Checkbox
+                checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSelectedContacts(contacts.map(contact => contact.id));
+                  } else {
+                    setSelectedContacts([]);
+                  }
+                }}
+              />
+            </th>
             {visibleFields.map((field) => (
-              <TableHead key={field.id} className="whitespace-nowrap">
-                <Popover>
-                  <PopoverTrigger className="cursor-pointer hover:text-coral-500 flex items-center">
-                    {field.name}
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <ColumnEditPopover field={field} />
-                  </PopoverContent>
-                </Popover>
-              </TableHead>
+              <th
+                key={field.id}
+                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+              >
+                {field.name}
+              </th>
             ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+            <th className="h-12 px-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
           {contacts.map((contact) => (
-            <TableRow key={contact.id} className="hover:bg-muted/50">
-              {visibleFields.map((field) => {
-                const isEditing = 
-                  editingCell?.contactId === contact.id && 
-                  editingCell?.fieldId === field.id;
-                
-                return (
-                  <TableCell 
-                    key={`${contact.id}-${field.id}`}
-                    className="cursor-pointer min-w-[120px] relative"
+            <tr key={contact.id} className="border-t hover:bg-muted/50">
+              <td className="p-2">
+                <Checkbox
+                  checked={selectedContacts.includes(contact.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedContacts([...selectedContacts, contact.id]);
+                    } else {
+                      setSelectedContacts(selectedContacts.filter(id => id !== contact.id));
+                    }
+                  }}
+                />
+              </td>
+              {visibleFields.map((field) => (
+                <td 
+                  key={field.id} 
+                  className="p-2"
+                  onClick={() => handleCellClick(contact.id, field.id)}
+                >
+                  <TableCellRenderer
+                    contact={contact}
+                    field={field}
+                    isEditing={editingCell?.contactId === contact.id && editingCell?.fieldId === field.id}
+                    onSave={(value) => handleSaveEdit(contact.id, field.id, value)}
+                    onCancel={() => setEditingCell(null)}
+                    onClick={() => handleCellClick(contact.id, field.id)}
+                  />
+                </td>
+              ))}
+              <td className="p-2 text-right">
+                {emailField && contact[emailField.id] && isEmailConnected && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setEmailContact({
+                      id: contact.id,
+                      email: contact[emailField.id] as string,
+                      name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+                    })}
                   >
-                    <TableCellRenderer
-                      contact={contact}
-                      field={field}
-                      isEditing={isEditing}
-                      onSave={(value) => handleSaveEdit(contact.id, field.id, value)}
-                      onCancel={handleCancelEdit}
-                      onClick={() => handleCellClick(contact.id, field.id)}
-                    />
-                  </TableCell>
-                );
-              })}
-            </TableRow>
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                )}
+              </td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
+      {emailContact && (
+        <Dialog open={!!emailContact} onOpenChange={(open) => !open && setEmailContact(null)}>
+          <DialogContent className="p-0 max-w-[800px]">
+            <EmailComposer 
+              prefilledRecipient={emailContact.email}
+              prefilledSubject={`Re: ${emailContact.name}`}
+              contactId={emailContact.id}
+              onClose={() => setEmailContact(null)}
+              onSent={() => setEmailContact(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

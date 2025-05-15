@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { toast as sonnerToast } from 'sonner'
 
@@ -13,7 +12,7 @@ export type ToastProps = {
 }
 
 const TOAST_LIMIT = 5
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 7000 // Reduced from 1000000 to 7000ms (7 seconds)
 
 type ToasterToast = ToastProps
 
@@ -153,6 +152,11 @@ function toast({ ...props }: Toast) {
       open: true,
     },
   })
+
+  // Auto-dismiss after TOAST_REMOVE_DELAY
+  setTimeout(() => {
+    dispatch({ type: "DISMISS_TOAST", toastId: id })
+  }, TOAST_REMOVE_DELAY)
 
   return {
     id: id,

@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,13 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarIcon, ChevronDown, Copy, Edit, Eye, Filter, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Send, Settings, Trash2, Users } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Copy, Edit, Eye, Filter, MoreHorizontal, Pause, Play, Plus, RefreshCw, Search, Send, Settings, Trash2, Users, AlertCircle, Mail, Loader2 } from 'lucide-react';
+import { useEmail } from '@/contexts/EmailContext';
+import { EmailTracker } from '@/components/email/EmailTracker';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { EmailComposer } from '@/components/email/EmailComposer';
+import { useNavigate } from 'react-router-dom';
+import { useGmailConnect } from '@/hooks/useGmailConnect';
 
 // Sample campaign data
 const campaignData = [
@@ -107,12 +112,84 @@ const campaignData = [
 ];
 
 const Campaigns: React.FC = () => {
+  const navigate = useNavigate();
+  const { isEmailConnected, emailStats, recentEmails } = useEmail();
+  const { connectGmail, isConnecting, resetConnectionState } = useGmailConnect();
+  
+  // Handle connection timeout
+  useEffect(() => {
+    let timeoutId: number | null = null;
+    
+    if (isConnecting) {
+      // If connecting takes more than 2 minutes, reset the state
+      timeoutId = window.setTimeout(() => {
+        console.log('Connection timeout - resetting state');
+        resetConnectionState();
+      }, 2 * 60 * 1000);
+    }
+    
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [isConnecting, resetConnectionState]);
+  
+  const handleConnect = async () => {
+    console.log('Campaign page: initiating Gmail connection');
+    try {
+      const success = await connectGmail();
+      console.log('Campaign page: connection result:', success);
+    } catch (error) {
+      console.error('Campaign page: connection error:', error);
+    }
+  };
+  
   // Calculate summary metrics
   const totalCampaigns = campaignData.length;
   const activeCampaigns = campaignData.filter(c => c.status === 'Active').length;
-  const totalSent = campaignData.reduce((sum, campaign) => sum + campaign.sent, 0);
-  const totalOpened = campaignData.reduce((sum, campaign) => sum + campaign.opened, 0);
+  const totalSent = isEmailConnected ? emailStats.sent : 0;
+  const totalOpened = isEmailConnected ? emailStats.opened : 0;
   const averageOpenRate = totalSent ? Math.round((totalOpened / totalSent) * 100) : 0;
+  
+  if (!isEmailConnected) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-h1 font-medium">Campaigns</h1>
+            <p className="text-gray-500 mt-1">Create and manage your email campaigns</p>
+          </div>
+        </div>
+        
+        <Card className="p-8 text-center">
+          <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <Mail className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 text-xl font-semibold">Connect Your Email</h3>
+            <p className="mb-4 mt-2 text-muted-foreground">
+              You need to connect your email account to use the campaign features.
+            </p>
+            <Button 
+              className="mt-4" 
+              onClick={handleConnect}
+              disabled={isConnecting}
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  Connect Email
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -121,11 +198,21 @@ const Campaigns: React.FC = () => {
           <h1 className="text-h1 font-medium">Campaigns</h1>
           <p className="text-gray-500 mt-1">Create and manage your email campaigns</p>
         </div>
-        <Button className="bg-primary">
-          <Plus size={16} className="mr-2" />
-          <span>Create Campaign</span>
-        </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="bg-primary">
+              <Plus size={16} className="mr-2" />
+              <span>Create Campaign</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[720px] p-0">
+            <EmailComposer />
+          </DialogContent>
+        </Dialog>
       </div>
+      
+      {/* Email Tracker - Show recent activity */}
+      <EmailTracker />
       
       {/* Campaign Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -244,96 +331,53 @@ const Campaigns: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {campaignData.map((campaign) => (
-                  <tr key={campaign.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">
-                      <div>{campaign.name}</div>
-                      <div className="text-xs text-gray-500">{campaign.schedule}</div>
-                    </td>
-                    <td className="px-4 py-3">{campaign.type}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={
-                        campaign.status === 'Active' ? 'default' : 
-                        campaign.status === 'Draft' ? 'outline' :
-                        campaign.status === 'Scheduled' ? 'secondary' :
-                        campaign.status === 'Paused' ? 'outline' :
-                        'outline'
-                      } className={
-                        campaign.status === 'Active' ? 'bg-green-50 text-green-700 hover:bg-green-50 hover:text-green-700' : 
-                        campaign.status === 'Draft' ? 'bg-gray-100 text-gray-700 hover:bg-gray-100' :
-                        campaign.status === 'Scheduled' ? 'bg-blue-50 text-blue-700 hover:bg-blue-50' :
-                        campaign.status === 'Paused' ? 'bg-amber-50 text-amber-700 hover:bg-amber-50' :
-                        campaign.status === 'Completed' ? 'bg-gray-50 text-gray-700 hover:bg-gray-50' :
-                        'bg-gray-100 text-gray-700'
-                      }>
-                        {campaign.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {campaign.sent > 0 ? (
-                        <div className="space-y-1 w-40">
-                          <div className="flex justify-between text-xs">
-                            <span>Open rate: {Math.round((campaign.opened / campaign.sent) * 100)}%</span>
-                            <span>{campaign.opened} / {campaign.sent}</span>
-                          </div>
-                          <Progress value={(campaign.opened / campaign.sent) * 100} className="h-1" />
-                          <div className="flex justify-between text-xs">
-                            <span>Click rate: {Math.round((campaign.clicked / campaign.sent) * 100)}%</span>
-                            <span>{campaign.clicked} / {campaign.sent}</span>
-                          </div>
-                          <Progress value={(campaign.clicked / campaign.sent) * 100} className="h-1" />
+                {/* Show recent emails as campaigns if available, otherwise show sample data */}
+                {recentEmails.length > 0 ? (
+                  recentEmails.map((email) => (
+                    <tr key={email.id} className="bg-white border-b hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium">
+                        <div>{email.subject || 'No subject'}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline">Email</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={email.opened_at ? 'default' : 'secondary'}>
+                          {email.opened_at ? 'Opened' : 'Sent'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center space-x-4">
+                          <Progress value={email.opened_at ? 100 : 0} className="h-2 w-[60px]" />
+                          <div className="text-xs text-gray-600">{email.opened_at ? 'Opened' : 'Pending'}</div>
                         </div>
-                      ) : (
-                        <span className="text-gray-500">Not sent yet</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{campaign.lastSent}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-1 text-gray-500" />
-                        <span>{typeof campaign.audienceSize === 'number' ? campaign.audienceSize.toLocaleString() : campaign.audienceSize}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                      </td>
+                      <td className="px-4 py-3">
+                        {new Date(email.sent_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center">
+                          <Avatar className="h-7 w-7 mr-2">
+                            <AvatarFallback>{email.recipient.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs">{email.recipient}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button variant="ghost" size="icon">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {campaign.status === 'Active' && (
-                              <DropdownMenuItem>
-                                <Pause className="mr-2 h-4 w-4" />
-                                <span>Pause</span>
-                              </DropdownMenuItem>
-                            )}
-                            {campaign.status === 'Paused' && (
-                              <DropdownMenuItem>
-                                <Play className="mr-2 h-4 w-4" />
-                                <span>Resume</span>
-                              </DropdownMenuItem>
-                            )}
-                            {campaign.status === 'Draft' && (
-                              <DropdownMenuItem>
-                                <Send className="mr-2 h-4 w-4" />
-                                <span>Send</span>
-                              </DropdownMenuItem>
-                            )}
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              <span>View</span>
+                            </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Copy className="mr-2 h-4 w-4" />
                               <span>Duplicate</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Settings</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Trash2 className="mr-2 h-4 w-4" />
@@ -341,23 +385,101 @@ const Campaigns: React.FC = () => {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  campaignData.map((campaign) => (
+                    <tr key={campaign.id} className="bg-white border-b hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium">
+                        <div>{campaign.name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline">{campaign.type}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={
+                          campaign.status === 'Active' ? 'default' : 
+                          campaign.status === 'Draft' ? 'secondary' : 
+                          campaign.status === 'Completed' ? 'outline' : 
+                          campaign.status === 'Scheduled' ? 'secondary' : 'destructive'
+                        }>
+                          {campaign.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center space-x-4">
+                          <Progress value={campaign.progress} className="h-2 w-[60px]" />
+                          <div className="text-xs text-gray-600">
+                            {campaign.sent > 0 ? 
+                              `${Math.round((campaign.opened / campaign.sent) * 100)}% open rate` : 
+                              'Not sent yet'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {campaign.lastSent}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2 text-gray-500" />
+                          <span className="text-xs">{typeof campaign.audienceSize === 'number' ? campaign.audienceSize.toLocaleString() : campaign.audienceSize}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              <span>View</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            {campaign.status === 'Active' ? (
+                              <DropdownMenuItem>
+                                <Pause className="mr-2 h-4 w-4" />
+                                <span>Pause</span>
+                              </DropdownMenuItem>
+                            ) : campaign.status === 'Paused' ? (
+                              <DropdownMenuItem>
+                                <Play className="mr-2 h-4 w-4" />
+                                <span>Resume</span>
+                              </DropdownMenuItem>
+                            ) : campaign.status === 'Draft' || campaign.status === 'Scheduled' ? (
+                              <DropdownMenuItem>
+                                <Send className="mr-2 h-4 w-4" />
+                                <span>Send Now</span>
+                              </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuItem>
+                              <Settings className="mr-2 h-4 w-4" />
+                              <span>Settings</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>Duplicate</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <div className="text-sm text-gray-500">
-            Showing <strong>{campaignData.length}</strong> of <strong>{campaignData.length}</strong> campaigns
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" disabled>Previous</Button>
-            <Button variant="outline" size="sm" disabled>Next</Button>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   );

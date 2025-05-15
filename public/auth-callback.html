@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gmail Authorization</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+    }
+    h1 {
+      color: #333;
+      margin-top: 0;
+    }
+    p {
+      color: #666;
+      line-height: 1.5;
+    }
+    .success {
+      color: #4caf50;
+      font-weight: bold;
+    }
+    .error {
+      color: #f44336;
+      font-weight: bold;
+    }
+    #debug {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      text-align: left;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Gmail Authorization</h1>
+    <div id="message">
+      <p>Processing authentication...</p>
+    </div>
+    <div id="debug"></div>
+  </div>
+
+  <script>
+    // Debug function to log messages
+    function debugLog(message) {
+      console.log(message);
+      const debugEl = document.getElementById('debug');
+      debugEl.style.display = 'block';
+      debugEl.innerHTML += `<div>${message}</div>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      debugLog('Auth callback page loaded');
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
+      const messageEl = document.getElementById('message');
+      
+      debugLog(`URL params - code: ${code ? 'present' : 'missing'}, error: ${error || 'none'}`);
+      
+      if (error) {
+        // Handle error
+        debugLog(`Authorization error: ${error}`);
+        messageEl.innerHTML = `
+          <p class="error">Authorization failed: ${error}</p>
+          <p>You can close this window and try again.</p>
+        `;
+      } else if (code) {
+        // Send code to parent window
+        if (window.opener) {
+          debugLog('Parent window found, sending message');
+          
+          try {
+            // First try with origin targeting
+            const origin = window.location.origin;
+            debugLog(`Sending message to origin: ${origin}`);
+            
+            window.opener.postMessage({ 
+              type: 'GMAIL_AUTH_CODE', 
+              code,
+              timestamp: new Date().toISOString() 
+            }, origin);
+            
+            // Also try with wildcard origin as backup
+            window.opener.postMessage({ 
+              type: 'GMAIL_AUTH_CODE', 
+              code,
+              timestamp: new Date().toISOString(),
+              fallback: true
+            }, '*');
+            
+            messageEl.innerHTML = `
+              <p class="success">Authorization successful!</p>
+              <p>This window will close automatically in a moment...</p>
+            `;
+            
+            // Close window after a delay
+            setTimeout(() => {
+              debugLog('Closing popup window');
+              window.close();
+            }, 3000);
+          } catch (err) {
+            debugLog(`Error sending message: ${err.message}`);
+            messageEl.innerHTML = `
+              <p class="error">Error: ${err.message}</p>
+              <p>Please close this window and try again.</p>
+            `;
+          }
+        } else {
+          debugLog('No parent window found');
+          messageEl.innerHTML = `
+            <p class="error">Error: Could not communicate with the main application.</p>
+            <p>Please close this window and try again.</p>
+          `;
+        }
+      } else {
+        debugLog('No code or error parameter found in URL');
+        messageEl.innerHTML = `
+          <p class="error">Error: No authorization code received.</p>
+          <p>Please close this window and try again.</p>
+        `;
+      }
+    });
+  </script>
+</body>
+</html> 

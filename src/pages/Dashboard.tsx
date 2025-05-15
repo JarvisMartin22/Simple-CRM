@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -16,6 +15,8 @@ import TaskForm from '@/components/dashboard/TaskForm';
 import ContactDetail from '@/components/dashboard/ContactDetail';
 import MetricDetail from '@/components/dashboard/MetricDetail';
 import TaskDetail from '@/components/dashboard/TaskDetail';
+import { EmailTracker } from '@/components/email/EmailTracker';
+import { useEmail } from '@/contexts/EmailContext';
 
 // Import sample data
 import { 
@@ -28,6 +29,7 @@ import {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { isEmailConnected } = useEmail();
   
   // State for dialogs
   const [taskFormOpen, setTaskFormOpen] = useState(false);
@@ -111,6 +113,11 @@ const Dashboard: React.FC = () => {
             onNewTaskClick={() => setTaskFormOpen(true)}
             onViewAllClick={() => setTaskFormOpen(true)}
           />
+
+          {/* Email Tracker - Only show if connected */}
+          {isEmailConnected && (
+            <EmailTracker />
+          )}
 
           {/* Recent Activity */}
           <RecentActivity 
