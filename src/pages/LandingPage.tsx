@@ -366,9 +366,7 @@ const LandingPage: React.FC = () => {
           once: true
         }} className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4 text-white">Ready to grow your business?</h2>
-            <p className="text-lg text-white opacity-90 mb-8">
-              Join thousands of businesses already using Folk CRM to manage their customer relationships.
-            </p>
+            <p className="text-lg text-white opacity-90 mb-8">Join thousands of businesses already using Golly to manage their customer relationships and Grow!</p>
             <Link to="/auth/register">
               <Button size="lg" variant="outline" className="bg-white text-primary hover:bg-gray-100">
                 Get Started for Free
