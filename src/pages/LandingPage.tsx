@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
+
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
+  
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -14,6 +16,7 @@ const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+  
   const features = [{
     title: 'Contact Management',
     description: 'Organize and manage your contacts with ease.',
@@ -31,6 +34,7 @@ const LandingPage: React.FC = () => {
     description: 'Schedule and manage your appointments.',
     icon: <CheckCircle className="h-5 w-5 text-green-500" />
   }];
+  
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
@@ -129,7 +133,7 @@ const LandingPage: React.FC = () => {
         </motion.div>
       </section>
 
-      {/* Features Section - White Background */}
+      {/* Features Section */}
       <section id="features" className="py-20 bg-white relative z-10">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -376,8 +380,8 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 relative z-10">
+      {/* Footer - Updated background to black */}
+      <footer className="bg-black text-gray-400 py-12 relative z-10">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
@@ -417,4 +421,5 @@ const LandingPage: React.FC = () => {
       </footer>
     </div>;
 };
+
 export default LandingPage;
