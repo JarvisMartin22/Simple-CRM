@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
-
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
-  
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -16,33 +14,29 @@ const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
-  const features = [
-    {
-      title: 'Contact Management',
-      description: 'Organize and manage your contacts with ease.',
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    }, {
-      title: 'Sales Pipeline',
-      description: 'Track deals and visualize your sales pipeline.',
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    }, {
-      title: 'Email Campaigns',
-      description: 'Create and send targeted email campaigns.',
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    }, {
-      title: 'Calendar Integration',
-      description: 'Schedule and manage your appointments.',
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    }
-  ];
-  
+  const features = [{
+    title: 'Contact Management',
+    description: 'Organize and manage your contacts with ease.',
+    icon: <CheckCircle className="h-5 w-5 text-green-500" />
+  }, {
+    title: 'Sales Pipeline',
+    description: 'Track deals and visualize your sales pipeline.',
+    icon: <CheckCircle className="h-5 w-5 text-green-500" />
+  }, {
+    title: 'Email Campaigns',
+    description: 'Create and send targeted email campaigns.',
+    icon: <CheckCircle className="h-5 w-5 text-green-500" />
+  }, {
+    title: 'Calendar Integration',
+    description: 'Schedule and manage your appointments.',
+    icon: <CheckCircle className="h-5 w-5 text-green-500" />
+  }];
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <span className="text-xl font-bold">WinSum</span>
+            <span className="font-bold text-3xl text-orange-500 text-center">Golly</span>
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">
@@ -423,5 +417,4 @@ const LandingPage: React.FC = () => {
       </footer>
     </div>;
 };
-
 export default LandingPage;
