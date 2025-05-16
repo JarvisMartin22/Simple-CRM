@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
+
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
+  
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -14,29 +16,33 @@ const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  const features = [{
-    title: 'Contact Management',
-    description: 'Organize and manage your contacts with ease.',
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  }, {
-    title: 'Sales Pipeline',
-    description: 'Track deals and visualize your sales pipeline.',
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  }, {
-    title: 'Email Campaigns',
-    description: 'Create and send targeted email campaigns.',
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  }, {
-    title: 'Calendar Integration',
-    description: 'Schedule and manage your appointments.',
-    icon: <CheckCircle className="h-5 w-5 text-green-500" />
-  }];
+  
+  const features = [
+    {
+      title: 'Contact Management',
+      description: 'Organize and manage your contacts with ease.',
+      icon: <CheckCircle className="h-5 w-5 text-green-500" />
+    }, {
+      title: 'Sales Pipeline',
+      description: 'Track deals and visualize your sales pipeline.',
+      icon: <CheckCircle className="h-5 w-5 text-green-500" />
+    }, {
+      title: 'Email Campaigns',
+      description: 'Create and send targeted email campaigns.',
+      icon: <CheckCircle className="h-5 w-5 text-green-500" />
+    }, {
+      title: 'Calendar Integration',
+      description: 'Schedule and manage your appointments.',
+      icon: <CheckCircle className="h-5 w-5 text-green-500" />
+    }
+  ];
+  
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <span className="text-xl font-bold">WinSum</span>
+            <img src="/lovable-uploads/0bcd3871-3a36-4221-9de8-55d48a626f59.png" alt="Golly" className="h-8" />
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">
@@ -56,7 +62,7 @@ const LandingPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Hero Section with Waves Background */}
+      {/* Hero Section with Waves Background - only in hero section */}
       <section className="py-20 md:py-32 relative overflow-hidden">
         {/* Waves Background - only in hero section */}
         <div className="absolute inset-0 z-0">
@@ -411,10 +417,11 @@ const LandingPage: React.FC = () => {
           </div>
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
-            <p>© {new Date().getFullYear()} Folk CRM. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Golly CRM. All rights reserved.</p>
           </div>
         </div>
       </footer>
     </div>;
 };
+
 export default LandingPage;
