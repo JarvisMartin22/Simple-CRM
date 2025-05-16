@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
-
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
-  
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -16,7 +14,6 @@ const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
   const features = [{
     title: 'Contact Management',
     description: 'Organize and manage your contacts with ease.',
@@ -34,7 +31,6 @@ const LandingPage: React.FC = () => {
     description: 'Schedule and manage your appointments.',
     icon: <CheckCircle className="h-5 w-5 text-green-500" />
   }];
-  
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
@@ -64,47 +60,42 @@ const LandingPage: React.FC = () => {
       <section className="py-20 md:py-32 relative overflow-hidden">
         {/* Waves Background - only in hero section */}
         <div className="absolute inset-0 z-0">
-          <Waves
-            lineColor="rgba(0, 0, 0, 0.1)" 
-            backgroundColor="transparent"
-            waveSpeedX={0.015}
-            waveSpeedY={0.01}
-            waveAmpX={35}
-            waveAmpY={20}
-            xGap={12}
-            yGap={36}
-            friction={0.9}
-            tension={0.01}
-            maxCursorMove={120}
-          />
+          <Waves lineColor="rgba(0, 0, 0, 0.1)" backgroundColor="transparent" waveSpeedX={0.015} waveSpeedY={0.01} waveAmpX={35} waveAmpY={20} xGap={12} yGap={36} friction={0.9} tension={0.01} maxCursorMove={120} />
         </div>
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.7 }} 
-              className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
-            >
-              Simple CRM for growing businesses
-            </motion.h1>
+            <motion.h1 initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.7
+          }} className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">Simple CRM for growth</motion.h1>
             
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.7, delay: 0.2 }} 
-              className="text-lg md:text-xl text-gray-600 mb-8"
-            >
-              Everything you need to manage contacts, track deals, and grow your business in one place.
-            </motion.p>
+            <motion.p initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.7,
+            delay: 0.2
+          }} className="text-lg md:text-xl text-gray-600 mb-8">Take the complex out of your day at half the cost</motion.p>
             
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.7, delay: 0.4 }} 
-              className="flex flex-col md:flex-row gap-4 justify-center"
-            >
+            <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} animate={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.7,
+            delay: 0.4
+          }} className="flex flex-col md:flex-row gap-4 justify-center">
               <Link to="/auth/register">
                 <Button size="lg" className="px-8">
                   Get Started <ArrowRight className="ml-2 h-4 w-4" />
@@ -119,12 +110,18 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
         
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: 0.5, delay: 1.5, repeat: Infinity, repeatType: "reverse" }} 
-          className="flex justify-center mt-16 relative z-10"
-        >
+        <motion.div initial={{
+        opacity: 0,
+        y: 10
+      }} animate={{
+        opacity: 1,
+        y: 0
+      }} transition={{
+        duration: 0.5,
+        delay: 1.5,
+        repeat: Infinity,
+        repeatType: "reverse"
+      }} className="flex justify-center mt-16 relative z-10">
           <a href="#features" className="flex flex-col items-center text-gray-400 hover:text-gray-600">
             <span className="text-sm mb-1">Scroll to learn more</span>
             <ChevronDown className="h-5 w-5" />
@@ -137,20 +134,22 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Features</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Folk CRM offers a range of powerful features designed to streamline your business operations.
-            </p>
+            <p className="text-gray-600 max-w-2xl mx-auto">Golly offers a range of powerful features designed to streamline your business operations.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {features.map((feature, index) => (
-              <motion.div 
-                key={index} 
-                initial={{ opacity: 0, y: 20 }} 
-                whileInView={{ opacity: 1, y: 0 }} 
-                transition={{ duration: 0.5, delay: index * 0.1 }} 
-                viewport={{ once: true }}
-              >
+            {features.map((feature, index) => <motion.div key={index} initial={{
+            opacity: 0,
+            y: 20
+          }} whileInView={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.5,
+            delay: index * 0.1
+          }} viewport={{
+            once: true
+          }}>
                 <Card className="h-full">
                   <CardHeader>
                     <div className="flex items-center gap-3">
@@ -162,8 +161,7 @@ const LandingPage: React.FC = () => {
                     <CardDescription>{feature.description}</CardDescription>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
+              </motion.div>)}
           </div>
         </div>
       </section>
@@ -179,12 +177,17 @@ const LandingPage: React.FC = () => {
           </div>
           
           <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              whileInView={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.5 }} 
-              viewport={{ once: true }}
-            >
+            <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} whileInView={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.5
+          }} viewport={{
+            once: true
+          }}>
               <Card className="h-full backdrop-blur-sm bg-white/80">
                 <CardHeader>
                   <CardTitle>Starter</CardTitle>
@@ -212,13 +215,19 @@ const LandingPage: React.FC = () => {
               </Card>
             </motion.div>
             
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              whileInView={{ opacity: 1, y: 0, scale: 1.05 }} 
-              transition={{ duration: 0.5, delay: 0.1 }} 
-              viewport={{ once: true }} 
-              className="md:transform md:-translate-y-4"
-            >
+            <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} whileInView={{
+            opacity: 1,
+            y: 0,
+            scale: 1.05
+          }} transition={{
+            duration: 0.5,
+            delay: 0.1
+          }} viewport={{
+            once: true
+          }} className="md:transform md:-translate-y-4">
               <Card className="h-full border-primary bg-primary bg-opacity-5 backdrop-blur-sm">
                 <CardHeader>
                   <div className="flex justify-between items-center">
@@ -253,12 +262,18 @@ const LandingPage: React.FC = () => {
               </Card>
             </motion.div>
             
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              whileInView={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 0.5, delay: 0.2 }} 
-              viewport={{ once: true }}
-            >
+            <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} whileInView={{
+            opacity: 1,
+            y: 0
+          }} transition={{
+            duration: 0.5,
+            delay: 0.2
+          }} viewport={{
+            once: true
+          }}>
               <Card className="h-full backdrop-blur-sm bg-white/80">
                 <CardHeader>
                   <CardTitle>Enterprise</CardTitle>
@@ -304,13 +319,15 @@ const LandingPage: React.FC = () => {
           </div>
           
           <div className="max-w-3xl mx-auto">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              whileInView={{ opacity: 1 }} 
-              transition={{ duration: 0.5 }} 
-              viewport={{ once: true }} 
-              className="space-y-6"
-            >
+            <motion.div initial={{
+            opacity: 0
+          }} whileInView={{
+            opacity: 1
+          }} transition={{
+            duration: 0.5
+          }} viewport={{
+            once: true
+          }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium mb-2">What is Folk CRM?</h3>
                 <p className="text-gray-600">Folk CRM is a customer relationship management platform designed to help businesses manage contacts, track sales opportunities, and streamline their operations.</p>
@@ -338,13 +355,17 @@ const LandingPage: React.FC = () => {
       {/* CTA Section */}
       <section className="py-20 bg-primary relative z-10">
         <div className="container mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            whileInView={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.7 }} 
-            viewport={{ once: true }} 
-            className="max-w-3xl mx-auto text-center"
-          >
+          <motion.div initial={{
+          opacity: 0,
+          y: 20
+        }} whileInView={{
+          opacity: 1,
+          y: 0
+        }} transition={{
+          duration: 0.7
+        }} viewport={{
+          once: true
+        }} className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-4 text-white">Ready to grow your business?</h2>
             <p className="text-lg text-white opacity-90 mb-8">
               Join thousands of businesses already using Folk CRM to manage their customer relationships.
@@ -399,5 +420,4 @@ const LandingPage: React.FC = () => {
       </footer>
     </div>;
 };
-
 export default LandingPage;
