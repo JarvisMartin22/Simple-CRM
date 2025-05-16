@@ -314,9 +314,7 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Find answers to common questions about Folk CRM.
-            </p>
+            <p className="text-gray-600 max-w-2xl mx-auto">Find answers to common questions about Golly</p>
           </div>
           
           <div className="max-w-3xl mx-auto">
@@ -330,8 +328,8 @@ const LandingPage: React.FC = () => {
             once: true
           }} className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium mb-2">What is Folk CRM?</h3>
-                <p className="text-gray-600">Folk CRM is a customer relationship management platform designed to help businesses manage contacts, track sales opportunities, and streamline their operations.</p>
+                <h3 className="text-lg font-medium mb-2">What is Golly?</h3>
+                <p className="text-gray-600">Golly is a customer relationship management platform designed to help individuals and businesses manage contacts, track sales opportunities, and streamline their operations.</p>
               </div>
               
               <div>
@@ -341,7 +339,7 @@ const LandingPage: React.FC = () => {
               
               <div>
                 <h3 className="text-lg font-medium mb-2">Can I integrate with other tools?</h3>
-                <p className="text-gray-600">Yes, Folk CRM integrates with a variety of popular tools, including Gmail, Outlook, and various calendar applications. More integrations are being added regularly.</p>
+                <p className="text-gray-600">Yes, Golly integrates with a variety of popular tools, including Gmail, Outlook, and various calendar applications. More integrations are being added regularly.</p>
               </div>
               
               <div>
