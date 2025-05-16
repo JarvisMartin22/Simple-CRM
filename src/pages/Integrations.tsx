@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import GmailIntegration from '@/components/integrations/GmailIntegration';
 import OutlookIntegration from '@/components/integrations/OutlookIntegration';
 import ContactsApiIntegration from '@/components/integrations/ContactsApiIntegration';
+import { DebugPanel } from '@/components/Debug';
 
 const Integrations = () => {
   const { user } = useAuth();
@@ -72,6 +73,7 @@ const Integrations = () => {
           Connect your email accounts and manage contact integrations
         </p>
       </div>
+      <DebugPanel />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">

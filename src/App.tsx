@@ -14,7 +14,6 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { useToast } from './components/ui/use-toast';
-import { DebugPanel } from './components/Debug';
 
 // Import pages
 import Dashboard from './pages/Dashboard';
@@ -102,11 +101,12 @@ const App: React.FC = () => {
               <Route path="calendar" element={<Calendar />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
+              {/* Add default redirect for authenticated users at root */}
+              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
           <Toaster />
-          <DebugPanel />
         </EmailProvider>
       </AuthProvider>
     </QueryClientProvider>

@@ -9,6 +9,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import PrivacyPolicyDialog from '@/components/legal/PrivacyPolicyDialog';
+import TermsOfServiceDialog from '@/components/legal/TermsOfServiceDialog';
+
 const registerSchema = z.object({
   firstName: z.string().min(1, {
     message: 'First name is required'
@@ -24,12 +28,20 @@ const registerSchema = z.object({
   }),
   confirmPassword: z.string().min(6, {
     message: 'Password must be at least 6 characters'
-  })
+  }),
+  termsAccepted: z.boolean().refine(val => val === true, {
+    message: 'You must accept the terms of service',
+  }),
+  privacyAccepted: z.boolean().refine(val => val === true, {
+    message: 'You must accept the privacy policy',
+  }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
 });
+
 type RegisterFormValues = z.infer<typeof registerSchema>;
+
 const Register = () => {
   const {
     signUp
@@ -37,6 +49,9 @@ const Register = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
+  const [termsOfServiceOpen, setTermsOfServiceOpen] = useState(false);
+
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -44,9 +59,12 @@ const Register = () => {
       lastName: '',
       email: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      termsAccepted: false,
+      privacyAccepted: false,
     }
   });
+
   const onSubmit = async (values: RegisterFormValues) => {
     setIsLoading(true);
     setError(null);
@@ -59,6 +77,7 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+
   return <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
@@ -125,6 +144,64 @@ const Register = () => {
                   <FormMessage />
                 </FormItem>} />
 
+            <div className="space-y-3">
+              <FormField
+                control={form.control}
+                name="termsAccepted"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-sm font-normal">
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => setTermsOfServiceOpen(true)}
+                          className="text-primary hover:underline"
+                        >
+                          Terms of Service
+                        </button>
+                      </FormLabel>
+                      <FormMessage />
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="privacyAccepted"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-sm font-normal">
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => setPrivacyPolicyOpen(true)}
+                          className="text-primary hover:underline"
+                        >
+                          Privacy Policy
+                        </button>
+                      </FormLabel>
+                      <FormMessage />
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <Button type="submit" className="w-full mt-6" disabled={isLoading}>
               {isLoading ? <>
                   <span className="animate-spin mr-2">&#9696;</span> Creating account...
@@ -142,6 +219,16 @@ const Register = () => {
           </p>
         </div>
       </div>
+
+      {/* Legal Dialogs */}
+      <PrivacyPolicyDialog 
+        open={privacyPolicyOpen} 
+        onOpenChange={setPrivacyPolicyOpen} 
+      />
+      <TermsOfServiceDialog 
+        open={termsOfServiceOpen} 
+        onOpenChange={setTermsOfServiceOpen} 
+      />
     </div>;
 };
 export default Register;
