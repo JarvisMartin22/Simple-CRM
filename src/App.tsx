@@ -28,6 +28,7 @@ import Calendar from './pages/Calendar';
 import Integrations from './pages/Integrations';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+import LandingPage from './pages/LandingPage';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -61,7 +62,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <EmailProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth">
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
