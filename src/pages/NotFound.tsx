@@ -13,8 +13,8 @@ const NotFound: React.FC = () => {
         <p className="mt-2 text-gray-500 max-w-md mx-auto">
           The page you are looking for doesn't exist or has been moved.
         </p>
-        <Button asChild className="mt-8 bg-gray-900 hover:bg-gray-800 text-white">
-          <Link to="/">
+                  <Button asChild className="mt-8 bg-gray-900 hover:bg-gray-800 text-white">
+          <Link to="/app/dashboard">
             <Home size={16} className="mr-2" />
             Return to Dashboard
           </Link>

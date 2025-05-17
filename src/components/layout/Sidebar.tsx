@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Briefcase, Mail, Calendar, Settings, Link2, Building, ClipboardList, FileText } from 'lucide-react';
@@ -13,16 +12,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const location = useLocation();
 
   const navigationItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Contacts', path: '/contacts', icon: Users },
-    { name: 'Companies', path: '/companies', icon: Building },
-    { name: 'Pipelines', path: '/pipelines', icon: Briefcase },
-    { name: 'Tasks', path: '/tasks', icon: ClipboardList },
-    { name: 'Notes', path: '/notes', icon: FileText },
-    { name: 'Campaigns', path: '/campaigns', icon: Mail },
-    { name: 'Calendar', path: '/calendar', icon: Calendar },
-    { name: 'Integrations', path: '/integrations', icon: Link2 },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Dashboard', path: '/app/dashboard', icon: LayoutDashboard },
+    { name: 'Contacts', path: '/app/contacts', icon: Users },
+    { name: 'Companies', path: '/app/companies', icon: Building },
+    { name: 'Pipelines', path: '/app/pipelines', icon: Briefcase },
+    { name: 'Tasks', path: '/app/tasks', icon: ClipboardList },
+    { name: 'Notes', path: '/app/notes', icon: FileText },
+    { name: 'Campaigns', path: '/app/campaigns', icon: Mail },
+    { name: 'Calendar', path: '/app/calendar', icon: Calendar },
+    { name: 'Integrations', path: '/app/integrations', icon: Link2 },
+    { name: 'Settings', path: '/app/settings', icon: Settings },
   ];
 
   return (
@@ -34,9 +33,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
     >
       <div className="flex items-center p-4 border-b border-gray-100">
         {!isCollapsed && (
-          <h1 className="text-h3 font-medium text-primary flex items-center">
-            Folk CRM
-          </h1>
+          <Link to="/app/dashboard">
+            <h1 className="text-h3 font-medium text-primary flex items-center">
+              Golly
+            </h1>
+          </Link>
         )}
         <button
           onClick={toggleSidebar}
@@ -81,17 +82,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
         {!isCollapsed && (
           <div className="flex items-center">
             <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center">
-              <span className="font-medium text-sm">JD</span>
+              <span className="font-medium text-sm">GU</span>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium">John Doe</p>
-              <p className="text-xs text-gray-500">john@example.com</p>
+                          <p className="text-sm font-medium">Golly User</p>
+            <p className="text-xs text-gray-500">user@golly.com</p>
             </div>
           </div>
         )}
         {isCollapsed && (
           <div className="w-7 h-7 mx-auto rounded-full bg-gray-200 text-gray-700 flex items-center justify-center">
-            <span className="font-medium text-sm">JD</span>
+            <span className="font-medium text-sm">GU</span>
           </div>
         )}
       </div>

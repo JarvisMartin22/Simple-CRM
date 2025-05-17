@@ -61,16 +61,18 @@ const App: React.FC = () => {
       <AuthProvider>
         <EmailProvider>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/auth">
-              <Route path="login" element={<Login />} />
-              <Route path="register" element={<Register />} />
-            </Route>
-            <Route path="/" element={
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/register" element={<Register />} />
+            
+            {/* Protected app routes under /app path */}
+            <Route path="/app" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>
             }>
+              <Route index element={<Dashboard />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="contacts" element={
                 <ContactsProvider>
@@ -101,10 +103,11 @@ const App: React.FC = () => {
               <Route path="calendar" element={<Calendar />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="settings" element={<Settings />} />
-              {/* Add default redirect for authenticated users at root */}
-              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFound />} />
             </Route>
+            
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />
         </EmailProvider>
