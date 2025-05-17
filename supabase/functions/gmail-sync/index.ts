@@ -177,11 +177,19 @@ async function pullContactsFromGmail(userId: string, accessToken: string) {
       const primaryPhone = contact.phoneNumbers ? contact.phoneNumbers.find(p => p.metadata?.primary) || contact.phoneNumbers[0] : null;
       const primaryUrl = contact.urls ? contact.urls.find(u => u.metadata?.primary) || contact.urls[0] : null;
       
+      // Extract domain from email
+      const email = primaryEmail?.value || null;
+      let domain = null;
+      if (email && email.includes('@')) {
+        domain = email.split('@')[1];
+      }
+      
       return {
         first_name: primaryName?.givenName || '',
         last_name: primaryName?.familyName || '',
-        email: primaryEmail?.value || null,
-        company: primaryOrg?.name || null,
+        email: email,
+        domain: domain,
+        company_name: primaryOrg?.name || null,
         title: primaryOrg?.title || null,
         phone: primaryPhone?.value || null,
         website: primaryUrl?.value || null,
@@ -195,48 +203,157 @@ async function pullContactsFromGmail(userId: string, accessToken: string) {
     
     console.log(`Processing ${processedContacts.length} contacts`);
     
+    // Process unique domains and create/update companies
+    const domains = new Set<string>();
+    const domainToCompanyMap = new Map<string, string>(); // Domain to company ID mapping
+    
+    processedContacts.forEach(contact => {
+      if (contact.domain && !isCommonEmailDomain(contact.domain)) {
+        domains.add(contact.domain);
+      }
+    });
+    
+    console.log(`Found ${domains.size} unique business domains`);
+    
+    // Check existing companies by domain
+    for (const domain of domains) {
+      const { data: existingCompanies } = await supabase
+        .from('companies')
+        .select('id, domain')
+        .eq('user_id', userId)
+        .eq('domain', domain);
+        
+      if (existingCompanies && existingCompanies.length > 0) {
+        // Company already exists
+        domainToCompanyMap.set(domain, existingCompanies[0].id);
+      } else {
+        // Create new company
+        const companyName = extractCompanyNameFromDomain(domain);
+        const { data: newCompany, error } = await supabase
+          .from('companies')
+          .insert({
+            user_id: userId,
+            name: companyName,
+            domain: domain,
+            website: `https://${domain}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+          
+        if (error) {
+          console.error(`Error creating company for domain ${domain}:`, error);
+        } else if (newCompany) {
+          domainToCompanyMap.set(domain, newCompany.id);
+        }
+      }
+    }
+    
     // Insert or update contacts in the database
     let updated = 0;
     let created = 0;
     
     for (const contact of processedContacts) {
-      // Check if contact already exists
-      const { data: existingContact } = await supabase
+      // Try to find if contact already exists
+      const { data: existingContacts, error: findError } = await supabase
         .from('contacts')
-        .select('id, updated_at')
+        .select('id, email, external_id')
         .eq('user_id', userId)
-        .eq('email', contact.email)
-        .maybeSingle();
+        .eq('email', contact.email);
+        
+      if (findError) {
+        console.error(`Error finding contact with email ${contact.email}:`, findError);
+        continue;
+      }
       
-      if (existingContact) {
+      // Link contact to company if domain is not common email provider
+      let company_id = null;
+      if (contact.domain && !isCommonEmailDomain(contact.domain)) {
+        company_id = domainToCompanyMap.get(contact.domain) || null;
+      }
+      
+      // Create contact data object, excluding non-DB fields
+      const { domain, company_name, ...contactData } = contact;
+      
+      // Add company_id to the contact data
+      const contactWithCompany = {
+        ...contactData,
+        company_id
+      };
+      
+      if (existingContacts && existingContacts.length > 0) {
         // Update existing contact
-        await supabase
+        const { error: updateError } = await supabase
           .from('contacts')
           .update({
-            ...contact,
+            ...contactWithCompany,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingContact.id);
-        updated++;
+          .eq('id', existingContacts[0].id);
+          
+        if (updateError) {
+          console.error(`Error updating contact ${contact.email}:`, updateError);
+        } else {
+          updated++;
+        }
       } else {
-        // Insert new contact
-        await supabase
+        // Create new contact
+        const { error: insertError } = await supabase
           .from('contacts')
-          .insert([contact]);
-        created++;
+          .insert(contactWithCompany);
+          
+        if (insertError) {
+          console.error(`Error creating contact ${contact.email}:`, insertError);
+        } else {
+          created++;
+        }
       }
     }
     
-    return { 
-      processed: processedContacts.length,
-      created,
-      updated,
-      message: `Created ${created} and updated ${updated} contacts`
-    };
+    return { processed: processedContacts.length, created, updated };
   } catch (error) {
-    console.error("Error pulling contacts:", error);
+    console.error("Error pulling contacts from Gmail:", error);
+    
+    // Log error to sync_logs
+    await supabase
+      .from('sync_logs')
+      .insert({
+        user_id: userId,
+        provider: 'gmail',
+        operation: 'pull',
+        status: 'error',
+        error_message: error.message,
+        created_at: new Date().toISOString()
+      });
+      
     throw error;
   }
+}
+
+// Helper function to check if domain is from common email providers
+function isCommonEmailDomain(domain: string): boolean {
+  const commonDomains = [
+    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
+    'icloud.com', 'protonmail.com', 'mail.com', 'zoho.com', 'yandex.com',
+    'gmx.com', 'live.com', 'me.com', 'inbox.com', 'fastmail.com'
+  ];
+  return commonDomains.includes(domain.toLowerCase());
+}
+
+// Helper function to extract company name from domain
+function extractCompanyNameFromDomain(domain: string): string {
+  // Remove TLD
+  let name = domain.split('.')[0];
+  
+  // Split by hyphens or numbers and take first part
+  name = name.split(/[-0-9]/)[0];
+  
+  // Capitalize first letter of each word
+  return name
+    .split(/[\s-_]+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 // Push CRM contacts to Gmail

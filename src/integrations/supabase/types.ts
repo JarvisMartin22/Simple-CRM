@@ -6,6 +6,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+export type UUID = string;
+
 export type Database = {
   public: {
     Tables: {
@@ -80,48 +82,74 @@ export type Database = {
       }
       contacts: {
         Row: {
-          company: string | null
+          company_id: UUID | null
           created_at: string
-          email: string | null
-          first_name: string
-          id: string
-          last_name: string
+          email: string
+          external_id: string | null
+          first_name: string | null
+          full_name: string | null
+          id: UUID
+          interaction_count: number | null
+          last_contacted: string | null
+          last_name: string | null
           notes: string | null
           phone: string | null
-          status: string | null
+          source: string | null
+          tags: string[] | null
           title: string | null
           updated_at: string
-          user_id: string
+          user_id: UUID
+          website: string | null
         }
         Insert: {
-          company?: string | null
+          company_id?: UUID | null
           created_at?: string
-          email?: string | null
-          first_name: string
-          id?: string
-          last_name: string
+          email: string
+          external_id?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: UUID
+          interaction_count?: number | null
+          last_contacted?: string | null
+          last_name?: string | null
           notes?: string | null
           phone?: string | null
-          status?: string | null
+          source?: string | null
+          tags?: string[] | null
           title?: string | null
           updated_at?: string
-          user_id: string
+          user_id: UUID
+          website?: string | null
         }
         Update: {
-          company?: string | null
+          company_id?: UUID | null
           created_at?: string
-          email?: string | null
-          first_name?: string
-          id?: string
-          last_name?: string
+          email?: string
+          external_id?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          id?: UUID
+          interaction_count?: number | null
+          last_contacted?: string | null
+          last_name?: string | null
           notes?: string | null
           phone?: string | null
-          status?: string | null
+          source?: string | null
+          tags?: string[] | null
           title?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: UUID
+          website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       deals: {
         Row: {
@@ -429,6 +457,51 @@ export type Database = {
           scope?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      companies: {
+        Row: {
+          id: UUID;
+          user_id: UUID;
+          name: string;
+          domain: string | null;
+          website: string | null;
+          industry: string | null;
+          size: string | null;
+          description: string | null;
+          logo_url: string | null;
+          tags: string[] | null;
+          created_at: string;
+          updated_at: string;
+        }
+        Insert: {
+          id?: UUID;
+          user_id: UUID;
+          name: string;
+          domain?: string | null;
+          website?: string | null;
+          industry?: string | null;
+          size?: string | null;
+          description?: string | null;
+          logo_url?: string | null;
+          tags?: string[] | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Update: {
+          id?: UUID;
+          user_id?: UUID;
+          name?: string;
+          domain?: string | null;
+          website?: string | null;
+          industry?: string | null;
+          size?: string | null;
+          description?: string | null;
+          logo_url?: string | null;
+          tags?: string[] | null;
+          created_at?: string;
+          updated_at?: string;
         }
         Relationships: []
       }

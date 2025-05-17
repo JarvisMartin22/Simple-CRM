@@ -12,6 +12,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { EmailProvider } from './contexts/EmailContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import Callback from './pages/auth/Callback';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { useToast } from './components/ui/use-toast';
 
@@ -65,6 +66,7 @@ const App: React.FC = () => {
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth/login" element={<Login />} />
             <Route path="/auth/register" element={<Register />} />
+            <Route path="/auth/callback" element={<Callback />} />
             
             {/* Protected app routes under /app path */}
             <Route path="/app" element={

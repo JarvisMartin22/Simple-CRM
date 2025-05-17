@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,20 +14,36 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useContacts } from '@/contexts/ContactsContext';
-import { v4 as uuidv4 } from 'uuid';
-import { toast } from '@/hooks/use-toast';
-import { flexibleUrlSchema } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
-  name: z.string().min(1, { message: 'Name is required' }),
-  company: z.string().optional(),
+  first_name: z.string().min(1, { message: 'First name is required' }),
+  last_name: z.string().optional(),
+  email: z.string().email({ message: 'Invalid email address' }),
+  phone: z.string().optional(),
   title: z.string().optional(),
-  phone_number: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  website: flexibleUrlSchema.optional().or(z.literal('')),
+  company_id: z.string().optional(),
+  notes: z.string().optional(),
+  website: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+interface Company {
+  id: string;
+  name: string;
+  domain?: string;
+}
 
 interface CreateContactFormProps {
   open: boolean;
@@ -38,33 +55,66 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
   onOpenChange,
 }) => {
   const { addContact } = useContacts();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Fetch companies for dropdown
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ['companies', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, domain')
+        .eq('user_id', user.id)
+        .order('name');
+        
+      if (error) {
+        console.error("Error fetching companies:", error);
+        throw error;
+      }
+      
+      return data || [];
+    },
+    enabled: !!user?.id && open, // Only fetch when form is open
+  });
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      company: '',
-      title: '',
-      phone_number: '',
+      first_name: '',
+      last_name: '',
       email: '',
+      phone: '',
+      title: '',
+      company_id: '',
+      notes: '',
       website: '',
     },
   });
+  
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      form.reset();
+    }
+  }, [open, form]);
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     try {
+      setIsSubmitting(true);
+      
       // Use the addContact function from context
-      addContact(values);
+      await addContact({
+        ...values,
+        tags: [], // Initialize with empty tags array
+      });
       
       // Reset form and close dialog
       form.reset();
       onOpenChange(false);
-      
-      // Show success toast
-      toast({
-        title: "Success",
-        description: "Contact created successfully",
-      });
     } catch (error) {
       console.error("Error creating contact:", error);
       toast({
@@ -72,11 +122,13 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
         title: "Error",
         description: "Failed to create contact",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={isSubmitting ? undefined : onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add New Contact</DialogTitle>
@@ -84,65 +136,41 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name*</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="company"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Company Name" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Job Title" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="phone_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="+1 (555) 123-4567" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="first_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name*</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="last_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email*</FormLabel>
                   <FormControl>
                     <Input type="email" placeholder="john.doe@example.com" {...field} />
                   </FormControl>
@@ -151,25 +179,109 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
               )}
             />
             
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="company_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Job Title" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+1 (555) 123-4567" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Website</FormLabel>
+                    <FormControl>
+                      <Input placeholder="example.com" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
             <FormField
               control={form.control}
-              name="website"
+              name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Website</FormLabel>
+                  <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Input placeholder="example.com" {...field} />
+                    <Input placeholder="Add any notes about this contact" {...field} />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
             
             <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              <Button 
+                variant="outline" 
+                type="button" 
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button type="submit">Save Contact</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Contact"
+                )}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
