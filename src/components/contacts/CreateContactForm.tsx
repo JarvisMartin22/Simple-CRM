@@ -58,25 +58,33 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
   
   // Fetch companies for dropdown
-  const { data: companies = [] } = useQuery<Company[]>({
+  const { data: companies = [], isError: companiesError } = useQuery<Company[]>({
     queryKey: ['companies', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name, domain')
-        .eq('user_id', user.id)
-        .order('name');
+      try {
+        console.log("Fetching companies for dropdown");
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id, name, domain')
+          .eq('user_id', user.id)
+          .order('name');
+          
+        if (error) {
+          console.error("Error fetching companies:", error);
+          throw error;
+        }
         
-      if (error) {
-        console.error("Error fetching companies:", error);
-        throw error;
+        console.log(`Fetched ${data?.length || 0} companies for dropdown`);
+        return data || [];
+      } catch (error) {
+        console.error("Error in company query:", error);
+        return [];
       }
-      
-      return data || [];
     },
     enabled: !!user?.id && open, // Only fetch when form is open
   });
@@ -99,17 +107,26 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
   useEffect(() => {
     if (open) {
       form.reset();
+      setRenderError(null);
     }
   }, [open, form]);
 
   const onSubmit = async (values: FormValues) => {
+    console.log("Form submitted with values:", values);
     try {
       setIsSubmitting(true);
+      
+      // Make sure domain is extracted from email
+      let domain = null;
+      if (values.email && values.email.includes('@')) {
+        domain = values.email.split('@')[1];
+      }
       
       // Use the addContact function from context
       await addContact({
         ...values,
         tags: [], // Initialize with empty tags array
+        domain,
       });
       
       // Reset form and close dialog
@@ -120,172 +137,197 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create contact",
+        description: error.message || "Failed to create contact",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={isSubmitting ? undefined : onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Add New Contact</DialogTitle>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+  // Handle rendering errors
+  if (renderError) {
+    return (
+      <Dialog open={open} onOpenChange={() => onOpenChange(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error</DialogTitle>
+          </DialogHeader>
+          <div className="text-red-500">
+            Error rendering contact form: {renderError}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  try {
+    return (
+      <Dialog open={open} onOpenChange={isSubmitting ? undefined : onOpenChange}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add New Contact</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="first_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name*</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <FormField
                 control={form.control}
-                name="first_name"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name*</FormLabel>
+                    <FormLabel>Email*</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input type="email" placeholder="john.doe@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="last_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Doe" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email*</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="john.doe@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="company_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value}
-                    >
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="company_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select company" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {companies.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select company" />
-                        </SelectTrigger>
+                        <Input placeholder="Job Title" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1 (555) 123-4567" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="website"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Website</FormLabel>
+                      <FormControl>
+                        <Input placeholder="example.com" {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Add any notes about this contact" {...field} />
+                    </FormControl>
                   </FormItem>
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Job Title" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1 (555) 123-4567" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="website"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Website</FormLabel>
-                    <FormControl>
-                      <Input placeholder="example.com" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Add any notes about this contact" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                type="button" 
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Contact"
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  type="button" 
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Contact"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    );
+  } catch (error) {
+    console.error("Error rendering contact form:", error);
+    setRenderError(error instanceof Error ? error.message : String(error));
+    return null; // Render nothing if there's an error
+  }
 };

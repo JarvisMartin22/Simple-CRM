@@ -32,11 +32,12 @@ export interface Contact {
   first_name?: string;
   last_name?: string;
   full_name?: string;
-  email: string;
+  email?: string;
   title?: string;
   phone?: string;
   company_id?: string;
   website?: string;
+  domain?: string;
   tags?: string[];
   last_contacted?: string;
   interaction_count?: number;
@@ -107,18 +108,32 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*, companies(name, domain)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      try {
+        console.log("Fetching contacts for user:", user.id);
+        const { data, error } = await supabase
+          .from('contacts')
+          .select(`
+            *,
+            companies:company_id (
+              id,
+              name,
+              domain
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          console.error("Error fetching contacts:", error);
+          throw error;
+        }
         
-      if (error) {
-        console.error("Error fetching contacts:", error);
-        throw error;
+        console.log(`Fetched ${data?.length || 0} contacts`);
+        return data as Contact[] || [];
+      } catch (error) {
+        console.error("Error in contacts query:", error);
+        return [];
       }
-      
-      return data as Contact[] || [];
     },
     enabled: !!user?.id,
   });

@@ -9,7 +9,7 @@ let isMessageListenerAttached = false;
 let activeAuthPopup: Window | null = null;
 let authPromiseResolve: ((value: boolean) => void) | null = null;
 
-// Function to check localStorage for auth code
+// Function to check localStorage for auth code (temporary - will be removed)
 async function processStoredAuthCode(user: any, queryClient: any, toast: any): Promise<boolean> {
   try {
     const storedCode = localStorage.getItem('gmail_auth_code');
@@ -49,9 +49,6 @@ async function processStoredAuthCode(user: any, queryClient: any, toast: any): P
       hasUrl: 'url' in tokenResponse.data // Check if we're getting an auth URL instead of tokens
     });
     
-    // Add full token response debugging
-    console.log('Full token response (stored code):', JSON.stringify(tokenResponse));
-    
     // Extract only the fields that exist in the user_integrations table
     // Use default values for required fields to prevent null constraint errors
     const integrationData = {
@@ -77,35 +74,79 @@ async function processStoredAuthCode(user: any, queryClient: any, toast: any): P
       return false;
     }
     
-    // Save integration data to database
-    console.log('Saving integration data to database');
-    console.log('Integration data being saved:', JSON.stringify(integrationData));
+    // Make sure all required fields are present
+    if (!integrationData.email) {
+      console.error('Missing required email field in integration data');
+      
+      // Try to get email from userInfo if available
+      if (tokenResponse.data && tokenResponse.data.email) {
+        console.log('Using email from token response:', tokenResponse.data.email);
+        integrationData.email = tokenResponse.data.email;
+      } else {
+        console.error('Cannot save integration: email is required');
+        // Set a fallback email based on user if available
+        integrationData.email = user?.email || 'unknown@example.com';
+      }
+    }
     
-    const { error: integrationError, data: savedData } = await supabase
-      .from('user_integrations')
-      .upsert(integrationData)
-      .select();
+    try {
+      // First, check if there's an existing integration for this user and provider
+      const { data: existingIntegration, error: checkError } = await supabase
+        .from('user_integrations')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('provider', integrationData.provider)
+        .maybeSingle();
+        
+      if (checkError) {
+        console.error('Error checking existing integration:', checkError);
+        throw new Error(`Database error checking existing integration: ${checkError.message}`);
+      }
       
-    if (integrationError) {
-      console.error('Error saving integration:', integrationError);
-      console.error('Error details:', JSON.stringify(integrationError));
+      let result;
       
-      // If we get a error, try to save to localStorage as fallback
-      console.log('Got database error, saving to localStorage as fallback');
-      localStorage.setItem('gmail_integration', JSON.stringify({
-        ...integrationData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      if (existingIntegration) {
+        console.log('Updating existing integration');
+        // Update the existing integration
+        result = await supabase
+          .from('user_integrations')
+          .update({
+            ...integrationData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingIntegration.id)
+          .select();
+      } else {
+        console.log('Creating new integration');
+        // Insert a new integration
+        result = await supabase
+          .from('user_integrations')
+          .insert({
+            ...integrationData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select();
+      }
       
-      // Check if localStorage has the integration data
-      const storedIntegration = localStorage.getItem('gmail_integration');
-      console.log('Checking localStorage fallback data:', storedIntegration ? 'Found data' : 'No data found');
-      
-      // Don't throw, continue with toast notification
-      console.log('Integration data saved to localStorage');
-    } else {
-      console.log('Integration data saved successfully to database');
+      const { error: integrationError, data: savedData } = result;
+        
+      if (integrationError) {
+        console.error('Error saving integration:', integrationError);
+        console.error('Error details:', JSON.stringify(integrationError));
+        throw new Error(`Database error saving integration: ${integrationError.message}`);
+      } else {
+        console.log('Integration data saved successfully to database:', savedData);
+      }
+    } catch (error) {
+      console.error('Unexpected error saving integration:', error);
+      // Don't save to localStorage - fail instead
+      toast({
+        title: "Failed to save integration",
+        description: `Error: ${error.message}`,
+        variant: "destructive"
+      });
+      return false;
     }
     
     toast({
@@ -182,9 +223,6 @@ export function useGmailConnect() {
           hasUrl: 'url' in tokenResponse.data // Check if we're getting an auth URL instead of tokens
         });
         
-        // Add full token response debugging
-        console.log('Full token response (popup):', JSON.stringify(tokenResponse));
-        
         // Extract only the fields that exist in the user_integrations table
         // Use default values for required fields to prevent null constraint errors
         const integrationData = {
@@ -210,35 +248,79 @@ export function useGmailConnect() {
           throw new Error('Missing required fields for integration');
         }
         
-        // Save integration data to database
-        console.log('Saving integration data to database');
-        console.log('Integration data being saved:', JSON.stringify(integrationData));
+        // Make sure all required fields are present
+        if (!integrationData.email) {
+          console.error('Missing required email field in integration data');
+          
+          // Try to get email from userInfo if available
+          if (tokenResponse.data && tokenResponse.data.email) {
+            console.log('Using email from token response:', tokenResponse.data.email);
+            integrationData.email = tokenResponse.data.email;
+          } else {
+            console.error('Cannot save integration: email is required');
+            // Set a fallback email based on user if available
+            integrationData.email = user?.email || 'unknown@example.com';
+          }
+        }
         
-        const { error: integrationError, data: savedData } = await supabase
-          .from('user_integrations')
-          .upsert(integrationData)
-          .select();
+        try {
+          // First, check if there's an existing integration for this user and provider
+          const { data: existingIntegration, error: checkError } = await supabase
+            .from('user_integrations')
+            .select('*')
+            .eq('user_id', user?.id)
+            .eq('provider', integrationData.provider)
+            .maybeSingle();
+            
+          if (checkError) {
+            console.error('Error checking existing integration:', checkError);
+            throw new Error(`Database error checking existing integration: ${checkError.message}`);
+          }
           
-        if (integrationError) {
-          console.error('Error saving integration:', integrationError);
-          console.error('Error details:', JSON.stringify(integrationError));
+          let result;
           
-          // If we get a error, try to save to localStorage as fallback
-          console.log('Got database error, saving to localStorage as fallback');
-          localStorage.setItem('gmail_integration', JSON.stringify({
-            ...integrationData,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }));
+          if (existingIntegration) {
+            console.log('Updating existing integration');
+            // Update the existing integration
+            result = await supabase
+              .from('user_integrations')
+              .update({
+                ...integrationData,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingIntegration.id)
+              .select();
+          } else {
+            console.log('Creating new integration');
+            // Insert a new integration
+            result = await supabase
+              .from('user_integrations')
+              .insert({
+                ...integrationData,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .select();
+          }
           
-          // Check if localStorage has the integration data
-          const storedIntegration = localStorage.getItem('gmail_integration');
-          console.log('Checking localStorage fallback data:', storedIntegration ? 'Found data' : 'No data found');
-          
-          // Don't throw, continue with toast notification
-          console.log('Integration data saved to localStorage');
-        } else {
-          console.log('Integration data saved successfully to database');
+          const { error: integrationError, data: savedData } = result;
+            
+          if (integrationError) {
+            console.error('Error saving integration:', integrationError);
+            console.error('Error details:', JSON.stringify(integrationError));
+            throw new Error(`Database error saving integration: ${integrationError.message}`);
+          } else {
+            console.log('Integration data saved successfully to database:', savedData);
+          }
+        } catch (error) {
+          console.error('Unexpected error saving integration:', error);
+          // Don't save to localStorage - fail instead
+          toast({
+            title: "Failed to save integration",
+            description: `Error: ${error.message}`,
+            variant: "destructive"
+          });
+          throw error; // Propagate the error
         }
         
         toast({

@@ -80,41 +80,46 @@ serve(async (req) => {
       // Check if this is a code exchange request via POST
       if (code) {
         console.log("Code received in POST body:", code);
+        console.log("REDIRECT_URI:", REDIRECT_URI);
+        console.log("CLIENT_ID (first few chars):", GOOGLE_CLIENT_ID.substring(0, 10) + "...");
         
-        const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            code: code,
-            client_id: GOOGLE_CLIENT_ID,
-            client_secret: GOOGLE_CLIENT_SECRET,
-            redirect_uri: REDIRECT_URI,
-            grant_type: "authorization_code",
-          }),
-        });
-        
-        const tokenData = await tokenResponse.json();
-        console.log("Token response status (from POST body):", tokenResponse.status);
-        
-        if (tokenData.error) {
-          console.error("Auth error details:", tokenData);
-          throw new Error(`Auth error: ${tokenData.error}`);
-        }
-        
-        // Get user information from Google
-        const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-          },
-        });
-        
-        const userInfo = await userInfoResponse.json();
-        
-        // Return tokens and user info to the client
-        return new Response(
-          JSON.stringify({
+        try {
+          const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              code: code,
+              client_id: GOOGLE_CLIENT_ID,
+              client_secret: GOOGLE_CLIENT_SECRET,
+              redirect_uri: REDIRECT_URI,
+              grant_type: "authorization_code",
+            }),
+          });
+          
+          const tokenData = await tokenResponse.json();
+          console.log("Token response status (from POST body):", tokenResponse.status);
+          console.log("Token response received, has keys:", Object.keys(tokenData).join(", "));
+          
+          if (tokenData.error) {
+            console.error("Auth error details:", tokenData);
+            throw new Error(`Auth error: ${tokenData.error}`);
+          }
+          
+          // Get user information from Google
+          console.log("Getting user info with access token");
+          const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+            },
+          });
+          
+          const userInfo = await userInfoResponse.json();
+          console.log("User info received, email:", userInfo.email);
+          
+          // Create response data with all required fields
+          const responseData = {
             provider: "gmail",
             provider_user_id: userInfo.id,
             email: userInfo.email,
@@ -122,12 +127,29 @@ serve(async (req) => {
             refresh_token: tokenData.refresh_token,
             expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
             scope: tokenData.scope,
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
+          };
+          
+          console.log("Response data prepared, fields:", Object.keys(responseData).join(", "));
+          console.log("Email:", responseData.email, "Expiry:", responseData.expires_at);
+          
+          // Return tokens and user info to the client
+          return new Response(
+            JSON.stringify(responseData),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        } catch (error) {
+          console.error("Error processing auth code:", error);
+          return new Response(
+            JSON.stringify({ error: error.message }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 500,
+            }
+          );
+        }
       }
     }
     

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
 
 // Create a Supabase client
@@ -11,7 +11,7 @@ interface ImportContact {
   id: string;
   first_name: string;
   last_name: string;
-  email: string;
+  email?: string;
   company: string | null;
   title: string | null;
   phone: string | null;
@@ -23,9 +23,8 @@ interface ImportContact {
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
     const { userId, contacts, source } = await req.json();
@@ -41,6 +40,7 @@ serve(async (req) => {
     }
     
     console.log(`Importing ${contacts.length} contacts for user ${userId} from ${source}`);
+    console.log("First contact sample:", JSON.stringify(contacts[0]));
     
     // Process domains and create companies where needed
     const domains = new Set<string>();
@@ -64,10 +64,13 @@ serve(async (req) => {
         
       if (existingCompanies && existingCompanies.length > 0) {
         // Company already exists
+        console.log(`Company already exists for domain ${domain}: ${existingCompanies[0].id}`);
         domainToCompanyMap.set(domain, existingCompanies[0].id);
       } else {
         // Create new company
         const companyName = extractCompanyNameFromDomain(domain);
+        console.log(`Creating new company for domain ${domain}: ${companyName}`);
+        
         const { data: newCompany, error } = await supabase
           .from('companies')
           .insert({
@@ -84,6 +87,7 @@ serve(async (req) => {
         if (error) {
           console.error(`Error creating company for domain ${domain}:`, error);
         } else if (newCompany) {
+          console.log(`Created new company with ID: ${newCompany.id}`);
           domainToCompanyMap.set(domain, newCompany.id);
         }
       }
@@ -97,6 +101,8 @@ serve(async (req) => {
       }
     });
     
+    console.log(`Processing ${uniqueTags.size} unique tags`);
+    
     // Ensure all tags exist in the tags table
     for (const tagName of uniqueTags) {
       const { data: existingTag } = await supabase
@@ -108,6 +114,7 @@ serve(async (req) => {
         
       if (!existingTag || existingTag.length === 0) {
         // Create tag
+        console.log(`Creating tag: ${tagName}`);
         await supabase
           .from('tags')
           .insert({
@@ -126,40 +133,56 @@ serve(async (req) => {
       errors: 0
     };
     
+    console.log(`Starting to process ${contacts.length} contacts`);
+    
     for (const contact of contacts) {
       try {
         // Link contact to company if domain is not common email provider
         let company_id = null;
         if (contact.domain && !isCommonEmailDomain(contact.domain)) {
           company_id = domainToCompanyMap.get(contact.domain) || null;
+          if (company_id) {
+            console.log(`Linking contact ${contact.email} to company ID: ${company_id}`);
+          }
         }
         
-        // Create contact data object, excluding non-DB fields
+        // Remove non-DB fields from contact before inserting
         const { domain, company, tags, ...contactData } = contact;
         
         // Create full name from first and last name
         const fullName = `${contactData.first_name} ${contactData.last_name}`.trim();
         
+        // Prepare contact data for insertion
+        const contactInsertData = {
+          ...contactData,
+          full_name: fullName,
+          user_id: userId,
+          source: source || 'manual',
+          tags: contact.tags || [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Only add company_id if we have one (to avoid foreign key issues)
+        if (company_id) {
+          contactInsertData.company_id = company_id;
+        }
+        
+        // Log message with name and email (if available)
+        console.log(`Creating contact: ${contactData.email || (contactData.first_name + ' ' + contactData.last_name)}`);
+        
         // Create contact
         const { data: newContact, error } = await supabase
           .from('contacts')
-          .insert({
-            ...contactData,
-            full_name: fullName,
-            company_id,
-            user_id: userId,
-            source: source || 'manual',
-            tags: contact.tags || [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .insert(contactInsertData)
           .select('id')
           .single();
           
         if (error) {
-          console.error(`Error creating contact ${contact.email}:`, error);
+          console.error(`Error creating contact ${contactData.email || (contactData.first_name + ' ' + contactData.last_name)}:`, error);
           results.errors++;
         } else {
+          console.log(`Created contact with ID: ${newContact.id}`);
           results.created++;
           
           // Create initial activity entry
@@ -179,6 +202,8 @@ serve(async (req) => {
         results.errors++;
       }
     }
+    
+    console.log(`Import complete. Created: ${results.created}, Errors: ${results.errors}`);
     
     return new Response(
       JSON.stringify({

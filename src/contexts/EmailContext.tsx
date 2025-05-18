@@ -56,25 +56,6 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [notificationCount, setNotificationCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [localStorageIntegration, setLocalStorageIntegration] = useState<any>(null);
-  
-  // Check localStorage for integration data
-  useEffect(() => {
-    if (user?.id) {
-      try {
-        const storedData = localStorage.getItem('gmail_integration');
-        if (storedData) {
-          const parsedData = JSON.parse(storedData);
-          if (parsedData.user_id === user.id) {
-            setLocalStorageIntegration(parsedData);
-            console.log('EmailContext: Found integration data in localStorage');
-          }
-        }
-      } catch (e) {
-        console.error("EmailContext: Error reading from localStorage:", e);
-      }
-    }
-  }, [user?.id]);
   
   // Fetch email integration data
   const { data: integration } = useQuery({
@@ -136,7 +117,7 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
       
       return data as EmailTrackingData[];
     },
-    enabled: !!user?.id && !!(integration || localStorageIntegration),
+    enabled: !!user?.id && !!integration,
   });
   
   // Fetch email stats
@@ -161,7 +142,7 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
         replied: data.filter(email => email.replied_at).length
       };
     },
-    enabled: !!user?.id && !!(integration || localStorageIntegration),
+    enabled: !!user?.id && !!integration,
   });
   
   // Set a default notification count for now
@@ -205,16 +186,22 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
     }
   });
   
-  // Sync contacts mutation
-  const syncContactsMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      setIsSyncing(true);
-      
-      const response = await supabase.functions.invoke('gmail-sync', {
+  // Send email function
+  const sendEmail = async (params: SendEmailParams) => {
+    await sendEmailMutation.mutateAsync(params);
+  };
+  
+  // Sync contacts function
+  const syncContacts = async () => {
+    if (!user?.id) throw new Error("User not authenticated");
+    if (!integration) throw new Error("Email not connected");
+    
+    setIsSyncing(true);
+    
+    try {
+      const response = await supabase.functions.invoke('sync-contacts', {
         body: {
-          userId: user.id,
-          syncType: 'both'
+          userId: user.id
         }
       });
       
@@ -222,52 +209,43 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
         throw new Error(response.error.message);
       }
       
-      return response.data;
-    },
-    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       
       toast({
-        title: "Contacts synchronized",
-        description: `Created ${data.pull.created} and updated ${data.pull.updated} contacts`,
+        title: "Contacts synced",
+        description: `${response.data.imported} contacts imported successfully`,
       });
-    },
-    onError: (error) => {
+    } catch (error) {
       toast({
-        title: "Sync failed",
+        title: "Failed to sync contacts",
         description: error.message,
         variant: "destructive"
       });
-    },
-    onSettled: () => {
+    } finally {
       setIsSyncing(false);
     }
-  });
+  };
   
-  // Send email handler
-  const sendEmail = useCallback(async (params: SendEmailParams) => {
-    await sendEmailMutation.mutateAsync(params);
-  }, [sendEmailMutation]);
+  const isEmailConnected = !!integration;
+  const emailProvider = integration?.provider || null;
+  const emailAddress = integration?.email || null;
+  const isEmailSending = sendEmailMutation.isPending;
   
-  // Sync contacts handler
-  const syncContacts = useCallback(async () => {
-    await syncContactsMutation.mutateAsync();
-  }, [syncContactsMutation]);
-  
-  // Get effective integration (prioritize database, fallback to localStorage)
-  const effectiveIntegration = integration || localStorageIntegration;
-  
-  // Email context value
   const value = {
-    isEmailConnected: !!effectiveIntegration,
-    emailProvider: effectiveIntegration?.provider || null,
-    emailAddress: effectiveIntegration?.email || null,
-    isEmailSending: sendEmailMutation.isPending,
+    // States
+    isEmailConnected,
+    emailProvider,
+    emailAddress,
+    isEmailSending,
     recentEmails,
     emailStats,
+    
+    // Actions
     sendEmail,
     syncContacts,
     isSyncing,
+    
+    // Notification
     notificationCount
   };
   
@@ -280,10 +258,8 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
 
 export function useEmail() {
   const context = useContext(EmailContext);
-  
   if (context === undefined) {
-    throw new Error("useEmail must be used within an EmailProvider");
+    throw new Error('useEmail must be used within an EmailProvider');
   }
-  
   return context;
 } 

@@ -27,7 +27,7 @@ const Contacts: React.FC = () => {
       
       const { data, error } = await supabase
         .from('contacts')
-        .select('*, companies(name, domain)')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
         

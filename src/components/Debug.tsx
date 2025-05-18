@@ -67,15 +67,15 @@ export function DebugPanel() {
   const checkDatabase = async () => {
     try {
       // Get the list of tables using a direct SQL query
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from('user_integrations')
-        .select('count(*)', { count: 'exact' });
+        .select('*', { count: 'exact', head: true });
         
       setDbCheck({
         integrations: {
           exists: !error,
           error: error ? error.message : null,
-          count: data?.length || 0
+          count: count || 0
         }
       });
       
