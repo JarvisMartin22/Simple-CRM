@@ -24,6 +24,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useContacts } from '@/contexts/ContactsContext';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/components/ui/use-toast';
 
 interface Contact {
   id: string;
@@ -56,7 +68,11 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
 }) => {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [emailContact, setEmailContact] = useState<{ id: string, email: string, name: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<string | null>(null);
   const { isEmailConnected } = useEmail();
+  const { deleteContact } = useContacts();
+  const { toast } = useToast();
   
   // Filter contacts based on search query
   const filteredContacts = contacts.filter(contact => {
@@ -73,6 +89,51 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
       (contact.phone && contact.phone.toLowerCase().includes(query))
     );
   });
+  
+  // Handler for deleting a contact
+  const handleDeleteContact = async (contactId: string) => {
+    try {
+      await deleteContact(contactId);
+      // No need for toast here as it's handled in the ContactsContext
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem deleting this contact.",
+        variant: "destructive"
+      });
+    } finally {
+      setContactToDelete(null);
+      setDeleteDialogOpen(false);
+    }
+  };
+  
+  // Handler for bulk deleting selected contacts
+  const handleBulkDelete = async () => {
+    if (selectedContacts.length === 0) return;
+    
+    try {
+      // Delete each selected contact
+      const promises = selectedContacts.map(id => deleteContact(id));
+      await Promise.all(promises);
+      
+      // Show success message
+      toast({
+        title: "Contacts Deleted",
+        description: `Successfully deleted ${selectedContacts.length} contacts.`
+      });
+      
+      // Clear selection
+      setSelectedContacts([]);
+    } catch (error) {
+      console.error("Error bulk deleting contacts:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem deleting the contacts.",
+        variant: "destructive"
+      });
+    }
+  };
   
   if (isLoading) {
     return <ContactsTableSkeleton />;
@@ -191,7 +252,13 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                         <span>Schedule Meeting</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => {
+                          setContactToDelete(contact.id);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         <span>Delete</span>
                       </DropdownMenuItem>
@@ -215,6 +282,73 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             />
           </DialogContent>
         </Dialog>
+      )}
+      
+      {/* Confirmation dialog for deleting a contact */}
+      <AlertDialog open={deleteDialogOpen && contactToDelete !== 'bulk'} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the contact
+              and remove the data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => contactToDelete && handleDeleteContact(contactToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Confirmation dialog for bulk delete */}
+      <AlertDialog 
+        open={deleteDialogOpen && contactToDelete === 'bulk'} 
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setContactToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedContacts.length} contacts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected contacts
+              and remove their data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Add bulk delete button if contacts are selected */}
+      {selectedContacts.length > 0 && (
+        <div className="mt-4 flex justify-start">
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={() => {
+              setDeleteDialogOpen(true);
+              setContactToDelete('bulk');
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Selected ({selectedContacts.length})
+          </Button>
+        </div>
       )}
     </div>
   );

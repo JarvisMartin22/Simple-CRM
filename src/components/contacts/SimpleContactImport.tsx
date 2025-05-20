@@ -4,14 +4,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Upload, Users, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
+import { Mail, Upload, Users, Loader2, CheckCircle2, RefreshCw, Filter } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useGmailContactsImport, ContactPreview } from '@/hooks/useGmailContactsImport';
+import { useGmailContactsImport, ContactPreview, ContactCategory } from '@/hooks/useGmailContactsImport';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useGmailConnect } from '@/hooks/useGmailConnect';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmail } from '@/contexts/EmailContext';
+import { useContacts } from '@/contexts/ContactsContext';
 
 // Simplified version of ContactImport that just shows the UI structure without complex logic
 const SimpleContactImport: React.FC = () => {
@@ -29,11 +30,14 @@ const SimpleContactImport: React.FC = () => {
     hasPreviewedContacts,
     previewGmailContacts,
     importGmailContacts,
-    resetState
+    resetState,
+    selectedCategories,
+    setSelectedCategories
   } = useGmailContactsImport();
   
   // Gmail connect hook (for connecting to Gmail if not already connected)
   const { connectGmail, isConnecting } = useGmailConnect();
+  const { addContact } = useContacts();
   
   // Update selected contacts when "Select All" changes
   useEffect(() => {
@@ -73,7 +77,7 @@ const SimpleContactImport: React.FC = () => {
           });
           // After connecting, preview contacts
           setTimeout(() => {
-            previewGmailContacts();
+            previewGmailContacts(selectedCategories);
           }, 1000);
         }
       } catch (error) {
@@ -84,7 +88,9 @@ const SimpleContactImport: React.FC = () => {
     
     // If we haven't loaded contacts yet
     if (!hasPreviewedContacts) {
-      previewGmailContacts();
+      // Make sure we're actually using all the selected categories
+      console.log("Previewing contacts with categories:", selectedCategories);
+      await previewGmailContacts(selectedCategories);
       return;
     }
     
@@ -98,6 +104,54 @@ const SimpleContactImport: React.FC = () => {
         description: "Please select at least one contact to import."
       });
     }
+  };
+  
+  // Function to directly test contact creation
+  const testDirectContactAdd = async () => {
+    try {
+      console.log("Attempting direct contact creation via ContactsContext");
+      
+      // Create a test contact
+      const testContact = {
+        first_name: "Test",
+        last_name: "User",
+        email: "test" + Math.floor(Math.random() * 1000) + "@example.com", // Random email to avoid duplicates
+        title: "Test Title",
+        tags: ["test", "gmail-import"]
+      };
+      
+      console.log("Test contact data:", testContact);
+      
+      // Attempt to add the contact directly
+      await addContact(testContact);
+      
+      toast({
+        title: "Test Contact Added",
+        description: "Successfully added a test contact directly"
+      });
+    } catch (error) {
+      console.error("Error adding test contact:", error);
+      toast({
+        title: "Test Failed",
+        description: error.message || "Failed to add test contact directly",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Add a small component to display the active categories
+  const CategoryBadge: React.FC<{category: ContactCategory}> = ({ category }) => {
+    const categoryLabels = {
+      contacts: "Main Contacts",
+      otherContacts: "Other Contacts",
+      frequent: "Frequently Contacted"
+    };
+    
+    return (
+      <span className="inline-flex items-center px-2 py-1 bg-primary/10 text-primary text-xs rounded-full mr-1">
+        {categoryLabels[category]}
+      </span>
+    );
   };
   
   // Render the contact list for selection
@@ -139,6 +193,16 @@ const SimpleContactImport: React.FC = () => {
                     {contact.first_name} {contact.last_name}
                   </div>
                   <div className="text-sm text-gray-500 truncate">{contact.email}</div>
+                  {contact.category && (
+                    <div className="text-xs mt-1">
+                      {contact.category === 'contacts' ? 
+                        <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-xs">Main Contact</span> : 
+                       contact.category === 'otherContacts' ? 
+                        <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">Other Contact</span> : 
+                        <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-xs">Frequently Contacted</span>
+                      }
+                    </div>
+                  )}
                 </div>
                 {contact.company && (
                   <div className="text-sm text-gray-500 truncate max-w-[120px]">
@@ -155,7 +219,7 @@ const SimpleContactImport: React.FC = () => {
   
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
         <CardTitle>Import Contacts</CardTitle>
         <CardDescription>
           Import your contacts from various sources
@@ -163,7 +227,7 @@ const SimpleContactImport: React.FC = () => {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 mx-auto">
             <TabsTrigger value="gmail">Gmail</TabsTrigger>
             <TabsTrigger value="csv">CSV Upload</TabsTrigger>
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
@@ -173,34 +237,80 @@ const SimpleContactImport: React.FC = () => {
             {!hasPreviewedContacts ? (
               <div className="p-6 text-center">
                 <Mail className="h-12 w-12 text-gray-400 mb-4 mx-auto" />
-                <h3 className="text-lg font-medium mb-2">Gmail Integration</h3>
-                <p className="text-gray-500 mb-4">
-                  {isEmailConnected && emailProvider === 'gmail' 
-                    ? "Your Gmail account is connected. Click below to import contacts."
-                    : "Connect your Gmail account to import contacts."}
-                </p>
+                
+                <div className="mb-4">
+                  <Label className="mb-2 block">Contact Categories to Import</Label>
+                  <div className="flex gap-2 flex-wrap mb-4 justify-center">
+                    <Button
+                      variant={selectedCategories.includes('contacts') ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        if (selectedCategories.includes('contacts')) {
+                          setSelectedCategories(selectedCategories.filter(c => c !== 'contacts'));
+                        } else {
+                          setSelectedCategories([...selectedCategories, 'contacts']);
+                        }
+                      }}
+                      disabled={isLoading}
+                      className={selectedCategories.includes('contacts') ? "bg-primary" : ""}
+                    >
+                      Main Contacts
+                    </Button>
+                    <Button
+                      variant={selectedCategories.includes('otherContacts') ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        if (selectedCategories.includes('otherContacts')) {
+                          setSelectedCategories(selectedCategories.filter(c => c !== 'otherContacts'));
+                        } else {
+                          setSelectedCategories([...selectedCategories, 'otherContacts']);
+                        }
+                      }}
+                      disabled={isLoading}
+                      className={selectedCategories.includes('otherContacts') ? "bg-primary" : ""}
+                    >
+                      Other Contacts
+                    </Button>
+                    <Button
+                      variant={selectedCategories.includes('frequent') ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        if (selectedCategories.includes('frequent')) {
+                          setSelectedCategories(selectedCategories.filter(c => c !== 'frequent'));
+                        } else {
+                          setSelectedCategories([...selectedCategories, 'frequent']);
+                        }
+                      }}
+                      disabled={isLoading}
+                      className={selectedCategories.includes('frequent') ? "bg-primary" : ""}
+                    >
+                      Frequently Contacted
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Select which categories of contacts to import from Google.
+                    <br />
+                    • <strong>Main Contacts</strong> are contacts you've manually saved.
+                    <br />
+                    • <strong>Other Contacts</strong> are people you've interacted with but haven't manually saved.
+                    <br />
+                    • <strong>Frequently Contacted</strong> are people you interact with often.
+                  </p>
+                </div>
+                
                 <Button 
                   onClick={handleGmailAction}
-                  disabled={isLoading || isConnecting}
+                  disabled={isLoading || isConnecting || selectedCategories.length === 0}
                 >
-                  {isLoading || isConnecting ? (
+                  {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isConnecting ? "Connecting..." : "Loading Contacts..."}
+                      Loading...
                     </>
                   ) : (
                     <>
-                      {isEmailConnected && emailProvider === 'gmail' ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Fetch Contacts
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="mr-2 h-4 w-4" />
-                          Connect Gmail
-                        </>
-                      )}
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isEmailConnected && emailProvider === 'gmail' ? 'Preview Contacts' : 'Connect Gmail'}
                     </>
                   )}
                 </Button>
@@ -208,14 +318,20 @@ const SimpleContactImport: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                  <h3 className="font-medium mb-2">Contacts from Gmail</h3>
-                  <p className="text-sm text-gray-500 mb-4">
+                  <h3 className="font-medium mb-2 text-center">Contacts from Gmail</h3>
+                  <p className="text-sm text-gray-500 mb-2 text-center">
                     Select the contacts you want to import into your CRM.
                   </p>
                   
+                  <div className="flex justify-center mb-4 gap-1 flex-wrap">
+                    {selectedCategories.map(category => (
+                      <CategoryBadge key={category} category={category} />
+                    ))}
+                  </div>
+                  
                   {renderContactsList()}
                   
-                  <div className="flex justify-end space-x-2 mt-4">
+                  <div className="flex justify-center space-x-2 mt-4">
                     <Button 
                       variant="outline" 
                       onClick={() => {

@@ -12,7 +12,108 @@ interface FilterOptions {
   excludeNoReply: boolean;
   lastContactedDays: number | null;
   searchTerm: string;
+  categories?: string[];
+  resourceName?: string;
 }
+
+// Function to fetch other contacts
+const fetchOtherContacts = async (accessToken: string) => {
+  try {
+    console.log("Fetching other contacts...");
+    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,organizations,phoneNumbers,urls,metadata,photos';
+    
+    const response = await fetch(otherContactsUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`Error fetching other contacts: ${response.status}`, error);
+      return { success: false, data: null, error };
+    }
+    
+    const data = await response.json();
+    return { 
+      success: true, 
+      data: data.otherContacts || [],
+      totalItems: data.otherContacts?.length || 0,
+      nextPageToken: data.nextPageToken
+    };
+  } catch (error) {
+    console.error("Error fetching other contacts:", error);
+    return { success: false, data: null, error: error.message };
+  }
+};
+
+// Function to fetch frequently contacted people
+const fetchFrequentContacts = async (accessToken: string) => {
+  try {
+    console.log("Fetching frequent contacts...");
+    // First, get the frequent contact group members
+    const frequentGroupUrl = 'https://people.googleapis.com/v1/contactGroups/frequentlyContacted';
+    
+    const groupResponse = await fetch(frequentGroupUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    
+    if (!groupResponse.ok) {
+      const error = await groupResponse.text();
+      console.error(`Error fetching frequent contacts group: ${groupResponse.status}`, error);
+      return { success: false, data: null, error };
+    }
+    
+    const groupData = await groupResponse.json();
+    const memberResourceNames = groupData.memberResourceNames || [];
+    
+    if (memberResourceNames.length === 0) {
+      console.log("No frequent contacts found");
+      return { success: true, data: [], totalItems: 0 };
+    }
+    
+    // Now fetch the actual contact details
+    // Google API has a limit on batch sizes, so we'll do batches of 50
+    const batchSize = 50;
+    let allContacts = [];
+    
+    for (let i = 0; i < memberResourceNames.length; i += batchSize) {
+      const batch = memberResourceNames.slice(i, i + batchSize);
+      const personFields = "names,emailAddresses,organizations,phoneNumbers,urls,metadata,photos";
+      const batchUrl = `https://people.googleapis.com/v1/people:batchGet?personFields=${personFields}&` + 
+                     batch.map(name => `resourceNames=${encodeURIComponent(name)}`).join('&');
+      
+      const batchResponse = await fetch(batchUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      if (!batchResponse.ok) {
+        console.error(`Error fetching batch ${i/batchSize} of contact details: ${batchResponse.status}`);
+        continue;
+      }
+      
+      const batchData = await batchResponse.json();
+      if (batchData.responses && batchData.responses.length > 0) {
+        const validResponses = batchData.responses.filter(r => r.person);
+        const contacts = validResponses.map(r => r.person);
+        allContacts = [...allContacts, ...contacts];
+      }
+    }
+    
+    return { 
+      success: true, 
+      data: allContacts,
+      totalItems: allContacts.length
+    };
+  } catch (error) {
+    console.error("Error fetching frequent contacts:", error);
+    return { success: false, data: null, error: error.message };
+  }
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,8 +126,14 @@ serve(async (req) => {
       onlyWithName: true,
       excludeNoReply: true,
       lastContactedDays: 180,
-      searchTerm: ""
+      searchTerm: "",
+      categories: ["contacts"],
+      resourceName: "connections"
     };
+    
+    // Default to connections if no resourceName is provided
+    const resourceName = filterOptions.resourceName || "connections";
+    console.log(`Using resource name: ${resourceName}`);
     
     // If userId is not provided, try to get it from the authenticated user
     let effectiveUserId = userId;
@@ -57,7 +164,7 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Processing contacts preview for user ${effectiveUserId} with filters:`, filterOptions);
+    console.log(`Processing contacts preview for user ${effectiveUserId} with resource: ${resourceName}`);
     
     // 1. Get the user's Gmail integration
     const { data: integration, error: integrationError } = await supabase
@@ -127,42 +234,60 @@ serve(async (req) => {
     
     // 3. Fetch contacts from Gmail People API
     try {
-      // Determine time filter (if any)
-      let peopleUrl = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,organizations,phoneNumbers,urls,metadata,photos&sortOrder=LAST_MODIFIED_DESCENDING';
+      // The response structure differs depending on the endpoint
+      let connections = [];
       
-      // Increase results per page to max (1000)
-      peopleUrl += '&pageSize=1000';
-      
-      console.log(`Fetching contacts from Google API: ${peopleUrl}`);
-      console.log(`Using access token: ${accessToken.substring(0, 5)}...${accessToken.substring(accessToken.length - 5)}`);
-      
-      // Send request to Google
-      const response = await fetch(peopleUrl, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      
-      console.log(`Google API response status: ${response.status}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        console.error("Google API error response:", error);
-        throw new Error(`Failed to fetch contacts: ${error.error?.message || response.statusText}`);
+      if (resourceName === "connections") {
+        // For main contacts - use existing method
+        const peopleUrl = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,organizations,phoneNumbers,urls,metadata,photos&sortOrder=LAST_MODIFIED_DESCENDING&pageSize=1000';
+        
+        console.log(`Fetching main contacts from Google API: ${peopleUrl}`);
+        
+        const response = await fetch(peopleUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          console.error("Google API error response:", error);
+          throw new Error(`Failed to fetch contacts: ${error.error?.message || response.statusText}`);
+        }
+        
+        const contactsData = await response.json();
+        connections = contactsData.connections || [];
+        console.log(`Google API returned ${connections.length} main connections`);
+      } 
+      else if (resourceName === "otherContacts") {
+        // For other contacts - use the specific function
+        const otherContactsResult = await fetchOtherContacts(accessToken);
+        if (!otherContactsResult.success) {
+          throw new Error(`Failed to fetch other contacts: ${otherContactsResult.error}`);
+        }
+        
+        connections = otherContactsResult.data;
+        console.log(`Google API returned ${connections.length} other contacts`);
+      } 
+      else if (resourceName === "contactGroups/frequentlyContacted/members") {
+        // For frequently contacted - use the specific function
+        const frequentContactsResult = await fetchFrequentContacts(accessToken);
+        if (!frequentContactsResult.success) {
+          throw new Error(`Failed to fetch frequent contacts: ${frequentContactsResult.error}`);
+        }
+        
+        connections = frequentContactsResult.data;
+        console.log(`Google API returned ${connections.length} frequently contacted people`);
       }
       
-      // Parse response data
-      const contactsData = await response.json();
+      console.log("Google API response sample:", JSON.stringify(connections.slice(0, 1)).slice(0, 500) + "...");
       
-      console.log(`Google API returned ${contactsData.connections ? contactsData.connections.length : 0} contacts`);
-      console.log("Google API response sample:", JSON.stringify(contactsData).slice(0, 500) + "...");
-      
-      if (!contactsData.connections || contactsData.connections.length === 0) {
-        console.log("No connections found in Google response, payload:", JSON.stringify(contactsData).slice(0, 500) + "...");
+      if (connections.length === 0) {
+        console.log("No connections found in Google response for resource:", resourceName);
         return new Response(
           JSON.stringify({ 
             contacts: [],
-            message: "No contacts found in your Google account"
+            message: `No contacts found in your Google account for resource: ${resourceName}`
           }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -181,7 +306,7 @@ serve(async (req) => {
       console.log(`Found ${existingEmails.size} existing contacts to filter out`);
       
       // 5. Process contacts with filtering
-      let processedContacts = contactsData.connections.map((contact: any) => {
+      let processedContacts = connections.map((contact: any) => {
         const primaryName = contact.names ? contact.names.find((n: any) => n.metadata?.primary) || contact.names[0] : null;
         const primaryEmail = contact.emailAddresses ? contact.emailAddresses.find((e: any) => e.metadata?.primary) || contact.emailAddresses[0] : null;
         const primaryOrg = contact.organizations ? contact.organizations.find((o: any) => o.metadata?.primary) || contact.organizations[0] : null;
@@ -214,11 +339,13 @@ serve(async (req) => {
           website: primaryUrl?.value || null,
           photo_url: photo,
           external_id: contact.resourceName,
+          // Explicitly include the category
+          category: resourceName === "connections" ? "contacts" : 
+                    resourceName === "otherContacts" ? "otherContacts" : "frequent"
         };
       });
       
-      console.log(`Mapped ${processedContacts.length} contacts from Google data`);
-      console.log("Sample processed contact:", JSON.stringify(processedContacts[0]));
+      console.log(`Mapped ${processedContacts.length} contacts from Google data for resource: ${resourceName}`);
       
       // Filter out contacts without emails - disabled to show all contacts
       const beforeEmailFilter = processedContacts.length;
@@ -284,12 +411,13 @@ serve(async (req) => {
       }
       
       // Return processed contacts
-      console.log(`Returning ${processedContacts.length} contacts after all filtering`);
+      console.log(`Returning ${processedContacts.length} contacts for resource ${resourceName} after all filtering`);
       return new Response(
         JSON.stringify({
           contacts: processedContacts,
           total: processedContacts.length,
-          existing: existingEmails.size
+          existing: existingEmails.size,
+          resourceName: resourceName
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -39,8 +39,78 @@ serve(async (req) => {
       );
     }
     
+    // Check for test mode
+    const url = new URL(req.url);
+    const testMode = url.searchParams.get('testMode') === 'true';
+    
+    if (testMode) {
+      console.log("RUNNING IN TEST MODE - No database changes will be made");
+      console.log(`Received ${contacts.length} contacts for user ${userId}`);
+      
+      // Validate input contact format
+      const validationResults = contacts.map(contact => {
+        const issues = [];
+        
+        // Check required fields
+        if (!contact.first_name) issues.push("Missing first_name");
+        if (!contact.email) issues.push("Missing email");
+        
+        // Check data types
+        if (contact.tags && !Array.isArray(contact.tags)) issues.push("tags is not an array");
+        
+        return {
+          contact: {
+            id: contact.id,
+            first_name: contact.first_name,
+            last_name: contact.last_name,
+            email: contact.email,
+            company: contact.company,
+            title: contact.title,
+            tags: contact.tags
+          },
+          valid: issues.length === 0,
+          issues: issues
+        };
+      });
+      
+      return new Response(
+        JSON.stringify({
+          message: "Test mode - data validated without database changes",
+          validationResults,
+          userId,
+          source
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+    
     console.log(`Importing ${contacts.length} contacts for user ${userId} from ${source}`);
     console.log("First contact sample:", JSON.stringify(contacts[0]));
+    
+    // First fetch existing contacts by email to prevent duplicates
+    console.log("Checking for existing contacts to avoid duplicates");
+    const { data: existingContacts, error: existingError } = await supabase
+      .from('contacts')
+      .select('email')
+      .eq('user_id', userId);
+      
+    if (existingError) {
+      console.error("Error fetching existing contacts:", existingError);
+    }
+    
+    // Create a Set of lowercase emails for fast lookup
+    const existingEmails = new Set<string>();
+    if (existingContacts) {
+      existingContacts.forEach(contact => {
+        if (contact.email) {
+          existingEmails.add(contact.email.toLowerCase());
+        }
+      });
+    }
+    console.log(`Found ${existingEmails.size} existing contacts`);
     
     // Process domains and create companies where needed
     const domains = new Set<string>();
@@ -130,13 +200,28 @@ serve(async (req) => {
     // Insert contacts in batches
     const results = {
       created: 0,
-      errors: 0
+      errors: 0,
+      skipped: 0
     };
     
     console.log(`Starting to process ${contacts.length} contacts`);
     
     for (const contact of contacts) {
       try {
+        // Skip if contact doesn't have required fields
+        if (!contact.email) {
+          console.log(`Skipping contact missing email: ${contact.first_name} ${contact.last_name}`);
+          results.skipped++;
+          continue;
+        }
+        
+        // Skip if email already exists (case insensitive check)
+        if (contact.email && existingEmails.has(contact.email.toLowerCase())) {
+          console.log(`Skipping existing contact: ${contact.email}`);
+          results.skipped++;
+          continue;
+        }
+        
         // Link contact to company if domain is not common email provider
         let company_id = null;
         if (contact.domain && !isCommonEmailDomain(contact.domain)) {
@@ -150,15 +235,23 @@ serve(async (req) => {
         const { domain, company, tags, ...contactData } = contact;
         
         // Create full name from first and last name
-        const fullName = `${contactData.first_name} ${contactData.last_name}`.trim();
+        const fullName = `${contactData.first_name || ''} ${contactData.last_name || ''}`.trim();
         
         // Prepare contact data for insertion
         const contactInsertData = {
           ...contactData,
-          full_name: fullName,
+          // Ensure all string fields have proper values or null
+          first_name: contactData.first_name || null,
+          last_name: contactData.last_name || null,
+          email: contactData.email || null, // This should never be null due to our filter above
+          phone: contactData.phone || null,
+          title: contactData.title || null,
+          website: contactData.website || null,
+          full_name: fullName || null,
           user_id: userId,
           source: source || 'manual',
-          tags: contact.tags || [],
+          // Ensure tags is properly formatted as a Postgres array
+          tags: Array.isArray(contact.tags) ? contact.tags : [],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -168,8 +261,9 @@ serve(async (req) => {
           contactInsertData.company_id = company_id;
         }
         
-        // Log message with name and email (if available)
-        console.log(`Creating contact: ${contactData.email || (contactData.first_name + ' ' + contactData.last_name)}`);
+        // Log message with name, email, and tags (if available)
+        console.log(`Creating contact: ${contactData.email || (contactData.first_name + ' ' + contactData.last_name)} with tags:`, 
+          JSON.stringify(contactInsertData.tags));
         
         // Create contact
         const { data: newContact, error } = await supabase
@@ -181,6 +275,16 @@ serve(async (req) => {
         if (error) {
           console.error(`Error creating contact ${contactData.email || (contactData.first_name + ' ' + contactData.last_name)}:`, error);
           results.errors++;
+          
+          // Log detailed error information for debugging
+          console.error("Full error details:", JSON.stringify(error));
+          
+          // Check for common errors
+          if (error.code === '23505') {
+            console.log("Duplicate key violation - contact may already exist");
+          } else if (error.code === '23503') {
+            console.log("Foreign key violation - referenced entity may not exist");
+          }
         } else {
           console.log(`Created contact with ID: ${newContact.id}`);
           results.created++;
@@ -203,7 +307,7 @@ serve(async (req) => {
       }
     }
     
-    console.log(`Import complete. Created: ${results.created}, Errors: ${results.errors}`);
+    console.log(`Import complete. Created: ${results.created}, Errors: ${results.errors}, Skipped: ${results.skipped}`);
     
     return new Response(
       JSON.stringify({

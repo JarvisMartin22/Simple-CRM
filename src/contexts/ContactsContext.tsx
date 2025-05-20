@@ -152,6 +152,10 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         
         // Handle each field explicitly to avoid any type conversion issues
+        // Ensure tags is always an array
+        const tagsValue = Array.isArray(newContact.tags) ? newContact.tags : [];
+        console.log("[DEBUG] Processed tags value:", tagsValue);
+        
         // Explicitly only include string/number/boolean fields in first insert
         const { data: newContactData, error: insertError } = await supabase
           .from('contacts')
@@ -167,8 +171,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
               : newContact.company_id || null,
             website: newContact.website || null,
             notes: newContact.notes || null,
-            // Explicitly omit tags for now - handled later
-            // tags: null, // Do not include at all
+            tags: tagsValue, // Add tags directly in the main insert
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -181,32 +184,6 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         
         console.log("[DEBUG] Contact inserted with ID:", newContactData.id);
-        
-        // Handle tags separately if the initial insert was successful
-        if (newContactData?.id) {
-          const tags = Array.isArray(newContact.tags) ? newContact.tags : [];
-          console.log("[DEBUG] Updating tags:", tags);
-          
-          // Using a direct string format for PostgreSQL array
-          const pgArrayString = tags.length === 0 
-            ? '{}' 
-            : '{' + tags.map(tag => `"${tag}"`).join(',') + '}';
-          
-          // Since directly setting tags fails, let's use a raw UPDATE query with stringified array
-          const { error: updateError } = await supabase
-            .from('contacts')
-            .update({
-              // Use the string representation directly - will be parsed as array by Postgres
-              tags: pgArrayString as any,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', newContactData.id);
-            
-          if (updateError) {
-            console.error("Error updating tags:", updateError);
-            // Don't throw, we still have a contact
-          }
-        }
         
         // Fetch the complete contact
         const { data: completeContact, error: fetchError } = await supabase
