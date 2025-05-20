@@ -143,26 +143,89 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     mutationFn: async (newContact: Omit<Contact, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
       if (!user?.id) throw new Error("User not authenticated");
       
-      // Create full name from first and last name
-      const fullName = `${newContact.first_name || ''} ${newContact.last_name || ''}`.trim();
-      
-      const { data, error } = await supabase
-        .from('contacts')
-        .insert({
-          ...newContact,
-          user_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      try {
+        // Log all top-level properties of newContact for debugging
+        console.log("[DEBUG] All properties of newContact:", Object.keys(newContact));
+        for (const key of Object.keys(newContact)) {
+          const value = (newContact as any)[key];
+          console.log(`[DEBUG] Property ${key}:`, value, typeof value, Array.isArray(value));
+        }
         
-      if (error) {
+        // Handle each field explicitly to avoid any type conversion issues
+        // Explicitly only include string/number/boolean fields in first insert
+        const { data: newContactData, error: insertError } = await supabase
+          .from('contacts')
+          .insert({
+            user_id: user.id,
+            first_name: newContact.first_name || null,
+            last_name: newContact.last_name || null,
+            email: newContact.email || null,
+            phone: newContact.phone || null,
+            title: newContact.title || null,
+            company_id: newContact.company_id === 'none' || newContact.company_id === 'no-companies' 
+              ? null 
+              : newContact.company_id || null,
+            website: newContact.website || null,
+            notes: newContact.notes || null,
+            // Explicitly omit tags for now - handled later
+            // tags: null, // Do not include at all
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+          
+        if (insertError) {
+          console.error("Error inserting contact:", insertError);
+          throw insertError;
+        }
+        
+        console.log("[DEBUG] Contact inserted with ID:", newContactData.id);
+        
+        // Handle tags separately if the initial insert was successful
+        if (newContactData?.id) {
+          const tags = Array.isArray(newContact.tags) ? newContact.tags : [];
+          console.log("[DEBUG] Updating tags:", tags);
+          
+          // Using a direct string format for PostgreSQL array
+          const pgArrayString = tags.length === 0 
+            ? '{}' 
+            : '{' + tags.map(tag => `"${tag}"`).join(',') + '}';
+          
+          // Since directly setting tags fails, let's use a raw UPDATE query with stringified array
+          const { error: updateError } = await supabase
+            .from('contacts')
+            .update({
+              // Use the string representation directly - will be parsed as array by Postgres
+              tags: pgArrayString as any,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', newContactData.id);
+            
+          if (updateError) {
+            console.error("Error updating tags:", updateError);
+            // Don't throw, we still have a contact
+          }
+        }
+        
+        // Fetch the complete contact
+        const { data: completeContact, error: fetchError } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('id', newContactData.id)
+          .single();
+          
+        if (fetchError) {
+          console.error("Error fetching complete contact:", fetchError);
+          // Return the ID at least
+          return newContactData;
+        }
+        
+        return completeContact;
+      } catch (error) {
         console.error("Error adding contact:", error);
         throw error;
       }
-      
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });

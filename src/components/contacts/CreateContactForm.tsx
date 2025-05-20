@@ -35,6 +35,7 @@ const formSchema = z.object({
   company_id: z.string().optional(),
   notes: z.string().optional(),
   website: z.string().optional(),
+  tags: z.array(z.string()).optional().default([]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -76,6 +77,11 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
           
         if (error) {
           console.error("Error fetching companies:", error);
+          // Don't throw error for missing table - this is likely just a schema update needed
+          if (error.code === '42P01') { // relation does not exist
+            console.log("Companies table doesn't exist yet - this is normal during setup");
+            return [];
+          }
           throw error;
         }
         
@@ -97,9 +103,10 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
       email: '',
       phone: '',
       title: '',
-      company_id: '',
+      company_id: undefined, // Use undefined instead of empty string
       notes: '',
       website: '',
+      tags: [],
     },
   });
   
@@ -116,17 +123,21 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
     try {
       setIsSubmitting(true);
       
-      // Make sure domain is extracted from email
-      let domain = null;
-      if (values.email && values.email.includes('@')) {
-        domain = values.email.split('@')[1];
+      // Process special company_id values
+      let processedValues = { ...values };
+      if (values.company_id === 'none' || values.company_id === 'no-companies') {
+        processedValues.company_id = null;
       }
       
-      // Use the addContact function from context
+      // Ensure tags is always an array, even if a string
+      const tagsValue = Array.isArray(processedValues.tags) ? processedValues.tags : [];
+      
+      console.log("[DEBUG] Form rawTags value before processing:", processedValues.tags, "Type:", typeof processedValues.tags);
+      console.log("[DEBUG] Form sending tags value:", tagsValue);
+      
       await addContact({
-        ...values,
-        tags: [], // Initialize with empty tags array
-        domain,
+        ...processedValues,
+        tags: tagsValue,
       });
       
       // Reset form and close dialog
@@ -233,12 +244,16 @@ export const CreateContactForm: React.FC<CreateContactFormProps> = ({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
-                          {companies.map((company) => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="none">None</SelectItem>
+                          {companies && companies.length > 0 ? (
+                            companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-companies">No companies available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </FormItem>
