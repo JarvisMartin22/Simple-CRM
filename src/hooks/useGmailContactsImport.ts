@@ -16,10 +16,10 @@ export interface ContactPreview {
   website: string | null;
   photo_url: string | null;
   external_id: string;
-  category?: 'contacts' | 'otherContacts' | 'frequent';
+  category?: 'contacts' | 'otherContacts';
 }
 
-export type ContactCategory = 'contacts' | 'otherContacts' | 'frequent';
+export type ContactCategory = 'contacts' | 'otherContacts';
 
 export function useGmailContactsImport() {
   const { user } = useAuth();
@@ -118,9 +118,7 @@ export function useGmailContactsImport() {
                 excludeNoReply: true,
                 onlyWithName: true,
                 categories: [category], // Send just one category at a time to ensure we get correct category data
-                resourceName: category === 'contacts' ? 'connections' : 
-                             category === 'otherContacts' ? 'otherContacts' : 
-                             'contactGroups/frequentlyContacted/members'
+                resourceName: category === 'contacts' ? 'connections' : 'otherContacts'
               }
             })
           });

@@ -1,0 +1,447 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
+
+// Create a Supabase client
+const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+interface FilterOptions {
+  onlyWithName: boolean;
+  excludeNoReply: boolean;
+  lastContactedDays: number | null;
+  searchTerm: string;
+  categories?: string[];
+  resourceName?: string;
+}
+
+// Function to fetch other contacts
+const fetchOtherContacts = async (accessToken: string) => {
+  try {
+    console.log("Fetching other contacts...");
+    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,metadata,photos';
+    
+    const response = await fetch(otherContactsUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`Error fetching other contacts: ${response.status}`, error);
+      return { success: false, data: null, error };
+    }
+    
+    const data = await response.json();
+    return { 
+      success: true, 
+      data: data.otherContacts || [],
+      totalItems: data.otherContacts?.length || 0,
+      nextPageToken: data.nextPageToken
+    };
+  } catch (error) {
+    console.error("Error fetching other contacts:", error);
+    return { success: false, data: null, error: error.message };
+  }
+};
+
+// Function to fetch frequently contacted people
+const fetchFrequentContacts = async (accessToken: string) => {
+  try {
+    console.log("Fetching frequent contacts...");
+    // First, get the frequent contact group members
+    const frequentGroupUrl = 'https://people.googleapis.com/v1/contactGroups/frequentlyContacted';
+    
+    const groupResponse = await fetch(frequentGroupUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+    
+    if (!groupResponse.ok) {
+      const error = await groupResponse.text();
+      console.error(`Error fetching frequent contacts group: ${groupResponse.status}`, error);
+      return { success: false, data: null, error };
+    }
+    
+    const groupData = await groupResponse.json();
+    const memberResourceNames = groupData.memberResourceNames || [];
+    
+    if (memberResourceNames.length === 0) {
+      console.log("No frequent contacts found");
+      return { success: true, data: [], totalItems: 0 };
+    }
+    
+    // Now fetch the actual contact details
+    // Google API has a limit on batch sizes, so we'll do batches of 50
+    const batchSize = 50;
+    let allContacts = [];
+    
+    for (let i = 0; i < memberResourceNames.length; i += batchSize) {
+      const batch = memberResourceNames.slice(i, i + batchSize);
+      const personFields = "names,emailAddresses,phoneNumbers,urls,metadata,photos";
+      const batchUrl = `https://people.googleapis.com/v1/people:batchGet?personFields=${personFields}&` + 
+                     batch.map(name => `resourceNames=${encodeURIComponent(name)}`).join('&');
+      
+      const batchResponse = await fetch(batchUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      if (!batchResponse.ok) {
+        console.error(`Error fetching batch ${i/batchSize} of contact details: ${batchResponse.status}`);
+        continue;
+      }
+      
+      const batchData = await batchResponse.json();
+      if (batchData.responses && batchData.responses.length > 0) {
+        const validResponses = batchData.responses.filter(r => r.person);
+        const contacts = validResponses.map(r => r.person);
+        allContacts = [...allContacts, ...contacts];
+      }
+    }
+    
+    return { 
+      success: true, 
+      data: allContacts,
+      totalItems: allContacts.length
+    };
+  } catch (error) {
+    console.error("Error fetching frequent contacts:", error);
+    return { success: false, data: null, error: error.message };
+  }
+};
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
+
+  try {
+    const { userId, filters } = await req.json();
+    const filterOptions: FilterOptions = filters || {
+      onlyWithName: true,
+      excludeNoReply: true,
+      lastContactedDays: 180,
+      searchTerm: "",
+      categories: ["contacts"],
+      resourceName: "connections"
+    };
+    
+    // Default to connections if no resourceName is provided
+    const resourceName = filterOptions.resourceName || "connections";
+    console.log(`Using resource name: ${resourceName}`);
+    
+    // If userId is not provided, try to get it from the authenticated user
+    let effectiveUserId = userId;
+    if (!effectiveUserId) {
+      // Try to get user ID from the supabase authorization header
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        try {
+          // Create another client with the user's token
+          const userSupabase = createClient(supabaseUrl, authHeader.replace('Bearer ', ''));
+          const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+          if (!userError && user) {
+            effectiveUserId = user.id;
+          }
+        } catch (e) {
+          console.error('Failed to get user from auth header:', e);
+        }
+      }
+    }
+    
+    if (!effectiveUserId) {
+      return new Response(
+        JSON.stringify({ error: "Missing user ID" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+    
+    console.log(`Processing contacts preview for user ${effectiveUserId} with resource: ${resourceName}`);
+    
+    // 1. Get the user's Gmail integration
+    const { data: integration, error: integrationError } = await supabase
+      .from('user_integrations')
+      .select('*')
+      .eq('user_id', effectiveUserId)
+      .eq('provider', 'gmail')
+      .single();
+      
+    if (integrationError) {
+      console.error("Error fetching integration:", integrationError);
+      return new Response(
+        JSON.stringify({ error: "Gmail integration not found" }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+    
+    // 2. Check if token needs refreshing
+    const now = new Date();
+    const expiresAt = new Date(integration.expires_at);
+    let accessToken = integration.access_token;
+    
+    if (expiresAt < now) {
+      console.log("Token expired, refreshing...");
+      try {
+        // Refresh the token
+        const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({ refresh_token: integration.refresh_token }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to refresh token: ${response.statusText}`);
+        }
+        
+        const refreshData = await response.json();
+        
+        // Update token in database
+        await supabase
+          .from('user_integrations')
+          .update({
+            access_token: refreshData.access_token,
+            expires_at: refreshData.expires_at,
+          })
+          .eq('id', integration.id);
+          
+        accessToken = refreshData.access_token;
+        console.log("Token refreshed successfully");
+      } catch (error) {
+        console.error("Token refresh error:", error);
+        return new Response(
+          JSON.stringify({ error: "Failed to refresh access token" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
+    }
+    
+    // 3. Fetch contacts from Gmail People API
+    try {
+      // The response structure differs depending on the endpoint
+      let connections = [];
+      
+      if (resourceName === "connections") {
+        // For main contacts - use existing method
+        const peopleUrl = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,organizations,phoneNumbers,urls,metadata,photos&sortOrder=LAST_MODIFIED_DESCENDING&pageSize=1000';
+        
+        console.log(`Fetching main contacts from Google API: ${peopleUrl}`);
+        
+        const response = await fetch(peopleUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          console.error("Google API error response:", error);
+          throw new Error(`Failed to fetch contacts: ${error.error?.message || response.statusText}`);
+        }
+        
+        const contactsData = await response.json();
+        connections = contactsData.connections || [];
+        console.log(`Google API returned ${connections.length} main connections`);
+      } 
+      else if (resourceName === "otherContacts") {
+        // For other contacts - use the specific function
+        const otherContactsResult = await fetchOtherContacts(accessToken);
+        if (!otherContactsResult.success) {
+          throw new Error(`Failed to fetch other contacts: ${otherContactsResult.error}`);
+        }
+        
+        connections = otherContactsResult.data;
+        console.log(`Google API returned ${connections.length} other contacts`);
+      } 
+      else if (resourceName === "contactGroups/frequentlyContacted/members") {
+        // For frequently contacted - use the specific function
+        const frequentContactsResult = await fetchFrequentContacts(accessToken);
+        if (!frequentContactsResult.success) {
+          throw new Error(`Failed to fetch frequent contacts: ${frequentContactsResult.error}`);
+        }
+        
+        connections = frequentContactsResult.data;
+        console.log(`Google API returned ${connections.length} frequently contacted people`);
+      }
+      
+      console.log("Google API response sample:", JSON.stringify(connections.slice(0, 1)).slice(0, 500) + "...");
+      
+      if (connections.length === 0) {
+        console.log("No connections found in Google response for resource:", resourceName);
+        return new Response(
+          JSON.stringify({ 
+            contacts: [],
+            message: `No contacts found in your Google account for resource: ${resourceName}`
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          }
+        );
+      }
+      
+      // 4. Fetch existing contacts to avoid duplicates
+      const { data: existingContacts } = await supabase
+        .from('contacts')
+        .select('email')
+        .eq('user_id', effectiveUserId);
+        
+      const existingEmails = new Set(existingContacts?.map(c => c.email.toLowerCase()) || []);
+      console.log(`Found ${existingEmails.size} existing contacts to filter out`);
+      
+      // 5. Process contacts with filtering
+      let processedContacts = connections.map((contact: any) => {
+        const primaryName = contact.names ? contact.names.find((n: any) => n.metadata?.primary) || contact.names[0] : null;
+        const primaryEmail = contact.emailAddresses ? contact.emailAddresses.find((e: any) => e.metadata?.primary) || contact.emailAddresses[0] : null;
+        const primaryOrg = contact.organizations ? contact.organizations.find((o: any) => o.metadata?.primary) || contact.organizations[0] : null;
+        const primaryPhone = contact.phoneNumbers ? contact.phoneNumbers.find((p: any) => p.metadata?.primary) || contact.phoneNumbers[0] : null;
+        const primaryUrl = contact.urls ? contact.urls.find((u: any) => u.metadata?.primary) || contact.urls[0] : null;
+        const photo = contact.photos ? contact.photos.find((p: any) => p.metadata?.primary)?.url : null;
+        
+        // Extract domain from email
+        const email = primaryEmail?.value || null;
+        let domain = null;
+        if (email && typeof email === 'string' && email.includes('@')) {
+          try {
+            domain = email.split('@')[1];
+          } catch (error) {
+            console.error(`Error extracting domain from email ${email}:`, error);
+          }
+        }
+        
+        const resourceId = contact.resourceName?.split('/')[1] || Math.random().toString(36).substring(2, 9);
+        
+        return {
+          id: resourceId,
+          first_name: primaryName?.givenName || '',
+          last_name: primaryName?.familyName || '',
+          email: email,
+          domain: domain,
+          company: primaryOrg?.name || null,
+          title: primaryOrg?.title || null,
+          phone: primaryPhone?.value || null,
+          website: primaryUrl?.value || null,
+          photo_url: photo,
+          external_id: contact.resourceName,
+          // Explicitly include the category
+          category: resourceName === "connections" ? "contacts" : 
+                    resourceName === "otherContacts" ? "otherContacts" : "frequent"
+        };
+      });
+      
+      console.log(`Mapped ${processedContacts.length} contacts from Google data for resource: ${resourceName}`);
+      
+      // Filter out contacts without emails - disabled to show all contacts
+      const beforeEmailFilter = processedContacts.length;
+      // We don't filter out contacts without email anymore
+      // processedContacts = processedContacts.filter(contact => !!contact.email);
+      console.log(`After email filter: ${processedContacts.length} contacts (removed ${beforeEmailFilter - processedContacts.length} without emails)`);
+      
+      // Exclude contacts that are already in the CRM (based on email)
+      if (existingEmails.size > 0) {
+        console.log(`Filtering out ${existingEmails.size} existing contacts`);
+        const beforeFilter = processedContacts.length;
+        processedContacts = processedContacts.filter(contact => 
+          !contact.email || !existingEmails.has(contact.email.toLowerCase())
+        );
+        console.log(`After filtering: ${processedContacts.length} contacts (removed ${beforeFilter - processedContacts.length})`);
+      }
+      
+      // Apply filters for no-reply addresses if requested
+      if (filterOptions.excludeNoReply) {
+        const beforeFilter = processedContacts.length;
+        processedContacts = processedContacts.filter(contact => {
+          // Skip contacts without emails
+          if (!contact.email) return true;
+          
+          const email = contact.email.toLowerCase();
+          return !(
+            email.startsWith('noreply@') || 
+            email.startsWith('no-reply@') || 
+            email.includes('.noreply@') || 
+            email.includes('.no-reply@') ||
+            email.includes('donotreply')
+          );
+        });
+        console.log(`After no-reply filter: ${processedContacts.length} contacts (removed ${beforeFilter - processedContacts.length})`);
+      }
+      
+      // If we're filtering to only include contacts with names
+      if (filterOptions.onlyWithName) {
+        const beforeFilter = processedContacts.length;
+        processedContacts = processedContacts.filter(contact => 
+          (contact.first_name && contact.first_name.trim() !== '') || 
+          (contact.last_name && contact.last_name.trim() !== '')
+        );
+        console.log(`After name filter: ${processedContacts.length} contacts (removed ${beforeFilter - processedContacts.length} without names)`);
+      }
+      
+      // If we're filtering by contacts contacted in the last X days, exclude others
+      // This isn't implemented in this preview version
+      
+      // Apply search term filter if provided
+      if (filterOptions.searchTerm) {
+        const term = filterOptions.searchTerm.toLowerCase();
+        const beforeFilter = processedContacts.length;
+        processedContacts = processedContacts.filter(contact => {
+          return (
+            (contact.first_name && contact.first_name.toLowerCase().includes(term)) ||
+            (contact.last_name && contact.last_name.toLowerCase().includes(term)) ||
+            (contact.email && contact.email.toLowerCase().includes(term)) ||
+            (contact.company && contact.company.toLowerCase().includes(term))
+          );
+        });
+        console.log(`After search term filter: ${processedContacts.length} contacts (removed ${beforeFilter - processedContacts.length})`);
+      }
+      
+      // Return processed contacts
+      console.log(`Returning ${processedContacts.length} contacts for resource ${resourceName} after all filtering`);
+      return new Response(
+        JSON.stringify({
+          contacts: processedContacts,
+          total: processedContacts.length,
+          existing: existingEmails.size,
+          resourceName: resourceName
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+      return new Response(
+        JSON.stringify({ error: error.message || "Error fetching contacts" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
+  } catch (error) {
+    console.error("Error in contacts preview:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
+  }
+}); 

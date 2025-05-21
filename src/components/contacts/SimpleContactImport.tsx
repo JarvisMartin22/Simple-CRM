@@ -143,8 +143,7 @@ const SimpleContactImport: React.FC = () => {
   const CategoryBadge: React.FC<{category: ContactCategory}> = ({ category }) => {
     const categoryLabels = {
       contacts: "Main Contacts",
-      otherContacts: "Other Contacts",
-      frequent: "Frequently Contacted"
+      otherContacts: "Other Contacts"
     };
     
     return (
@@ -199,7 +198,7 @@ const SimpleContactImport: React.FC = () => {
                         <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-xs">Main Contact</span> : 
                        contact.category === 'otherContacts' ? 
                         <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">Other Contact</span> : 
-                        <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-xs">Frequently Contacted</span>
+                        <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">Other Contact</span>
                       }
                     </div>
                   )}
@@ -271,21 +270,6 @@ const SimpleContactImport: React.FC = () => {
                     >
                       Other Contacts
                     </Button>
-                    <Button
-                      variant={selectedCategories.includes('frequent') ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        if (selectedCategories.includes('frequent')) {
-                          setSelectedCategories(selectedCategories.filter(c => c !== 'frequent'));
-                        } else {
-                          setSelectedCategories([...selectedCategories, 'frequent']);
-                        }
-                      }}
-                      disabled={isLoading}
-                      className={selectedCategories.includes('frequent') ? "bg-primary" : ""}
-                    >
-                      Frequently Contacted
-                    </Button>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
                     Select which categories of contacts to import from Google.
@@ -293,8 +277,6 @@ const SimpleContactImport: React.FC = () => {
                     • <strong>Main Contacts</strong> are contacts you've manually saved.
                     <br />
                     • <strong>Other Contacts</strong> are people you've interacted with but haven't manually saved.
-                    <br />
-                    • <strong>Frequently Contacted</strong> are people you interact with often.
                   </p>
                 </div>
                 
