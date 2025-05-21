@@ -1,8 +1,8 @@
-# Welcome to your Lovable project
+# Welcome to Golly! The simplest CRM EVER, built for growing your business. 
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/0c0e6d13-2bca-42e4-be78-98828f5e1f1f
+**URL**: https://www.trygolly.com/
 
 ## How can I edit this code?
 
