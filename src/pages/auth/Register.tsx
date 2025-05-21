@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -12,6 +13,7 @@ import { AlertCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import PrivacyPolicyDialog from '@/components/legal/PrivacyPolicyDialog';
 import TermsOfServiceDialog from '@/components/legal/TermsOfServiceDialog';
+import { Waves } from '@/components/ui/waves-background';
 
 const registerSchema = z.object({
   firstName: z.string().min(1, {
@@ -78,8 +80,26 @@ const Register = () => {
     }
   };
 
-  return <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 relative overflow-hidden">
+      {/* Waves Background */}
+      <div className="absolute inset-0">
+        <Waves 
+          lineColor="rgba(249, 115, 22, 0.25)" 
+          backgroundColor="transparent" 
+          waveSpeedX={0.015} 
+          waveSpeedY={0.01} 
+          waveAmpX={35} 
+          waveAmpY={20} 
+          xGap={12} 
+          yGap={36} 
+          friction={0.9} 
+          tension={0.01} 
+          maxCursorMove={120} 
+        />
+      </div>
+      
+      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md relative z-10">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold mb-2">Create your account</h1>
           <p className="text-gray-600">We're so excited to welcome you</p>
@@ -229,6 +249,8 @@ const Register = () => {
         open={termsOfServiceOpen} 
         onOpenChange={setTermsOfServiceOpen} 
       />
-    </div>;
+    </div>
+  );
 };
+
 export default Register;

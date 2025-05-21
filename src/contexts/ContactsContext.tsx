@@ -1,20 +1,22 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { supabase } from '../integrations/supabase/client';
+import { useAuth } from './AuthContext';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define the Contact type
-export type Contact = {
+export interface Contact {
   id?: string;
   user_id: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   full_name?: string;
   email?: string;
   phone?: string;
   title?: string;
   company?: string;
   company_id?: string;
-  website?: string; // Changed from string[] to string to match database
+  website?: string; // Changed from string[] to string for Supabase compatibility
   notes?: string;
   status?: string;
   tags?: string[];
@@ -24,315 +26,248 @@ export type Contact = {
     name?: string;
     domain?: string;
   };
-};
+}
 
-// Define SelectOption type for select and multi-select fields
-export type SelectOption = {
-  value: string;
-  label: string;
-  color?: string;
-};
+// Define the field type enum
+export type FieldType = 'text' | 'number' | 'email' | 'phone' | 'date' | 'url' | 'select' | 'multi-select' | 'checkbox';
 
-// Define a type for custom fields
-export type ContactField = {
+// Define the ContactField type
+export interface ContactField {
   id: string;
   name: string;
   label: string;
-  type: 'text' | 'email' | 'phone' | 'date' | 'select' | 'multi-select' | 'checkbox' | 'url' | 'number';
+  type: FieldType;
   visible: boolean;
-  required?: boolean;
+  required: boolean;
   options?: SelectOption[];
-  defaultValue?: any;
-};
+}
 
-// For type usage in other files
-export type FieldType = 'text' | 'email' | 'phone' | 'date' | 'select' | 'multi-select' | 'checkbox' | 'url' | 'number';
+// Define the SelectOption type
+export interface SelectOption {
+  value: string;
+  label: string;
+}
 
-export type ContactsContextType = {
+interface ContactsContextType {
   contacts: Contact[];
-  loading: boolean;
-  error: string | null;
-  fields: ContactField[];
-  selectedContact: Contact | null;
-  fetchContacts: () => Promise<void>;
-  addContact: (contact: Contact) => Promise<void>;
+  setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
+  isLoading: boolean;
+  createContact: (contact: Partial<Contact>) => Promise<Contact>;
   updateContact: (id: string, updates: Partial<Contact>) => Promise<void>;
   deleteContact: (id: string) => Promise<void>;
-  selectContact: (contact: Contact | null) => void;
-  toggleFieldVisibility: (fieldName: string) => void; // Added missing method
-  deleteField: (fieldName: string) => void; // Added missing method
-  addField: (field: ContactField) => void; // Added missing method
-  updateField: (fieldName: string, updates: Partial<ContactField>) => void; // Added missing method
-};
+  searchContacts: (query: string) => Promise<Contact[]>;
+  fields: ContactField[];
+  setFields: React.Dispatch<React.SetStateAction<ContactField[]>>;
+  createField: (field: Partial<ContactField>) => void;
+  updateField: (id: string, updates: Partial<ContactField>) => void;
+  deleteField: (id: string) => void;
+  refetchContacts: () => Promise<void>;
+}
 
-// Create the context
-const ContactsContext = createContext<ContactsContextType>({
-  contacts: [],
-  loading: false,
-  error: null,
-  fields: [],
-  selectedContact: null,
-  fetchContacts: async () => {},
-  addContact: async () => {},
-  updateContact: async () => {},
-  deleteContact: async () => {},
-  selectContact: () => {},
-  toggleFieldVisibility: () => {}, // Added missing method
-  deleteField: () => {}, // Added missing method
-  addField: () => {}, // Added missing method
-  updateField: () => {}, // Added missing method
-});
+const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
 
-// Define default fields
-const defaultFields: ContactField[] = [
-  { id: 'first_name', name: 'first_name', label: 'First Name', type: 'text', visible: true, required: true },
-  { id: 'last_name', name: 'last_name', label: 'Last Name', type: 'text', visible: true, required: true },
-  { id: 'email', name: 'email', label: 'Email', type: 'email', visible: true },
-  { id: 'phone', name: 'phone', label: 'Phone', type: 'phone', visible: true },
-  { id: 'title', name: 'title', label: 'Title', type: 'text', visible: true },
-  { id: 'company', name: 'company', label: 'Company', type: 'text', visible: true },
-  { id: 'website', name: 'website', label: 'Website', type: 'url', visible: true },
-  { id: 'status', name: 'status', label: 'Status', type: 'select', visible: true, options: [
-    { value: 'new', label: 'New' }, 
-    { value: 'active', label: 'Active' }, 
-    { value: 'inactive', label: 'Inactive' }
-  ] },
-  { id: 'tags', name: 'tags', label: 'Tags', type: 'multi-select', visible: true, options: [
-    { value: 'customer', label: 'Customer' }, 
-    { value: 'lead', label: 'Lead' }, 
-    { value: 'partner', label: 'Partner' }
-  ] },
-];
-
-// Provider component
-export const ContactsProvider = ({ children }: { children: ReactNode }) => {
+export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fields, setFields] = useState<ContactField[]>(defaultFields);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  
-  const { toast } = useToast();
-  
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const [fields, setFields] = useState<ContactField[]>([
+    { id: uuidv4(), name: 'first_name', label: 'First Name', type: 'text', visible: true, required: true },
+    { id: uuidv4(), name: 'last_name', label: 'Last Name', type: 'text', visible: true, required: true },
+    { id: uuidv4(), name: 'email', label: 'Email', type: 'email', visible: true, required: false },
+    { id: uuidv4(), name: 'phone', label: 'Phone', type: 'phone', visible: true, required: false },
+    { id: uuidv4(), name: 'title', label: 'Title', type: 'text', visible: true, required: false },
+    { id: uuidv4(), name: 'company', label: 'Company', type: 'text', visible: true, required: false },
+    { id: uuidv4(), name: 'website', label: 'Website', type: 'url', visible: true, required: false },
+    { id: uuidv4(), name: 'notes', label: 'Notes', type: 'text', visible: true, required: false },
+    { id: uuidv4(), name: 'tags', label: 'Tags', type: 'multi-select', visible: true, required: false },
+  ]);
+
+  // Load contacts when the user changes
+  useEffect(() => {
+    if (user) {
+      fetchContacts();
+    } else {
+      setContacts([]);
+    }
+  }, [user]);
+
   const fetchContacts = async () => {
-    setLoading(true);
-    setError(null);
+    if (!user) return;
     
+    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('contacts')
         .select(`
           *,
-          companies (
-            name,
-            domain
-          )
+          companies(name, domain)
         `)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw new Error(error.message);
-      
-      // Convert data to Contact[] type with type assertion
-      setContacts(data as unknown as Contact[]);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch contacts';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      setContacts(data || []);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-  
-  const addContact = async (contact: Partial<Contact>) => {
-    setLoading(true);
-    setError(null);
+
+  const createContact = async (contactData: Partial<Contact>): Promise<Contact> => {
+    if (!user) throw new Error('User not authenticated');
     
     try {
-      // Ensure user_id is set
-      if (!contact.user_id) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-        contact.user_id = user.id;
-      }
-      
-      // Handle website field type mismatch (string vs string[])
-      const contactToInsert = {
-        ...contact,
-        website: contact.website || '' // Ensure it's a string, not an array
-      } as Contact;
-      
+      const contact: Contact = {
+        ...contactData,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        tags: contactData.tags || [],
+      };
+
       const { data, error } = await supabase
         .from('contacts')
-        .insert(contactToInsert)
+        .insert([{
+          ...contact,
+          // Ensure website is a string for Supabase compatibility
+          website: typeof contact.website === 'string' ? contact.website : undefined
+        }])
         .select();
-      
-      if (error) throw new Error(error.message);
-      
-      if (data && data.length > 0) {
-        setContacts(prev => [data[0] as unknown as Contact, ...prev]);
-        toast({
-          title: 'Success',
-          description: 'Contact added successfully',
-        });
+
+      if (error) {
+        throw error;
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add contact';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+
+      const newContact = data[0] as Contact;
+      setContacts(prevContacts => [...prevContacts, newContact]);
+      return newContact;
+    } catch (error) {
+      console.error('Error creating contact:', error);
+      throw error;
     }
   };
-  
+
   const updateContact = async (id: string, updates: Partial<Contact>) => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      const updatedContact = {
-        ...updates,
-        updated_at: new Date().toISOString(),
-        website: updates.website || '' // Ensure website is a string
-      };
-      
       const { error } = await supabase
         .from('contacts')
-        .update(updatedContact)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+          // Ensure website is a string for Supabase compatibility
+          website: typeof updates.website === 'string' ? updates.website : undefined
+        })
         .eq('id', id);
-      
-      if (error) throw new Error(error.message);
-      
-      // Update local state
-      setContacts(prev => 
-        prev.map(contact => 
-          contact.id === id ? { ...contact, ...updates } : contact
+
+      if (error) {
+        throw error;
+      }
+
+      setContacts(prevContacts => 
+        prevContacts.map(contact => 
+          contact.id === id ? { ...contact, ...updates, updated_at: new Date().toISOString() } : contact
         )
       );
-      
-      // Update selected contact if it's the one being updated
-      if (selectedContact?.id === id) {
-        setSelectedContact(prev => prev ? { ...prev, ...updates } : null);
-      }
-      
-      toast({
-        title: 'Success',
-        description: 'Contact updated successfully',
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update contact';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      throw error;
     }
   };
-  
+
   const deleteContact = async (id: string) => {
-    setLoading(true);
-    setError(null);
-    
     try {
       const { error } = await supabase
         .from('contacts')
         .delete()
         .eq('id', id);
-      
-      if (error) throw new Error(error.message);
-      
-      // Update local state
-      setContacts(prev => prev.filter(contact => contact.id !== id));
-      
-      // Clear selected contact if it's the one being deleted
-      if (selectedContact?.id === id) {
-        setSelectedContact(null);
+
+      if (error) {
+        throw error;
       }
-      
-      toast({
-        title: 'Success',
-        description: 'Contact deleted successfully',
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete contact';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+
+      setContacts(prevContacts => prevContacts.filter(contact => contact.id !== id));
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      throw error;
     }
   };
-  
-  const selectContact = (contact: Contact | null) => {
-    setSelectedContact(contact);
+
+  const searchContacts = async (query: string): Promise<Contact[]> => {
+    if (!user) return [];
+    if (!query) return contacts;
+
+    const lowerQuery = query.toLowerCase();
+    return contacts.filter(contact => 
+      contact.first_name?.toLowerCase().includes(lowerQuery) ||
+      contact.last_name?.toLowerCase().includes(lowerQuery) ||
+      contact.email?.toLowerCase().includes(lowerQuery) ||
+      contact.company?.toLowerCase().includes(lowerQuery)
+    );
   };
 
-  // Add the missing field management methods
-  const toggleFieldVisibility = (fieldId: string) => {
-    setFields(prev => 
-      prev.map(field => 
-        field.id === fieldId ? { ...field, visible: !field.visible } : field
+  // Field management functions
+  const createField = (fieldData: Partial<ContactField>) => {
+    const newField: ContactField = {
+      id: uuidv4(),
+      name: fieldData.name || '',
+      label: fieldData.label || fieldData.name || '',
+      type: fieldData.type || 'text',
+      visible: fieldData.visible !== undefined ? fieldData.visible : true,
+      required: fieldData.required !== undefined ? fieldData.required : false,
+      options: fieldData.options,
+    };
+
+    setFields(prevFields => [...prevFields, newField]);
+  };
+
+  const updateField = (id: string, updates: Partial<ContactField>) => {
+    setFields(prevFields =>
+      prevFields.map(field =>
+        field.id === id ? { ...field, ...updates } : field
       )
     );
   };
 
-  const deleteField = (fieldId: string) => {
-    setFields(prev => prev.filter(field => field.id !== fieldId));
+  const deleteField = (id: string) => {
+    setFields(prevFields => prevFields.filter(field => field.id !== id));
   };
 
-  const addField = (field: ContactField) => {
-    setFields(prev => [...prev, field]);
+  const refetchContacts = async () => {
+    await fetchContacts();
   };
 
-  const updateField = (fieldId: string, updates: Partial<ContactField>) => {
-    setFields(prev => 
-      prev.map(field => 
-        field.id === fieldId ? { ...field, ...updates } : field
-      )
-    );
+  const contextValue: ContactsContextType = {
+    contacts,
+    setContacts,
+    isLoading,
+    createContact,
+    updateContact,
+    deleteContact,
+    searchContacts,
+    fields,
+    setFields,
+    createField,
+    updateField,
+    deleteField,
+    refetchContacts,
   };
-  
-  // Fetch contacts on component mount
-  useEffect(() => {
-    fetchContacts();
-  }, []);
-  
+
   return (
-    <ContactsContext.Provider
-      value={{
-        contacts,
-        loading,
-        error,
-        fields,
-        selectedContact,
-        fetchContacts,
-        addContact,
-        updateContact,
-        deleteContact,
-        selectContact,
-        toggleFieldVisibility,
-        deleteField,
-        addField,
-        updateField
-      }}
-    >
+    <ContactsContext.Provider value={contextValue}>
       {children}
     </ContactsContext.Provider>
   );
 };
 
-// Create a hook to use the context
-export const useContacts = () => useContext(ContactsContext);
+export const useContacts = () => {
+  const context = useContext(ContactsContext);
+  if (context === undefined) {
+    throw new Error('useContacts must be used within a ContactsProvider');
+  }
+  return context;
+};
+
+export default ContactsContext;

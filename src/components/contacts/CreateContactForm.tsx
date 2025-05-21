@@ -1,348 +1,214 @@
-import React, { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { useContacts } from '@/contexts/ContactsContext';
-import { useToast } from '@/components/ui/use-toast';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useContacts, Contact } from '@/contexts/ContactsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const formSchema = z.object({
-  first_name: z.string().min(1, { message: 'First name is required' }),
-  last_name: z.string().optional(),
-  email: z.string().email({ message: 'Invalid email address' }),
-  phone: z.string().optional(),
-  title: z.string().optional(),
-  company_id: z.string().optional(),
-  notes: z.string().optional(),
-  website: z.string().optional(),
-  tags: z.array(z.string()).optional().default([]),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-interface Company {
-  id: string;
-  name: string;
-  domain?: string;
-}
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { TagInput } from '@/components/ui/tag-input';
+import { useCompanies } from '@/contexts/CompaniesContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CreateContactFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const CreateContactForm: React.FC<CreateContactFormProps> = ({
-  open,
-  onOpenChange,
-}) => {
-  const { addContact } = useContacts();
-  const { toast } = useToast();
+const contactSchema = z.object({
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  title: z.string().optional().or(z.literal('')),
+  company_id: z.string().optional().or(z.literal('')),
+  website: z.string().optional().or(z.literal('')),
+  notes: z.string().optional().or(z.literal(''))
+});
+
+type ContactFormValues = z.infer<typeof contactSchema>;
+
+export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps) {
+  const { createContact } = useContacts();
   const { user } = useAuth();
+  const { companies } = useCompanies();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [renderError, setRenderError] = useState<string | null>(null);
-  
-  // Fetch companies for dropdown
-  const { data: companies = [], isError: companiesError } = useQuery<Company[]>({
-    queryKey: ['companies', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      try {
-        console.log("Fetching companies for dropdown");
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id, name, domain')
-          .eq('user_id', user.id)
-          .order('name');
-          
-        if (error) {
-          console.error("Error fetching companies:", error);
-          // Don't throw error for missing table - this is likely just a schema update needed
-          if (error.code === '42P01') { // relation does not exist
-            console.log("Companies table doesn't exist yet - this is normal during setup");
-            return [];
-          }
-          throw error;
-        }
-        
-        console.log(`Fetched ${data?.length || 0} companies for dropdown`);
-        return data || [];
-      } catch (error) {
-        console.error("Error in company query:", error);
-        return [];
-      }
-    },
-    enabled: !!user?.id && open, // Only fetch when form is open
-  });
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const [tags, setTags] = useState<string[]>([]);
+
+  const form = useForm<ContactFormValues>({
+    resolver: zodResolver(contactSchema),
     defaultValues: {
       first_name: '',
       last_name: '',
       email: '',
       phone: '',
       title: '',
-      company_id: undefined, // Use undefined instead of empty string
-      notes: '',
+      company_id: '',
       website: '',
-      tags: [],
+      notes: ''
     },
   });
-  
-  // Reset form when dialog opens/closes
-  useEffect(() => {
-    if (open) {
-      form.reset();
-      setRenderError(null);
-    }
-  }, [open, form]);
 
-  const onSubmit = async (values: FormValues) => {
-    console.log("Form submitted with values:", values);
+  const onSubmit = async (values: ContactFormValues) => {
+    if (!user) return;
+    
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      
-      // Process special company_id values
-      let processedValues = { ...values };
-      if (values.company_id === 'none' || values.company_id === 'no-companies') {
-        processedValues.company_id = null;
-      }
-      
-      // Ensure tags is always an array, even if a string
-      const tagsValue = Array.isArray(processedValues.tags) ? processedValues.tags : [];
-      
-      console.log("[DEBUG] Form rawTags value before processing:", processedValues.tags, "Type:", typeof processedValues.tags);
-      console.log("[DEBUG] Form sending tags value:", tagsValue);
-      
-      await addContact({
-        ...processedValues,
-        tags: tagsValue,
-      });
-      
-      // Reset form and close dialog
-      form.reset();
+      const contactData: Partial<Contact> = {
+        ...values,
+        tags,
+        user_id: user.id // Include the user_id from auth context
+      };
+
+      await createContact(contactData);
+      toast.success('Contact created successfully');
+      resetForm();
       onOpenChange(false);
     } catch (error) {
-      console.error("Error creating contact:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to create contact",
-      });
+      console.error('Failed to create contact:', error);
+      toast.error('Failed to create contact');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle rendering errors
-  if (renderError) {
-    return (
-      <Dialog open={open} onOpenChange={() => onOpenChange(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Error</DialogTitle>
-          </DialogHeader>
-          <div className="text-red-500">
-            Error rendering contact form: {renderError}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const resetForm = () => {
+    form.reset();
+    setTags([]);
+  };
 
-  try {
-    return (
-      <Dialog open={open} onOpenChange={isSubmitting ? undefined : onOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Contact</DialogTitle>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="first_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name*</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="last_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email*</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="john.doe@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) resetForm();
+      onOpenChange(isOpen);
+    }}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Create New Contact</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="first_name">First Name *</Label>
+              <Input 
+                id="first_name" 
+                {...form.register('first_name')} 
+                placeholder="Enter first name" 
               />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="company_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select company" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {companies && companies.length > 0 ? (
-                            companies.map((company) => (
-                              <SelectItem key={company.id} value={company.id}>
-                                {company.name}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="no-companies">No companies available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Job Title" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="website"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Website</FormLabel>
-                      <FormControl>
-                        <Input placeholder="example.com" {...field} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Add any notes about this contact" {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
+              {form.formState.errors.first_name && (
+                <p className="text-sm text-red-500">{form.formState.errors.first_name.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="last_name">Last Name *</Label>
+              <Input 
+                id="last_name" 
+                {...form.register('last_name')} 
+                placeholder="Enter last name" 
               />
-              
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => onOpenChange(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Contact"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    );
-  } catch (error) {
-    console.error("Error rendering contact form:", error);
-    setRenderError(error instanceof Error ? error.message : String(error));
-    return null; // Render nothing if there's an error
-  }
-};
+              {form.formState.errors.last_name && (
+                <p className="text-sm text-red-500">{form.formState.errors.last_name.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                {...form.register('email')} 
+                type="email" 
+                placeholder="Enter email address" 
+              />
+              {form.formState.errors.email && (
+                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input 
+                id="phone" 
+                {...form.register('phone')} 
+                placeholder="Enter phone number" 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Job Title</Label>
+              <Input 
+                id="title" 
+                {...form.register('title')} 
+                placeholder="Enter job title" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company_id">Company</Label>
+              <Select 
+                onValueChange={(value) => form.setValue('company_id', value)} 
+                defaultValue={form.getValues('company_id')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id || ''}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="website">Website</Label>
+            <Input 
+              id="website" 
+              {...form.register('website')} 
+              placeholder="Enter website URL" 
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tags">Tags</Label>
+            <TagInput 
+              id="tags" 
+              tags={tags} 
+              setTags={setTags} 
+              placeholder="Add tags..." 
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea 
+              id="notes" 
+              {...form.register('notes')} 
+              placeholder="Enter notes about the contact" 
+              className="min-h-[100px]" 
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Contact'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
