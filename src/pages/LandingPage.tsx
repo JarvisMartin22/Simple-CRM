@@ -66,9 +66,9 @@ const LandingPage: React.FC = () => {
 
       {/* Hero Section with Waves Background - only in hero section */}
       <section className="py-20 md:py-32 relative overflow-hidden">
-        {/* Waves Background - only in hero section */}
+        {/* Waves Background - only in hero section - Changed line color to orange */}
         <div className="absolute inset-0 z-0">
-          <Waves lineColor="rgba(0, 0, 0, 0.1)" backgroundColor="transparent" waveSpeedX={0.015} waveSpeedY={0.01} waveAmpX={35} waveAmpY={20} xGap={12} yGap={36} friction={0.9} tension={0.01} maxCursorMove={120} />
+          <Waves lineColor="rgba(249, 115, 22, 0.25)" backgroundColor="transparent" waveSpeedX={0.015} waveSpeedY={0.01} waveAmpX={35} waveAmpY={20} xGap={12} yGap={36} friction={0.9} tension={0.01} maxCursorMove={120} />
         </div>
         
         <div className="container mx-auto px-4 relative z-10">
