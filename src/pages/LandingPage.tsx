@@ -44,7 +44,7 @@ const LandingPage: React.FC = () => {
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <span className="font-bold text-3xl text-orange-500 text-center">Golly</span>
+            <span className="font-poetsen text-3xl text-orange-500 text-center">Golly</span>
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">

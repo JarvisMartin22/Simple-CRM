@@ -1,330 +1,314 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
+import { createClient } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-// Define types for our contact fields
-export type FieldType = 
-  | 'text' | 'number' | 'select' | 'multi-select' | 'status' 
-  | 'date' | 'files-media' | 'checkbox' | 'url' | 'email' 
-  | 'phone' | 'formula' | 'relation' | 'created-time' 
-  | 'last-edited-time';
-
-export interface SelectOption {
-  label: string;
-  value: string;
-  color: string;
-}
-
-export interface ContactField {
-  id: string;
-  name: string;
-  type: FieldType;
-  visible: boolean;
-  required: boolean;
-  options?: SelectOption[]; // For select, multi-select and status types
-}
-
-export interface Contact {
-  id: string;
+// Define the Contact type
+export type Contact = {
+  id?: string;
   user_id: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   full_name?: string;
   email?: string;
-  title?: string;
   phone?: string;
+  title?: string;
+  company?: string;
   company_id?: string;
-  website?: string;
-  domain?: string;
-  tags?: string[];
-  last_contacted?: string;
-  interaction_count?: number;
+  website?: string; // Changed from string[] to string to match database
   notes?: string;
-  created_at: string;
-  updated_at: string;
+  status?: string;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
   companies?: {
     name?: string;
     domain?: string;
   };
-}
+};
 
-interface ContactsContextType {
+// Define a type for custom fields
+export type ContactField = {
+  name: string;
+  label: string;
+  type: 'text' | 'email' | 'phone' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url' | 'number';
+  visible: boolean;
+  options?: string[];
+  defaultValue?: any;
+};
+
+export type ContactsContextType = {
   contacts: Contact[];
+  loading: boolean;
+  error: string | null;
   fields: ContactField[];
-  visibleFields: ContactField[];
-  isLoading: boolean;
-  isFetched: boolean;
-  showImportDialog: () => void;
-  addContact: (contact: Omit<Contact, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  selectedContact: Contact | null;
+  fetchContacts: () => Promise<void>;
+  addContact: (contact: Contact) => Promise<void>;
   updateContact: (id: string, updates: Partial<Contact>) => Promise<void>;
   deleteContact: (id: string) => Promise<void>;
-}
+  selectContact: (contact: Contact | null) => void;
+  toggleFieldVisibility: (fieldName: string) => void; // Added missing method
+  deleteField: (fieldName: string) => void; // Added missing method
+  addField: (field: ContactField) => void; // Added missing method
+  updateField: (fieldName: string, updates: Partial<ContactField>) => void; // Added missing method
+};
 
-const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
+// Create the context
+const ContactsContext = createContext<ContactsContextType>({
+  contacts: [],
+  loading: false,
+  error: null,
+  fields: [],
+  selectedContact: null,
+  fetchContacts: async () => {},
+  addContact: async () => {},
+  updateContact: async () => {},
+  deleteContact: async () => {},
+  selectContact: () => {},
+  toggleFieldVisibility: () => {}, // Added missing method
+  deleteField: () => {}, // Added missing method
+  addField: () => {}, // Added missing method
+  updateField: () => {}, // Added missing method
+});
 
-// Default fields based on requirements
+// Define default fields
 const defaultFields: ContactField[] = [
-  { id: 'name', name: 'Name', type: 'text', visible: true, required: true },
-  { id: 'company', name: 'Company', type: 'text', visible: true, required: false },
-  { id: 'title', name: 'Title', type: 'text', visible: true, required: false },
-  { id: 'tags', name: 'Tags', type: 'multi-select', visible: true, required: false, options: [
-    { label: 'Customer', value: 'customer', color: '#10B981' },
-    { label: 'Prospect', value: 'prospect', color: '#F59E0B' },
-    { label: 'VIP', value: 'vip', color: '#8B5CF6' },
-  ] },
-  { id: 'type_of_contact', name: 'Type of Contact', type: 'select', visible: true, required: false, options: [
-    { label: 'Client', value: 'client', color: '#9b87f5' },
-    { label: 'Lead', value: 'lead', color: '#F97316' },
-    { label: 'Partner', value: 'partner', color: '#0EA5E9' },
-    { label: 'Vendor', value: 'vendor', color: '#8B5CF6' }
-  ] },
-  { id: 'phone_number', name: 'Phone Number', type: 'phone', visible: true, required: false },
-  { id: 'email', name: 'Email', type: 'email', visible: true, required: false },
-  { id: 'details', name: 'Details', type: 'text', visible: true, required: false },
-  { id: 'website', name: 'Website', type: 'url', visible: true, required: false },
-  { id: 'last_contacted', name: 'Last Contacted', type: 'date', visible: true, required: false },
-  { id: 'number_of_times_contacted', name: 'Number of Times Contacted', type: 'number', visible: true, required: false }
+  { name: 'first_name', label: 'First Name', type: 'text', visible: true },
+  { name: 'last_name', label: 'Last Name', type: 'text', visible: true },
+  { name: 'email', label: 'Email', type: 'email', visible: true },
+  { name: 'phone', label: 'Phone', type: 'phone', visible: true },
+  { name: 'title', label: 'Title', type: 'text', visible: true },
+  { name: 'company', label: 'Company', type: 'text', visible: true },
+  { name: 'website', label: 'Website', type: 'url', visible: true },
+  { name: 'status', label: 'Status', type: 'select', visible: true, options: ['New', 'Active', 'Inactive'] },
+  { name: 'tags', label: 'Tags', type: 'multiselect', visible: true, options: ['Customer', 'Lead', 'Partner'] },
 ];
 
-export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+// Provider component
+export const ContactsProvider = ({ children }: { children: ReactNode }) => {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<ContactField[]>(defaultFields);
-  const [showImport, setShowImport] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   
-  // Get visible fields
-  const visibleFields = fields.filter(field => field.visible);
+  const { toast } = useToast();
+  const supabase = createClient();
   
-  // Fetch contacts from Supabase
-  const { 
-    data: contacts = [], 
-    isLoading, 
-    isFetched 
-  } = useQuery({
-    queryKey: ['contacts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
+  const fetchContacts = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select(`
+          *,
+          companies (
+            name,
+            domain
+          )
+        `)
+        .order('created_at', { ascending: false });
       
-      try {
-        console.log("Fetching contacts for user:", user.id);
-        const { data, error } = await supabase
-          .from('contacts')
-          .select(`
-            *,
-            companies:company_id (
-              id,
-              name,
-              domain
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-          
-        if (error) {
-          console.error("Error fetching contacts:", error);
-          throw error;
-        }
-        
-        console.log(`Fetched ${data?.length || 0} contacts`);
-        return data as Contact[] || [];
-      } catch (error) {
-        console.error("Error in contacts query:", error);
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-  });
-  
-  // Add contact mutation
-  const addContactMutation = useMutation({
-    mutationFn: async (newContact: Omit<Contact, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-      if (!user?.id) throw new Error("User not authenticated");
+      if (error) throw new Error(error.message);
       
-      try {
-        // Log all top-level properties of newContact for debugging
-        console.log("[DEBUG] All properties of newContact:", Object.keys(newContact));
-        for (const key of Object.keys(newContact)) {
-          const value = (newContact as any)[key];
-          console.log(`[DEBUG] Property ${key}:`, value, typeof value, Array.isArray(value));
-        }
-        
-        // Handle each field explicitly to avoid any type conversion issues
-        // Ensure tags is always an array
-        const tagsValue = Array.isArray(newContact.tags) ? newContact.tags : [];
-        console.log("[DEBUG] Processed tags value:", tagsValue);
-        
-        // Explicitly only include string/number/boolean fields in first insert
-        const { data: newContactData, error: insertError } = await supabase
-          .from('contacts')
-          .insert({
-            user_id: user.id,
-            first_name: newContact.first_name || null,
-            last_name: newContact.last_name || null,
-            email: newContact.email || null,
-            phone: newContact.phone || null,
-            title: newContact.title || null,
-            company_id: newContact.company_id === 'none' || newContact.company_id === 'no-companies' 
-              ? null 
-              : newContact.company_id || null,
-            website: newContact.website || null,
-            notes: newContact.notes || null,
-            tags: tagsValue, // Add tags directly in the main insert
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single();
-          
-        if (insertError) {
-          console.error("Error inserting contact:", insertError);
-          throw insertError;
-        }
-        
-        console.log("[DEBUG] Contact inserted with ID:", newContactData.id);
-        
-        // Fetch the complete contact
-        const { data: completeContact, error: fetchError } = await supabase
-          .from('contacts')
-          .select('*')
-          .eq('id', newContactData.id)
-          .single();
-          
-        if (fetchError) {
-          console.error("Error fetching complete contact:", fetchError);
-          // Return the ID at least
-          return newContactData;
-        }
-        
-        return completeContact;
-      } catch (error) {
-        console.error("Error adding contact:", error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      // Convert data to Contact[] type with type assertion
+      setContacts(data as unknown as Contact[]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch contacts';
+      setError(errorMessage);
       toast({
-        title: "Contact added",
-        description: "The contact has been added successfully",
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
       });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error adding contact",
-        description: error.message,
-        variant: "destructive"
-      });
+    } finally {
+      setLoading(false);
     }
-  });
+  };
   
-  // Update contact mutation
-  const updateContactMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string, updates: Partial<Contact> }) => {
-      if (!user?.id) throw new Error("User not authenticated");
+  const addContact = async (contact: Contact) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Ensure user_id is set
+      if (!contact.user_id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+        contact.user_id = user.id;
+      }
+      
+      // Handle website field type mismatch (string vs string[])
+      const contactToInsert = {
+        ...contact,
+        website: contact.website || '' // Ensure it's a string, not an array
+      };
       
       const { data, error } = await supabase
         .from('contacts')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error updating contact:", error);
-        throw error;
-      }
+        .insert(contactToInsert)
+        .select();
       
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      if (error) throw new Error(error.message);
+      
+      if (data && data.length > 0) {
+        setContacts(prev => [data[0] as unknown as Contact, ...prev]);
+        toast({
+          title: 'Success',
+          description: 'Contact added successfully',
+        });
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add contact';
+      setError(errorMessage);
       toast({
-        title: "Contact updated",
-        description: "The contact has been updated successfully",
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
       });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error updating contact",
-        description: error.message,
-        variant: "destructive"
-      });
+    } finally {
+      setLoading(false);
     }
-  });
+  };
   
-  // Delete contact mutation
-  const deleteContactMutation = useMutation({
-    mutationFn: async (id: string) => {
-      if (!user?.id) throw new Error("User not authenticated");
+  const updateContact = async (id: string, updates: Partial<Contact>) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const updatedContact = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+        website: updates.website || '' // Ensure website is a string
+      };
       
       const { error } = await supabase
         .from('contacts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-        
-      if (error) {
-        console.error("Error deleting contact:", error);
-        throw error;
+        .update(updatedContact)
+        .eq('id', id);
+      
+      if (error) throw new Error(error.message);
+      
+      // Update local state
+      setContacts(prev => 
+        prev.map(contact => 
+          contact.id === id ? { ...contact, ...updates } : contact
+        )
+      );
+      
+      // Update selected contact if it's the one being updated
+      if (selectedContact?.id === id) {
+        setSelectedContact(prev => prev ? { ...prev, ...updates } : null);
       }
       
-      return id;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
       toast({
-        title: "Contact deleted",
-        description: "The contact has been deleted successfully",
+        title: 'Success',
+        description: 'Contact updated successfully',
       });
-    },
-    onError: (error) => {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update contact';
+      setError(errorMessage);
       toast({
-        title: "Error deleting contact",
-        description: error.message,
-        variant: "destructive"
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
-  });
-  
-  // Add contact handler
-  const addContact = async (contact: Omit<Contact, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    await addContactMutation.mutateAsync(contact);
   };
   
-  // Update contact handler
-  const updateContact = async (id: string, updates: Partial<Contact>) => {
-    await updateContactMutation.mutateAsync({ id, updates });
-  };
-  
-  // Delete contact handler
   const deleteContact = async (id: string) => {
-    await deleteContactMutation.mutateAsync(id);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw new Error(error.message);
+      
+      // Update local state
+      setContacts(prev => prev.filter(contact => contact.id !== id));
+      
+      // Clear selected contact if it's the one being deleted
+      if (selectedContact?.id === id) {
+        setSelectedContact(null);
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Contact deleted successfully',
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete contact';
+      setError(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
-  // Show import dialog
-  const showImportDialog = () => {
-    setShowImport(true);
+  const selectContact = (contact: Contact | null) => {
+    setSelectedContact(contact);
   };
 
+  // Add the missing field management methods
+  const toggleFieldVisibility = (fieldName: string) => {
+    setFields(prev => 
+      prev.map(field => 
+        field.name === fieldName ? { ...field, visible: !field.visible } : field
+      )
+    );
+  };
+
+  const deleteField = (fieldName: string) => {
+    setFields(prev => prev.filter(field => field.name !== fieldName));
+  };
+
+  const addField = (field: ContactField) => {
+    setFields(prev => [...prev, field]);
+  };
+
+  const updateField = (fieldName: string, updates: Partial<ContactField>) => {
+    setFields(prev => 
+      prev.map(field => 
+        field.name === fieldName ? { ...field, ...updates } : field
+      )
+    );
+  };
+  
+  // Fetch contacts on component mount
+  useEffect(() => {
+    fetchContacts();
+  }, []);
+  
   return (
-    <ContactsContext.Provider 
-      value={{ 
-        contacts: contacts || [], 
-        fields, 
-        visibleFields,
-        isLoading,
-        isFetched,
-        showImportDialog,
+    <ContactsContext.Provider
+      value={{
+        contacts,
+        loading,
+        error,
+        fields,
+        selectedContact,
+        fetchContacts,
         addContact,
         updateContact,
-        deleteContact
+        deleteContact,
+        selectContact,
+        toggleFieldVisibility,
+        deleteField,
+        addField,
+        updateField
       }}
     >
       {children}
@@ -332,10 +316,5 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-export const useContacts = () => {
-  const context = useContext(ContactsContext);
-  if (context === undefined) {
-    throw new Error('useContacts must be used within a ContactsProvider');
-  }
-  return context;
-};
+// Create a hook to use the context
+export const useContacts = () => useContext(ContactsContext);

@@ -1,5 +1,6 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poetsen+One&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -72,7 +73,7 @@
 @layer base {
   * {
     @apply border-border;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Poetsen One', cursive;
   }
 
   body {
@@ -126,4 +127,3 @@
 .kanban-card {
   @apply bg-white p-4 rounded-md shadow-sm mb-3 cursor-pointer border border-transparent hover:border-gray-200 transition-all duration-150;
 }
-
