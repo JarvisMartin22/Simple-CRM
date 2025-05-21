@@ -385,7 +385,7 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <h3 className="text-white font-bold mb-4">Golly</h3>
+              <h3 className="font-bold mb-4 text-orange-500">Golly</h3>
               <p className="text-sm">Simple CRM for growing business</p>
             </div>
             
