@@ -17,12 +17,14 @@ export function formatUrl(url: string, protocol: string = 'https://'): string {
   return `${protocol}${url}`;
 }
 
-export const flexibleUrlSchema = (message = 'Please enter a valid URL') => ({
-  validate: (value: string) => {
-    if (!value) return true; // Empty is valid (for optional fields)
-    
-    // Simple URL validation
-    const urlPattern = /^(https?:\/\/)?(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/[a-zA-Z0-9-._~:/?#[\]@!$&'()*+,;=]*)?$/;
-    return urlPattern.test(value) || message;
-  }
-});
+export const flexibleUrlSchema = (message = 'Please enter a valid URL') => {
+  return {
+    validate: (value: string) => {
+      if (!value) return true; // Empty is valid (for optional fields)
+      
+      // Simple URL validation
+      const urlPattern = /^(https?:\/\/)?(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+(\/[a-zA-Z0-9-._~:/?#[\]@!$&'()*+,;=]*)?$/;
+      return urlPattern.test(value) || message;
+    }
+  };
+};

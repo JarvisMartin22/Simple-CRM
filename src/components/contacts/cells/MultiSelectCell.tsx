@@ -1,126 +1,139 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Check, ChevronDown, X } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export interface SelectOption {
-  value: string;
-  label: string;
-  color?: string; // Add color property
-}
-
-import { Badge } from '@/components/ui/badge';
-import { ContactField, SelectOption } from '@/contexts/ContactsContext';
+import { TagInput } from '@/components/ui/tag-input';
 import { BaseCellProps, ViewCellProps } from './CellTypes';
 
-interface MultiSelectCellEditProps extends BaseCellProps {
-  field: ContactField;
+// Define the SelectOption interface here to avoid conflicts
+interface SelectOption {
+  value: string;
+  label: string;
+  color?: string;
 }
 
-export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value, field, onSave, onCancel }) => {
-  // Make sure we always work with arrays for multi-select
-  const initialValues = Array.isArray(value) ? value : value ? [value] : [];
+export interface MultiSelectCellEditProps extends BaseCellProps {
+  options?: SelectOption[];
+}
+
+export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ 
+  value, 
+  field, 
+  onSave, 
+  onCancel,
+  options = [] 
+}) => {
+  // Handle both string[] and null/undefined
+  const initialValues = Array.isArray(value) ? value : [];
   const [selectedValues, setSelectedValues] = useState<string[]>(initialValues);
-  const [newOption, setNewOption] = useState<string>('');
-  
-  // Log initial values for debugging
+  const [selectedOptions, setSelectedOptions] = useState<SelectOption[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+
+  // Update selected options when value changes
   useEffect(() => {
-    console.log("MultiSelectCellEdit initialized with value:", value);
-    console.log("Type of value:", typeof value);
-    console.log("Is array?", Array.isArray(value));
-    console.log("Initial selected values:", selectedValues);
-  }, []);
-  
-  const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && newOption.trim()) {
+    if (Array.isArray(value)) {
+      setSelectedValues(value);
+    } else {
+      setSelectedValues([]);
+    }
+  }, [value]);
+
+  // Update selected options whenever selectedValues or options change
+  useEffect(() => {
+    // Map selected values to their corresponding options
+    const selected = selectedValues
+      .map(val => options.find(opt => opt.value === val))
+      .filter(opt => opt !== undefined) as SelectOption[];
+    
+    setSelectedOptions(selected);
+    setTags(selected.map(opt => opt.label));
+  }, [selectedValues, options]);
+
+  const handleTagChange = (newTags: string[]) => {
+    // Convert tag labels back to option values
+    const newValues = newTags
+      .map(tagLabel => {
+        // Try to find existing option
+        const option = options.find(opt => opt.label === tagLabel);
+        
+        if (option) return option.value;
+        
+        // If not found, create a new option with the same label as value
+        const newOptionValue = tagLabel.toLowerCase().replace(/\s+/g, '-');
+        return newOptionValue;
+      });
+    
+    setSelectedValues(newValues);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
       e.preventDefault();
       
-      // Create a new option
-      const newOptionValue = newOption.trim();
-      const newOptionObj: SelectOption = {
-        label: newOptionValue,
-        value: newOptionValue.toLowerCase().replace(/\s+/g, '-'),
-        color: '#F97316' // Default coral color
-      };
+      const newTag = e.currentTarget.value.trim();
+      const newTagValue = newTag.toLowerCase().replace(/\s+/g, '-');
       
-      // Add to field options if not already present
-      if (!field.options?.some(option => option.value === newOptionObj.value)) {
-        const updatedOptions = [...(field.options || []), newOptionObj];
-        field.options = updatedOptions;
+      // Check if this tag already exists as an option
+      const existingOption = options.find(opt => 
+        opt.label.toLowerCase() === newTag.toLowerCase() || 
+        opt.value === newTagValue
+      );
+      
+      if (existingOption) {
+        // Use existing option
+        if (!selectedValues.includes(existingOption.value)) {
+          setSelectedValues([...selectedValues, existingOption.value]);
+        }
+      } else {
+        // Create a new option
+        const newOption: SelectOption = {
+          label: newTag,
+          value: newTagValue,
+          color: '#F97316' // Default color
+        };
+        
+        setSelectedValues([...selectedValues, newOption.value]);
       }
       
-      // Add to selected values if not already selected
-      if (!selectedValues.includes(newOptionObj.value)) {
-        setSelectedValues([...selectedValues, newOptionObj.value]);
-        console.log("Added new option to selection:", newOptionObj.value);
-      }
-      
-      // Clear the input
-      setNewOption('');
+      // Clear the input (handled by TagInput)
     }
   };
-  
+
   const handleSave = () => {
-    console.log("MultiSelectCellEdit saving values:", selectedValues);
-    console.log("Is array?", Array.isArray(selectedValues));
-    // Always save as an array, even if empty
-    onSave(selectedValues);
+    onSave(selectedValues.length > 0 ? selectedValues : []);
   };
   
   return (
     <div className="min-w-[220px]">
-      <div className="relative">
-        <input
-          value={newOption}
-          onChange={(e) => setNewOption(e.target.value)}
-          onKeyDown={handleNewOptionKeyDown}
-          className="h-8 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-coral-300 w-full"
-          placeholder={`Type and press Enter to add...`}
-          autoFocus
-        />
-      </div>
-      {selectedValues.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2 mb-1">
-          {selectedValues.map((value) => {
-            const option = field.options?.find((o) => o.value === value);
-            return (
-              <Badge 
-                key={value} 
-                variant="secondary" 
-                className="flex items-center gap-1"
-                style={{ backgroundColor: option?.color || '#F97316', color: 'white' }}
-              >
-                {option?.label || value}
-                <X 
-                  size={12}
-                  className="cursor-pointer hover:text-coral-100" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedValues(selectedValues.filter(v => v !== value));
-                    console.log("Removed from selection:", value);
-                  }} 
-                />
-              </Badge>
-            );
-          })}
-        </div>
-      )}
-      <div className="mt-1 max-h-[120px] overflow-y-auto">
-        {field.options?.map((option) => (
+      <TagInput
+        tags={tags}
+        setTags={setTags}
+        placeholder="Type and press Enter..."
+        className="min-h-[120px]"
+      />
+      
+      <div className="mt-4 max-h-[150px] overflow-y-auto">
+        <div className="text-xs font-medium mb-2">Suggested options:</div>
+        {options.map((option) => (
           <div 
             key={option.value} 
-            className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${selectedValues.includes(option.value) ? 'bg-coral-50' : ''}`}
+            className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${
+              selectedValues.includes(option.value) ? 'bg-coral-50' : ''
+            }`}
             onClick={() => {
-              const newValues = selectedValues.includes(option.value)
-                ? selectedValues.filter(v => v !== option.value)
-                : [...selectedValues, option.value];
-              setSelectedValues(newValues);
-              console.log("Selected values updated:", newValues);
+              if (selectedValues.includes(option.value)) {
+                setSelectedValues(selectedValues.filter(v => v !== option.value));
+              } else {
+                setSelectedValues([...selectedValues, option.value]);
+              }
             }}
           >
-            <div 
-              className="w-3 h-3 rounded-full mr-2" 
-              style={{ backgroundColor: option.color }} 
-            />
+            {option.color && (
+              <div 
+                className="w-3 h-3 rounded-full mr-2" 
+                style={{ backgroundColor: option.color }} 
+              />
+            )}
             <span>{option.label}</span>
             {selectedValues.includes(option.value) && (
               <Check size={14} className="ml-auto text-coral-500" />
@@ -128,7 +141,8 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
           </div>
         ))}
       </div>
-      <div className="flex mt-2">
+      
+      <div className="flex mt-4">
         <button 
           onClick={handleSave}
           className="p-1 bg-coral-500 text-white rounded-md text-xs"
@@ -147,36 +161,30 @@ export const MultiSelectCellEdit: React.FC<MultiSelectCellEditProps> = ({ value,
 };
 
 export const MultiSelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick }) => {
-  // Log the value in view mode for debugging
-  useEffect(() => {
-    console.log("MultiSelectCellView rendering with value:", value);
-    console.log("Type of value:", typeof value);
-    console.log("Is array?", Array.isArray(value));
-  }, [value]);
-  
-  if (!value || (Array.isArray(value) && value.length === 0)) {
+  if (!value || !Array.isArray(value) || value.length === 0) {
     return <div onClick={onClick} className="cursor-pointer h-full w-full">&nbsp;</div>;
   }
   
-  // Ensure we're working with an array
-  const valueArray = Array.isArray(value) ? value : [value];
-  
   return (
-    <div onClick={onClick} className="cursor-pointer">
-      <div className="flex flex-wrap gap-1">
-        {valueArray.map((tag, i) => {
-          const option = field.options?.find(opt => opt.value === tag);
-          return (
-            <Badge 
-              key={i} 
-              variant="secondary" 
-              style={option ? { backgroundColor: option.color, color: '#fff' } : { backgroundColor: '#F97316', color: '#fff' }}
-            >
-              {option?.label || tag}
-            </Badge>
-          );
-        })}
-      </div>
+    <div onClick={onClick} className="flex flex-wrap gap-1 cursor-pointer">
+      {value.map((val, index) => {
+        const option = field.options?.find(opt => opt.value === val);
+        return (
+          <span 
+            key={index}
+            className={cn(
+              "inline-block text-xs px-2 py-0.5 rounded-full",
+              option?.color ? "" : "bg-gray-200 text-gray-800"
+            )}
+            style={option?.color ? {
+              backgroundColor: option.color,
+              color: '#fff'
+            } : undefined}
+          >
+            {option?.label || val}
+          </span>
+        );
+      })}
     </div>
   );
 };

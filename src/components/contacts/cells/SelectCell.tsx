@@ -1,22 +1,28 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export interface SelectOption {
-  value: string;
-  label: string;
-  color?: string; // Add color property
-}
-
 import { Badge } from '@/components/ui/badge';
-import { ContactField, SelectOption } from '@/contexts/ContactsContext';
 import { BaseCellProps, ViewCellProps } from './CellTypes';
 
-interface SelectCellEditProps extends BaseCellProps {
-  field: ContactField;
+// Define the SelectOption type
+interface SelectOption {
+  value: string;
+  label: string;
+  color?: string;
 }
 
-export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, onSave, onCancel }) => {
+export interface SelectCellEditProps extends BaseCellProps {
+  options?: SelectOption[];
+}
+
+export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ 
+  value, 
+  field, 
+  onSave, 
+  onCancel,
+  options = [] 
+}) => {
   // Initialize editValue from the provided value
   const [editValue, setEditValue] = useState<string | null>(value || null);
   const [newOption, setNewOption] = useState<string>('');
@@ -26,7 +32,7 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
     console.log("SelectCellEdit initialized with value:", value, "type:", typeof value);
   }, []);
   
-  const handleNewOptionKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleNewOptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && newOption.trim()) {
       e.preventDefault();
       
@@ -37,12 +43,6 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
         value: newOptionValue.toLowerCase().replace(/\s+/g, '-'),
         color: '#F97316' // Default coral color
       };
-      
-      // Add to field options if not already present
-      if (!field.options?.some(option => option.value === newOptionObj.value)) {
-        const updatedOptions = [...(field.options || []), newOptionObj];
-        field.options = updatedOptions;
-      }
       
       // Set the value in the editor
       setEditValue(newOptionObj.value);
@@ -72,7 +72,7 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
         />
       </div>
       <div className="mt-2 max-h-[150px] overflow-y-auto">
-        {field.options?.map((option) => (
+        {options?.map((option) => (
           <div 
             key={option.value} 
             className={`flex items-center p-1.5 rounded-md cursor-pointer mb-1 hover:bg-coral-50 ${editValue === option.value ? 'bg-coral-50' : ''}`}
@@ -81,10 +81,12 @@ export const SelectCellEdit: React.FC<SelectCellEditProps> = ({ value, field, on
               setEditValue(option.value);
             }}
           >
-            <div 
-              className="w-3 h-3 rounded-full mr-2" 
-              style={{ backgroundColor: option.color }} 
-            />
+            {option.color && (
+              <div 
+                className="w-3 h-3 rounded-full mr-2" 
+                style={{ backgroundColor: option.color }} 
+              />
+            )}
             <span>{option.label}</span>
             {editValue === option.value && (
               <Check size={14} className="ml-auto text-coral-500" />
@@ -123,7 +125,7 @@ export const SelectCellView: React.FC<ViewCellProps> = ({ value, field, onClick 
     <div onClick={onClick} className="cursor-pointer">
       {selectOption ? (
         <Badge 
-          style={{ backgroundColor: selectOption.color, color: '#fff' }} 
+          style={selectOption.color ? { backgroundColor: selectOption.color, color: '#fff' } : undefined} 
           variant="default"
         >
           {selectOption.label}

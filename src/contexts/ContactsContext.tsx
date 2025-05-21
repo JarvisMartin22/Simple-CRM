@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -46,6 +45,7 @@ export interface ContactField {
 export interface SelectOption {
   value: string;
   label: string;
+  color?: string;
 }
 
 interface ContactsContextType {
@@ -62,6 +62,7 @@ interface ContactsContextType {
   updateField: (id: string, updates: Partial<ContactField>) => void;
   deleteField: (id: string) => void;
   refetchContacts: () => Promise<void>;
+  toggleFieldVisibility: (id: string) => void;
 }
 
 const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
@@ -108,12 +109,23 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
         throw error;
       }
 
-      setContacts(data || []);
+      if (data) {
+        setContacts(data as Contact[]);
+      }
     } catch (error) {
       console.error('Error fetching contacts:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add toggleFieldVisibility function
+  const toggleFieldVisibility = (id: string) => {
+    setFields(fields.map(field => 
+      field.id === id && !field.required 
+        ? { ...field, visible: !field.visible } 
+        : field
+    ));
   };
 
   const createContact = async (contactData: Partial<Contact>): Promise<Contact> => {
@@ -253,6 +265,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     updateField,
     deleteField,
     refetchContacts,
+    toggleFieldVisibility,
   };
 
   return (

@@ -8,20 +8,10 @@ import { SelectCellEdit as SelectCell } from './SelectCell';
 import { TextCellEdit as TextCell } from './TextCell';
 import { UrlCellEdit as UrlCell } from './UrlCell';
 import { ContactField } from '@/contexts/ContactsContext';
+import { CompanyField } from '@/contexts/CompaniesContext';
+import { CellRendererProps } from './CellTypes';
 
-interface TableCellRendererProps {
-  field: string;
-  value: any;
-  row: any;
-  fields: ContactField[];
-  onChange?: (field: string, value: any) => void;
-  isEditable?: boolean;
-  onStartEdit?: () => void;
-  onEndEdit?: () => void;
-  entityType: 'contact' | 'company';
-}
-
-export const TableCellRenderer: React.FC<TableCellRendererProps> = ({
+export const TableCellRenderer: React.FC<CellRendererProps> = ({
   field,
   value,
   row,
@@ -33,104 +23,100 @@ export const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   entityType
 }) => {
   // Find the field configuration
-  const fieldConfig = fields.find(f => f.name === field);
+  const fieldConfig = fields.find(f => f.name === field || f.id === field);
   
   if (!fieldConfig) {
     // Default to text cell if field config not found
     return <TextCell 
       value={value} 
-      onChange={(val) => onChange?.(field, val)} 
-      isEditable={isEditable}
-      onStartEdit={onStartEdit}
-      onEndEdit={onEndEdit}
+      field={null}
+      onSave={(val) => onChange?.(field, val)}
+      onCancel={() => onEndEdit?.()}
     />;
   }
+
+  // Handle cell changes
+  const handleChange = (val: any) => {
+    onChange?.(field, val);
+    onEndEdit?.();
+  };
 
   // Render different cell types based on the field type
   switch (fieldConfig.type) {
     case 'checkbox':
       return <CheckboxCellEdit 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'date':
       return <DateCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'multi-select':
       return <MultiSelectCell 
         value={value} 
+        field={fieldConfig}
         options={fieldConfig.options || []} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'number':
       return <NumberCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'select':
       return <SelectCell 
         value={value} 
+        field={fieldConfig}
         options={fieldConfig.options || []} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'url':
       return <UrlCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
     
     case 'email':
       return <UrlCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
         protocol="mailto:"
       />;
     
     case 'phone':
       return <UrlCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
         protocol="tel:"
       />;
     
     default:
       return <TextCell 
         value={value} 
-        onChange={(val) => onChange?.(field, val)} 
-        isEditable={isEditable}
-        onStartEdit={onStartEdit}
-        onEndEdit={onEndEdit}
+        field={fieldConfig}
+        onSave={handleChange}
+        onCancel={() => onEndEdit?.()}
       />;
   }
 };
