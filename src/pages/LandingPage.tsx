@@ -7,12 +7,10 @@ import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
 import PrivacyPolicyDialog from '@/components/legal/PrivacyPolicyDialog';
 import TermsOfServiceDialog from '@/components/legal/TermsOfServiceDialog';
-
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
   const [termsOfServiceOpen, setTermsOfServiceOpen] = useState(false);
-  
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -20,7 +18,6 @@ const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
   const features = [{
     title: 'Contact Management',
     description: 'Organize and manage your contacts with ease.',
@@ -38,13 +35,12 @@ const LandingPage: React.FC = () => {
     description: 'Schedule and manage your appointments.',
     icon: <CheckCircle className="h-5 w-5 text-green-500" />
   }];
-  
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <span className="font-poetsen text-3xl text-orange-500 text-center">Golly</span>
+            <span className="font-poetsen text-orange-500 text-center text-5xl">Golly</span>
           </div>
           
           <nav className="hidden md:flex items-center space-x-6">
@@ -425,15 +421,8 @@ const LandingPage: React.FC = () => {
       </footer>
 
       {/* Legal Dialogs */}
-      <PrivacyPolicyDialog 
-        open={privacyPolicyOpen} 
-        onOpenChange={setPrivacyPolicyOpen} 
-      />
-      <TermsOfServiceDialog 
-        open={termsOfServiceOpen} 
-        onOpenChange={setTermsOfServiceOpen} 
-      />
+      <PrivacyPolicyDialog open={privacyPolicyOpen} onOpenChange={setPrivacyPolicyOpen} />
+      <TermsOfServiceDialog open={termsOfServiceOpen} onOpenChange={setTermsOfServiceOpen} />
     </div>;
 };
-
 export default LandingPage;
