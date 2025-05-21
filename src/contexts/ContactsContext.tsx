@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { createClient } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // Define the Contact type
@@ -27,15 +26,27 @@ export type Contact = {
   };
 };
 
+// Define SelectOption type for select and multi-select fields
+export type SelectOption = {
+  value: string;
+  label: string;
+  color?: string;
+};
+
 // Define a type for custom fields
 export type ContactField = {
+  id: string;
   name: string;
   label: string;
-  type: 'text' | 'email' | 'phone' | 'date' | 'select' | 'multiselect' | 'checkbox' | 'url' | 'number';
+  type: 'text' | 'email' | 'phone' | 'date' | 'select' | 'multi-select' | 'checkbox' | 'url' | 'number';
   visible: boolean;
-  options?: string[];
+  required?: boolean;
+  options?: SelectOption[];
   defaultValue?: any;
 };
+
+// For type usage in other files
+export type FieldType = 'text' | 'email' | 'phone' | 'date' | 'select' | 'multi-select' | 'checkbox' | 'url' | 'number';
 
 export type ContactsContextType = {
   contacts: Contact[];
@@ -74,15 +85,23 @@ const ContactsContext = createContext<ContactsContextType>({
 
 // Define default fields
 const defaultFields: ContactField[] = [
-  { name: 'first_name', label: 'First Name', type: 'text', visible: true },
-  { name: 'last_name', label: 'Last Name', type: 'text', visible: true },
-  { name: 'email', label: 'Email', type: 'email', visible: true },
-  { name: 'phone', label: 'Phone', type: 'phone', visible: true },
-  { name: 'title', label: 'Title', type: 'text', visible: true },
-  { name: 'company', label: 'Company', type: 'text', visible: true },
-  { name: 'website', label: 'Website', type: 'url', visible: true },
-  { name: 'status', label: 'Status', type: 'select', visible: true, options: ['New', 'Active', 'Inactive'] },
-  { name: 'tags', label: 'Tags', type: 'multiselect', visible: true, options: ['Customer', 'Lead', 'Partner'] },
+  { id: 'first_name', name: 'first_name', label: 'First Name', type: 'text', visible: true, required: true },
+  { id: 'last_name', name: 'last_name', label: 'Last Name', type: 'text', visible: true, required: true },
+  { id: 'email', name: 'email', label: 'Email', type: 'email', visible: true },
+  { id: 'phone', name: 'phone', label: 'Phone', type: 'phone', visible: true },
+  { id: 'title', name: 'title', label: 'Title', type: 'text', visible: true },
+  { id: 'company', name: 'company', label: 'Company', type: 'text', visible: true },
+  { id: 'website', name: 'website', label: 'Website', type: 'url', visible: true },
+  { id: 'status', name: 'status', label: 'Status', type: 'select', visible: true, options: [
+    { value: 'new', label: 'New' }, 
+    { value: 'active', label: 'Active' }, 
+    { value: 'inactive', label: 'Inactive' }
+  ] },
+  { id: 'tags', name: 'tags', label: 'Tags', type: 'multi-select', visible: true, options: [
+    { value: 'customer', label: 'Customer' }, 
+    { value: 'lead', label: 'Lead' }, 
+    { value: 'partner', label: 'Partner' }
+  ] },
 ];
 
 // Provider component
@@ -94,7 +113,6 @@ export const ContactsProvider = ({ children }: { children: ReactNode }) => {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   
   const { toast } = useToast();
-  const supabase = createClient();
   
   const fetchContacts = async () => {
     setLoading(true);
@@ -129,7 +147,7 @@ export const ContactsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const addContact = async (contact: Contact) => {
+  const addContact = async (contact: Partial<Contact>) => {
     setLoading(true);
     setError(null);
     
@@ -145,7 +163,7 @@ export const ContactsProvider = ({ children }: { children: ReactNode }) => {
       const contactToInsert = {
         ...contact,
         website: contact.website || '' // Ensure it's a string, not an array
-      };
+      } as Contact;
       
       const { data, error } = await supabase
         .from('contacts')
@@ -263,26 +281,26 @@ export const ContactsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Add the missing field management methods
-  const toggleFieldVisibility = (fieldName: string) => {
+  const toggleFieldVisibility = (fieldId: string) => {
     setFields(prev => 
       prev.map(field => 
-        field.name === fieldName ? { ...field, visible: !field.visible } : field
+        field.id === fieldId ? { ...field, visible: !field.visible } : field
       )
     );
   };
 
-  const deleteField = (fieldName: string) => {
-    setFields(prev => prev.filter(field => field.name !== fieldName));
+  const deleteField = (fieldId: string) => {
+    setFields(prev => prev.filter(field => field.id !== fieldId));
   };
 
   const addField = (field: ContactField) => {
     setFields(prev => [...prev, field]);
   };
 
-  const updateField = (fieldName: string, updates: Partial<ContactField>) => {
+  const updateField = (fieldId: string, updates: Partial<ContactField>) => {
     setFields(prev => 
       prev.map(field => 
-        field.name === fieldName ? { ...field, ...updates } : field
+        field.id === fieldId ? { ...field, ...updates } : field
       )
     );
   };
