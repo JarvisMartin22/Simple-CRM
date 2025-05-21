@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { CheckboxCell } from './CheckboxCell';
-import { DateCell } from './DateCell';
-import { MultiSelectCell } from './MultiSelectCell';
-import { NumberCell } from './NumberCell';
-import { SelectCell } from './SelectCell';
-import { TextCell } from './TextCell';
-import { UrlCell } from './UrlCell';
+import { CheckboxCellEdit } from './CheckboxCell';
+import { DateCellEdit as DateCell } from './DateCell';
+import { MultiSelectCellEdit as MultiSelectCell } from './MultiSelectCell';
+import { NumberCellEdit as NumberCell } from './NumberCell';
+import { SelectCellEdit as SelectCell } from './SelectCell';
+import { TextCellEdit as TextCell } from './TextCell';
+import { UrlCellEdit as UrlCell } from './UrlCell';
 import { ContactField } from '@/contexts/ContactsContext';
 
 interface TableCellRendererProps {
@@ -49,7 +49,7 @@ export const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   // Render different cell types based on the field type
   switch (fieldConfig.type) {
     case 'checkbox':
-      return <CheckboxCell 
+      return <CheckboxCellEdit 
         value={value} 
         onChange={(val) => onChange?.(field, val)} 
         isEditable={isEditable}

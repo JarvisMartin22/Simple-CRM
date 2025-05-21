@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -10,9 +9,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import PrivacyPolicyDialog from '@/components/legal/PrivacyPolicyDialog';
-import TermsOfServiceDialog from '@/components/legal/TermsOfServiceDialog';
 import { Waves } from '@/components/ui/waves-background';
 
 const registerSchema = z.object({

@@ -1,7 +1,14 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Check, ChevronDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
+export interface SelectOption {
+  value: string;
+  label: string;
+  color?: string; // Add color property
+}
+
 import { Badge } from '@/components/ui/badge';
-import { Check, X } from "lucide-react";
 import { ContactField, SelectOption } from '@/contexts/ContactsContext';
 import { BaseCellProps, ViewCellProps } from './CellTypes';
 
