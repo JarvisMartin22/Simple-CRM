@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.contacts (
   website TEXT,
   last_contacted TIMESTAMP WITH TIME ZONE,
   interaction_count INTEGER DEFAULT 0,
-  source TEXT,
+  source TEXT DEFAULT NULL,
   external_id TEXT,
   tags TEXT[] DEFAULT '{}',
   notes TEXT,

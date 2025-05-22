@@ -60,6 +60,7 @@ export type Database = {
           phone: string | null
           linkedin: string | null
           company_id: string | null
+          source: string | null
           created_at: string
           updated_at: string
         }
@@ -72,6 +73,7 @@ export type Database = {
           phone?: string | null
           linkedin?: string | null
           company_id?: string | null
+          source?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -84,6 +86,7 @@ export type Database = {
           phone?: string | null
           linkedin?: string | null
           company_id?: string | null
+          source?: string | null
           created_at?: string
           updated_at?: string
         }

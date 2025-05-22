@@ -45,9 +45,6 @@ const fetchMainContacts = async (accessToken: string): Promise<{ success: boolea
       },
     });
     
-    console.log('Main contacts response status:', response.status);
-    console.log('Main contacts response headers:', Object.fromEntries(response.headers.entries()));
-    
     if (!response.ok) {
       const error = await response.text();
       console.error(`Error fetching main contacts: ${response.status}`, error);
@@ -56,13 +53,6 @@ const fetchMainContacts = async (accessToken: string): Promise<{ success: boolea
     
     const data = await response.json();
     console.log(`Found ${data.connections?.length || 0} main contacts`);
-    
-    if (!data.connections || !Array.isArray(data.connections)) {
-      console.error('Unexpected response format - connections is not an array:', 
-        JSON.stringify(data).substring(0, 200) + '...');
-      return { success: false, data: [], error: 'Invalid response format' };
-    }
-    
     return { 
       success: true, 
       data: data.connections || []
@@ -85,9 +75,6 @@ const fetchOtherContacts = async (accessToken: string): Promise<{ success: boole
       },
     });
     
-    console.log('Other contacts response status:', response.status);
-    console.log('Other contacts response headers:', Object.fromEntries(response.headers.entries()));
-    
     if (!response.ok) {
       const error = await response.text();
       console.error(`Error fetching other contacts: ${response.status}`, error);
@@ -96,13 +83,6 @@ const fetchOtherContacts = async (accessToken: string): Promise<{ success: boole
     
     const data = await response.json();
     console.log(`Found ${data.otherContacts?.length || 0} other contacts`);
-    
-    if (!data.otherContacts || !Array.isArray(data.otherContacts)) {
-      console.error('Unexpected response format - otherContacts is not an array:', 
-        JSON.stringify(data).substring(0, 200) + '...');
-      return { success: false, data: [], error: 'Invalid response format' };
-    }
-    
     return { 
       success: true, 
       data: data.otherContacts || []
@@ -128,18 +108,6 @@ serve(async (req) => {
   }
 
   try {
-    // Check if the request has proper authorization
-    const apiKey = req.headers.get('apikey') || req.headers.get('Authorization')?.split('Bearer ')[1];
-    if (!apiKey) {
-      console.error('Missing API key in request headers');
-      return new Response(JSON.stringify({
-        error: 'Unauthorized: Missing API key'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401,
-      });
-    }
-    
     // Get the Gmail token from the header
     const gmailToken = req.headers.get('X-Gmail-Token');
     console.log('Gmail token present:', !!gmailToken);
@@ -162,54 +130,6 @@ serve(async (req) => {
 
     if (!access_token) {
       throw new Error('No access token provided');
-    }
-
-    // Validate the access token first
-    try {
-      console.log("Validating access token...");
-      const tokenInfoUrl = `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${access_token}`;
-      const tokenResponse = await fetch(tokenInfoUrl);
-      
-      if (!tokenResponse.ok) {
-        const tokenError = await tokenResponse.json();
-        console.error("Access token validation failed:", tokenError);
-        return new Response(JSON.stringify({
-          contacts: [],
-          error: 'Access token is invalid or expired. Please reconnect your Gmail account.'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        });
-      }
-      
-      const tokenInfo = await tokenResponse.json();
-      console.log("Token validation successful:", {
-        expiresIn: tokenInfo.expires_in,
-        scope: tokenInfo.scope,
-        hasContactsScope: tokenInfo.scope.includes('contacts')
-      });
-      
-      // Check for any contacts-related scope that might be present
-      const hasContactsScope = 
-        tokenInfo.scope.includes('contacts') || 
-        tokenInfo.scope.includes('people') ||
-        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts') || 
-        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.readonly') ||
-        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.other.readonly');
-        
-      if (!hasContactsScope) {
-        console.error("Missing required contacts scope");
-        return new Response(JSON.stringify({
-          contacts: [],
-          error: 'Gmail integration is missing the required contacts scope. Please reconnect with proper permissions.'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        });
-      }
-    } catch (validationError) {
-      console.error("Error validating token:", validationError);
-      // Continue with the request even if validation fails
     }
 
     const contacts: Contact[] = [];
@@ -238,15 +158,12 @@ serve(async (req) => {
     console.log('First few contacts:', contacts.slice(0, 2).map(c => ({
       hasNames: !!c.names?.length,
       hasEmail: !!c.emailAddresses?.length,
-      resourceName: c.resourceName,
-      fullData: JSON.stringify(c).substring(0, 200) + '...'
+      resourceName: c.resourceName
     })));
 
     if (contacts.length === 0) {
-      console.error('No contacts found from Gmail API - check token validity and API response.');
       return new Response(JSON.stringify({
-        contacts: [],
-        error: 'No contacts found in Gmail account'
+        contacts: []
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -269,8 +186,6 @@ serve(async (req) => {
         title: primaryOrg?.title || '',
         company: primaryOrg?.name || '',
         website: primaryUrl?.value || '',
-        source: 'gmail',
-        tags: [contact.resourceName?.includes('otherContacts') ? 'gmail-other' : 'gmail-main'],
         names: contact.names || [],
         emailAddresses: contact.emailAddresses || [],
         phoneNumbers: contact.phoneNumbers || [],

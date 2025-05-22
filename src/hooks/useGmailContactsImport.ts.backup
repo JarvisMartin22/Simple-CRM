@@ -32,6 +32,33 @@ export function useGmailContactsImport() {
         successful: 0,
         failed: 0
       });
+      
+      // Try to fix the tags column if needed
+      try {
+        console.log('Checking and fixing tags column...');
+        await supabase.rpc('execute_sql', {
+          sql_query: `
+            -- Try to fix the tags column default value if not already set correctly
+            DO $$
+            BEGIN
+              BEGIN
+                ALTER TABLE contacts ALTER COLUMN tags SET DEFAULT '{}';
+              EXCEPTION WHEN OTHERS THEN
+                NULL;
+              END;
+              
+              BEGIN
+                UPDATE contacts SET tags = '{}' WHERE tags IS NULL;
+              EXCEPTION WHEN OTHERS THEN
+                NULL;
+              END;
+            END $$;
+          `
+        });
+        console.log('Column check/fix completed');
+      } catch (fixError) {
+        console.error('Error trying to fix schema:', fixError);
+      }
 
       // First check if Gmail is connected
       const { data: integration, error: integrationError } = await supabase
@@ -56,71 +83,13 @@ export function useGmailContactsImport() {
         expiresAt: integration.expires_at
       });
 
-      // Check if token is expired and refresh if needed
-      const now = new Date();
-      const tokenExpiry = integration.expires_at ? new Date(integration.expires_at) : null;
-      const isTokenExpired = tokenExpiry && now > tokenExpiry;
-      
-      if (isTokenExpired && integration.refresh_token) {
-        console.log('Access token expired, refreshing...');
-        try {
-          const refreshResponse = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-auth`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-            },
-            body: JSON.stringify({
-              refresh_token: integration.refresh_token
-            })
-          });
-          
-          if (!refreshResponse.ok) {
-            throw new Error('Failed to refresh token');
-          }
-          
-          const tokenData = await refreshResponse.json();
-          
-          // Update the token in the database
-          const { error: updateError } = await supabase
-            .from('user_integrations')
-            .update({
-              access_token: tokenData.access_token,
-              expires_at: tokenData.expires_at
-            })
-            .eq('id', integration.id);
-            
-          if (updateError) {
-            throw new Error('Failed to update token in database');
-          }
-          
-          // Update our local integration object
-          integration.access_token = tokenData.access_token;
-          integration.expires_at = tokenData.expires_at;
-          
-          console.log('Token refreshed successfully');
-        } catch (refreshError) {
-          console.error('Error refreshing token:', refreshError);
-          throw new Error('Failed to refresh access token. Please reconnect Gmail.');
-        }
-      }
-
       // Call the Gmail contacts import function
-      console.log('Calling Gmail contacts import function with token:', {
-        tokenLength: integration.access_token?.length,
-        tokenStart: integration.access_token?.substring(0, 10) + '...',
-        expiresAt: integration.expires_at,
-        includeNoEmail
-      });
-      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-contacts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'X-Gmail-Token': integration.access_token,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'X-Gmail-Token': integration.access_token
         },
         body: JSON.stringify({
           integration_id: integration.id,
@@ -144,7 +113,6 @@ export function useGmailContactsImport() {
       const data = await response.json();
       console.log('Received contacts data:', {
         totalContacts: data.contacts?.length || 0,
-        error: data.error,
         firstContact: data.contacts?.[0] ? {
           hasName: !!(data.contacts[0].firstName || data.contacts[0].lastName),
           hasEmail: !!data.contacts[0].email,
@@ -153,16 +121,6 @@ export function useGmailContactsImport() {
         } : null
       });
       const contacts = data.contacts || [];
-      
-      if (contacts.length === 0) {
-        console.warn('No contacts received from Edge Function - check Gmail API access and response');
-        toast({
-          title: 'No Contacts Found',
-          description: data.error || 'No contacts found in your Gmail account. Please check your permissions.',
-          variant: 'destructive'
-        });
-        return;
-      }
 
       // Process each contact
       let successful = 0;
@@ -175,6 +133,17 @@ export function useGmailContactsImport() {
           const userId = (await supabase.auth.getUser()).data.user?.id;
           const companyName = contact.company || contact.organizations?.[0]?.name;
           let companyId = null;
+
+          // Check if source column exists by querying schema
+          const { data: columns, error: schemaError } = await supabase
+            .from('contacts')
+            .select('*')
+            .limit(1);
+          
+          const hasSourceColumn = columns && columns[0] && 'source' in columns[0];
+          const hasTagsColumn = columns && columns[0] && 'tags' in columns[0];
+          console.log('Schema check - source column exists:', hasSourceColumn);
+          console.log('Schema check - tags column exists:', hasTagsColumn);
 
           // If we have a company name, try to find or create the company
           if (companyName && userId) {
@@ -215,18 +184,37 @@ export function useGmailContactsImport() {
             phone: contact.phone || contact.phoneNumbers?.[0]?.value || '',
             title: contact.title || contact.organizations?.[0]?.title || '',
             company_id: companyId,
-            website: contact.website || contact.urls?.[0]?.value || '',
-            source: 'gmail',
-            tags: Array.isArray(contact.tags) ? contact.tags : ['gmail-import']
+            website: contact.website || contact.urls?.[0]?.value || ''
           };
+          
+          // Add source field if it exists in the schema
+          if (hasSourceColumn) {
+            contactData.source = 'gmail';
+          }
+
+          // Try different approaches - first try removing tags completely
+          /*
+          // Add detailed debugging for tags
+          if (hasTagsColumn) {
+            console.log('Adding tags field to contact data');
+            // Try different formats
+            const tagFormats = {
+              emptyArray: [],
+              jsArray: ["gmail-import"],
+              pgEmptyArray: "{}",
+              pgArray: "{gmail-import}",
+              nullValue: null
+            };
+            
+            // Try format 1 first
+            contactData.tags = tagFormats.jsArray;
+          }
+          */
           
           console.log(`Inserting contact ${i+1}/${contacts.length}:`, JSON.stringify(contactData));
           
           // Try regular insert first
-          const { error: insertError } = await supabase.from('contacts').insert({
-            ...contactData,
-            tags: Array.isArray(contactData.tags) ? contactData.tags : ['gmail-import']
-          });
+          const { error: insertError } = await supabase.from('contacts').insert(contactData);
 
           if (insertError) {
             console.error('Failed to insert contact:', {
@@ -242,47 +230,52 @@ export function useGmailContactsImport() {
             if (insertError.code === '22P02' && insertError.message.includes('array')) {
               console.log('Trying direct SQL query as fallback');
               
-              // Try the stored procedure with proper array handling
-              const { data: sqlResult, error: sqlError } = await supabase.rpc(
-                'create_contact',
-                {
-                  p_user_id: userId,
-                  p_first_name: contact.firstName || '',
-                  p_last_name: contact.lastName || '',
-                  p_email: contact.email || '',
-                  p_phone: contact.phone || '',
-                  p_title: contact.title || '',
-                  p_company_id: companyId,
-                  p_website: contact.website || '',
-                  p_notes: '',
-                  p_tags: ['gmail-import']
-                }
-              );
+              // Try a simplified record with only required fields
+              const simplifiedContact = {
+                user_id: userId,
+                first_name: contact.firstName || '',
+                last_name: contact.lastName || '',
+                email: contact.email || '',
+              };
               
-              if (sqlError) {
-                console.error('SQL fallback failed:', sqlError);
+              console.log('Trying simplified contact without tags:', simplifiedContact);
+              
+              const { error: simpleError } = await supabase
+                .from('contacts')
+                .insert(simplifiedContact);
+              
+              if (simpleError) {
+                console.error('Simplified insert also failed:', simpleError);
                 
-                // Last resort: try simplified contact without tags
-                console.log('Trying simplified contact without tags as last resort');
-                const simplifiedContact = {
-                  user_id: userId,
-                  first_name: contact.firstName || '',
-                  last_name: contact.lastName || '',
-                  email: contact.email || '',
-                  tags: '{gmail-import}'  // PostgreSQL array literal syntax
-                };
+                // Now try the stored procedure as final fallback
+                const { firstName, lastName, email, phone, title, website } = contact;
                 
-                const { error: simpleError } = await supabase
-                  .from('contacts')
-                  .insert(simplifiedContact);
+                // Use direct SQL with proper array syntax
+                const { data: sqlResult, error: sqlError } = await supabase.rpc(
+                  'create_contact',
+                  {
+                    p_user_id: userId,
+                    p_first_name: firstName || '',
+                    p_last_name: lastName || '',
+                    p_email: email || '',
+                    p_phone: phone || '',
+                    p_title: title || '',
+                    p_company_id: companyId,
+                    p_website: website || '',
+                    p_notes: '',
+                    p_tags: ['gmail-import']
+                  }
+                );
                 
-                if (simpleError) {
+                if (sqlError) {
+                  console.error('SQL fallback also failed:', sqlError);
                   failed++;
                 } else {
+                  console.log('SQL fallback succeeded:', sqlResult);
                   successful++;
                 }
               } else {
-                console.log('SQL fallback succeeded:', sqlResult);
+                console.log('Simplified insert succeeded!');
                 successful++;
               }
             } else {

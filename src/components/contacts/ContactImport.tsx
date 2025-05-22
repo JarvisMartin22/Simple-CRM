@@ -27,7 +27,13 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
     lastContactedDays: "180" // Last 6 months
   });
 
-  const { importFromGmail, isImporting, importProgress } = useGmailContactsImport();
+  const { 
+    importFromGmail, 
+    isImporting, 
+    importProgress,
+    includeNoEmail,
+    setIncludeNoEmail
+  } = useGmailContactsImport();
 
   const handleImport = async () => {
     if (!user) {
@@ -79,6 +85,15 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
                 </h3>
                 
                 <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="includeNoEmail" 
+                      checked={includeNoEmail} 
+                      onCheckedChange={(checked) => setIncludeNoEmail(checked === true)}
+                    />
+                    <Label htmlFor="includeNoEmail">Exclude contacts without email addresses</Label>
+                  </div>
+
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="onlyWithName" 

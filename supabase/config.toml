@@ -281,8 +281,9 @@ enabled = false
 
 [auth.external.google]
 enabled = true
-# client_id and secret should be configured in Supabase dashboard
-redirect_uri = "https://your-dev-project.supabase.co/auth/v1/callback"
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = "env(GMAIL_REDIRECT_URI)"
 
 [edge_runtime]
 enabled = true
