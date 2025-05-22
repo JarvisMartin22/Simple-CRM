@@ -1,24 +1,27 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useContacts, Contact } from '@/contexts/ContactsContext';
+import { useContacts } from '@/contexts/ContactsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, Check, AlertTriangle, FolderDown } from 'lucide-react';
+import { Upload, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
 
-interface CsvImportProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+export interface CsvImportProps {
+  onClose: () => void;
 }
 
-export function CsvImport({ open, onOpenChange }: CsvImportProps) {
+const CsvImport: React.FC<CsvImportProps> = ({ onClose }) => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [importResults, setImportResults] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({
+    total: 0,
+    processed: 0,
+    successful: 0,
+    failed: 0
+  });
   const { createContact } = useContacts();
   const { user } = useAuth();
 
@@ -34,130 +37,158 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
       return;
     }
 
-    setIsSubmitting(true);
-    setParseError(null);
-    setImportResults({ success: 0, failed: 0 });
+    if (!user) {
+      toast.error('You must be logged in to import contacts');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress({
+      total: 0,
+      processed: 0,
+      successful: 0,
+      failed: 0
+    });
 
     Papa.parse(csvFile, {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        if (!user) {
-          toast.error('You must be logged in to import contacts');
-          setIsSubmitting(false);
-          return;
-        }
+        try {
+          const contacts = results.data;
+          setImportProgress(prev => ({
+            ...prev,
+            total: contacts.length
+          }));
 
-        let successCount = 0;
-        let failedCount = 0;
+          for (const row of results.data) {
+            try {
+              // Type assertion to tell TypeScript that row is an object
+              const contactData = row as Record<string, any>;
 
-        for (const row of results.data) {
-          try {
-            // Type assertion to tell TypeScript that row is an object
-            const contactData = row as Record<string, any>;
+              // Map CSV fields to contact fields
+              const newContact = {
+                user_id: user.id,
+                first_name: contactData.first_name || contactData.firstName || '',
+                last_name: contactData.last_name || contactData.lastName || '',
+                email: contactData.email || '',
+                phone: contactData.phone || contactData.phoneNumber || '',
+                title: contactData.title || contactData.jobTitle || '',
+                company_name: contactData.company || contactData.company_name || '',
+                website: contactData.website || '',
+                notes: contactData.notes || '',
+                tags: ['csv-import'],
+                source: 'csv'
+              };
 
-            // Ensure that first_name and last_name exist, otherwise set them to empty strings
-            const firstName = typeof contactData.first_name === 'string' ? contactData.first_name : '';
-            const lastName = typeof contactData.last_name === 'string' ? contactData.last_name : '';
-
-            // Check if both first_name and last_name are empty
-            if (!firstName && !lastName) {
-              console.warn('Skipping row due to missing first_name and last_name', row);
-              failedCount++;
-              continue; // Skip to the next row
+              // We need at least an email or name
+              if ((newContact.first_name || newContact.last_name) || newContact.email) {
+                await createContact(newContact);
+                setImportProgress(prev => ({
+                  ...prev,
+                  processed: prev.processed + 1,
+                  successful: prev.successful + 1
+                }));
+              } else {
+                throw new Error('Contact requires either a name or email');
+              }
+            } catch (error) {
+              console.error('Failed to import row:', row, error);
+              setImportProgress(prev => ({
+                ...prev,
+                processed: prev.processed + 1,
+                failed: prev.failed + 1
+              }));
             }
-
-            const newContact: Partial<Contact> = {
-              user_id: user.id,
-              first_name: firstName,
-              last_name: lastName,
-              email: contactData.email || '',
-              phone: contactData.phone || '',
-              title: contactData.title || '',
-              company_id: contactData.company_id || '',
-              website: contactData.website || '',
-              notes: contactData.notes || '',
-              tags: (contactData.tags || '').split(',').map((tag: string) => tag.trim()).filter(Boolean),
-            };
-
-            await createContact(newContact);
-            successCount++;
-          } catch (error) {
-            console.error('Failed to import row:', row, error);
-            failedCount++;
           }
-        }
 
-        setImportResults({ success: successCount, failed: failedCount });
-        toast.success(`Successfully imported ${successCount} contacts`);
-        if (failedCount > 0) {
-          toast.error(`Failed to import ${failedCount} contacts`);
+          if (importProgress.successful > 0) {
+            toast.success(`Successfully imported ${importProgress.successful} contacts`);
+            onClose();
+          } else {
+            toast.error('No valid contacts found in CSV file');
+          }
+        } catch (error) {
+          console.error('CSV import failed:', error);
+          toast.error('Failed to import contacts from CSV');
+        } finally {
+          setIsImporting(false);
         }
-        setIsSubmitting(false);
       },
       error: (error) => {
         console.error('CSV parsing error:', error);
-        setParseError(error.message);
-        setIsSubmitting(false);
         toast.error('Failed to parse CSV file');
-      },
+        setIsImporting(false);
+      }
     });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Import Contacts from CSV</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="csv" className="text-right">
-              CSV File
-            </Label>
-            <Input type="file" id="csv" accept=".csv" className="col-span-3" onChange={handleFileChange} />
-          </div>
-          {parseError && (
-            <div className="flex items-center text-sm text-red-500 space-x-2">
-              <AlertTriangle className="h-4 w-4" />
-              <p>{parseError}</p>
-            </div>
-          )}
-          {csvFile && (
-            <div className="flex items-center text-sm text-green-500 space-x-2">
-              <Check className="h-4 w-4" />
-              <p>Selected file: {csvFile.name}</p>
-            </div>
-          )}
-          {importResults.success > 0 && (
-            <div className="flex items-center text-sm text-green-500 space-x-2">
-              <Check className="h-4 w-4" />
-              <p>Successfully imported {importResults.success} contacts.</p>
-            </div>
-          )}
-          {importResults.failed > 0 && (
-            <div className="flex items-center text-sm text-red-500 space-x-2">
-              <AlertTriangle className="h-4 w-4" />
-              <p>Failed to import {importResults.failed} contacts.</p>
-            </div>
-          )}
-        </div>
-        <div className="flex justify-end">
-          <Button type="button" variant="secondary" onClick={handleImport} disabled={isSubmitting || !csvFile}>
-            {isSubmitting ? (
-              <>
-                <span className="animate-spin mr-2">&#9696;</span>
-                Importing...
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Import Contacts
-              </>
-            )}
+    <div className="space-y-4">
+      <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-md">
+        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+        <h3 className="text-lg font-medium mb-1">Upload CSV File</h3>
+        <p className="text-gray-500 text-sm mb-4 text-center">
+          Drag and drop a CSV file here, or click to browse
+        </p>
+        <Input
+          type="file"
+          accept=".csv"
+          onChange={handleFileChange}
+          className="hidden"
+          id="csv-upload"
+        />
+        <Label htmlFor="csv-upload">
+          <Button variant="outline" className="cursor-pointer" asChild>
+            <span>Browse Files</span>
           </Button>
+        </Label>
+        {csvFile && (
+          <p className="text-sm text-gray-600 mt-2">
+            Selected file: {csvFile.name}
+          </p>
+        )}
+      </div>
+
+      {isImporting && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>Importing contacts...</span>
+            <span>{importProgress.processed} / {importProgress.total}</span>
+          </div>
+          <Progress value={(importProgress.processed / importProgress.total) * 100} />
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+
+      <div className="bg-gray-50 p-4 rounded-md text-sm space-y-2">
+        <h4 className="font-medium">CSV Format Requirements:</h4>
+        <ul className="list-disc list-inside space-y-1 text-gray-600">
+          <li>First row should contain column headers</li>
+          <li>Required columns: email OR first_name/last_name</li>
+          <li>Optional: phone, title, company, website, notes</li>
+        </ul>
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleImport}
+          disabled={!csvFile || isImporting}
+        >
+          {isImporting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Importing...
+            </>
+          ) : (
+            'Import Contacts'
+          )}
+        </Button>
+      </div>
+    </div>
   );
-}
+};
+
+export default CsvImport;

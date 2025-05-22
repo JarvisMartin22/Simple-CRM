@@ -1,7 +1,10 @@
-
 export interface PipelineStage {
   id: string;
   name: string;
+  position: number;
+  pipeline_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Pipeline {

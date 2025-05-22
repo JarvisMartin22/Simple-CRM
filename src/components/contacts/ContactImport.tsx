@@ -6,11 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Upload, Users, Filter, RefreshCw, Loader2 } from "lucide-react";
+import { Mail, Upload, Users, Filter, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGmailContactsImport } from '@/hooks/useGmailContactsImport';
+import CsvImport from './CsvImport';
+import { Progress } from "@/components/ui/progress";
 
-const ContactImport: React.FC = () => {
+export interface ContactImportProps {
+  onClose: () => void;
+}
+
+const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("gmail");
@@ -19,25 +26,36 @@ const ContactImport: React.FC = () => {
     excludeNoReply: true,
     lastContactedDays: "180" // Last 6 months
   });
-  
-  // Placeholder Gmail connection handler
-  const handleConnectGmail = () => {
-    toast({
-      title: "Gmail Connection",
-      description: "This functionality is currently disabled."
-    });
+
+  const { importFromGmail, isImporting, importProgress } = useGmailContactsImport();
+
+  const handleImport = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to import contacts.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await importFromGmail();
+      if (importProgress.successful > 0) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error importing contacts:', error);
+      toast({
+        title: "Import Failed",
+        description: "There was an error importing your contacts. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
-  
-  // Placeholder fetch contacts handler
-  const fetchGmailContacts = () => {
-    toast({
-      title: "Fetching Contacts",
-      description: "This functionality is currently disabled."
-    });
-  };
-  
+
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Import Contacts</CardTitle>
         <CardDescription>
@@ -99,39 +117,56 @@ const ContactImport: React.FC = () => {
                         <SelectItem value="90">Last 3 months</SelectItem>
                         <SelectItem value="180">Last 6 months</SelectItem>
                         <SelectItem value="365">Last year</SelectItem>
-                        <SelectItem value="">All time</SelectItem>
+                        <SelectItem value="all">All time</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {isImporting && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>Importing contacts...</span>
+                        <span>{importProgress.processed} / {importProgress.total}</span>
+                      </div>
+                      <Progress value={(importProgress.processed / importProgress.total) * 100} />
+                    </div>
+                  )}
                   
                   <div className="pt-2">
                     <Button 
-                      onClick={fetchGmailContacts} 
+                      onClick={handleImport}
                       className="w-full"
+                      disabled={isImporting}
                     >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Fetch Contacts
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Import from Gmail
+                        </>
+                      )}
                     </Button>
                   </div>
+
+                  {!user && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md flex items-start">
+                      <AlertCircle className="text-yellow-600 mr-2 h-5 w-5 mt-0.5" />
+                      <p className="text-sm text-yellow-800">
+                        Please log in to import contacts from Gmail
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </TabsContent>
           
           <TabsContent value="csv">
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-md">
-              <Upload className="h-8 w-8 text-gray-400 mb-2" />
-              <h3 className="text-lg font-medium mb-1">Upload CSV File</h3>
-              <p className="text-gray-500 text-sm mb-4 text-center">
-                Drag and drop a CSV file here, or click to browse
-              </p>
-              <Button variant="outline">
-                Browse Files
-              </Button>
-              <p className="text-xs text-gray-400 mt-4">
-                CSV should include columns for name, email, company, etc.
-              </p>
-            </div>
+            <CsvImport onClose={onClose} />
           </TabsContent>
           
           <TabsContent value="manual">
@@ -141,7 +176,7 @@ const ContactImport: React.FC = () => {
               <p className="text-gray-500 text-sm mb-4">
                 Add contacts one by one with detailed information
               </p>
-              <Button variant="outline">
+              <Button variant="outline" onClick={onClose}>
                 Add New Contact
               </Button>
             </div>

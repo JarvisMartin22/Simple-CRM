@@ -8,41 +8,59 @@ const Callback = () => {
   const { toast } = useToast();
   
   useEffect(() => {
+    let mounted = true;
+    
     // Process the authentication response on component mount
     const handleAuthCallback = async () => {
-      const { hash } = window.location;
-      
-      if (hash && hash.includes('access_token')) {
-        // Process the hash with Supabase
-        const { data: authData, error } = await supabase.auth.getSession();
+      try {
+        // Get the current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) {
+        if (sessionError) {
+          console.error('Session error:', sessionError);
           toast({
             variant: "destructive",
             title: "Authentication failed",
-            description: error.message,
+            description: sessionError.message,
           });
           navigate('/auth/login');
           return;
         }
-        
-        if (authData?.session) {
+
+        if (session) {
+          console.log('Session found in callback:', session.user.email);
           // Successfully authenticated
           toast({
-            title: "Email verified",
-            description: "Your account has been verified successfully!",
+            title: "Authentication successful",
+            description: "You have been successfully logged in!",
           });
           
           // Redirect to dashboard
           navigate('/app/dashboard');
+          return;
         }
-      } else {
-        // No auth data in URL, redirect to login
+
+        // If we get here, there's no session and no error - likely a direct visit to callback
+        console.log('No session found in callback, redirecting to login');
+        navigate('/auth/login');
+      } catch (error: any) {
+        console.error('Callback error:', error);
+        toast({
+          variant: "destructive",
+          title: "Authentication failed",
+          description: error.message || "An unexpected error occurred",
+        });
         navigate('/auth/login');
       }
     };
     
-    handleAuthCallback();
+    if (mounted) {
+      handleAuthCallback();
+    }
+
+    return () => {
+      mounted = false;
+    };
   }, [navigate, toast]);
   
   return (

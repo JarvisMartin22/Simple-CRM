@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -24,7 +23,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { signIn } = useAuth();
+  const { signIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +38,18 @@ const Login = () => {
       password: ''
     }
   });
+
+  useEffect(() => {
+    // Clear any previous errors when the component mounts
+    setError(null);
+  }, []);
   
   const onSubmit = async (values: LoginFormValues) => {
+    if (isLoading || authLoading) return;
+    
     setIsLoading(true);
     setError(null);
+    
     try {
       await signIn(values.email, values.password);
       navigate(from, {
@@ -50,10 +57,23 @@ const Login = () => {
       });
     } catch (error: any) {
       setError(error.message || 'Failed to sign in');
+      // Reset form on error
+      form.reset();
     } finally {
       setIsLoading(false);
     }
   };
+  
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 relative overflow-hidden">
@@ -80,37 +100,65 @@ const Login = () => {
           <p className="text-gray-600">We've got customers to grow</p>
         </div>
 
-        {error && <Alert variant="destructive" className="mb-6">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
-          </Alert>}
+          </Alert>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField control={form.control} name="email" render={({
-            field
-          }) => <FormItem>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="email@example.com" {...field} />
+                    <Input
+                      placeholder="email@example.com"
+                      {...field}
+                      disabled={isLoading}
+                      autoComplete="email"
+                    />
                   </FormControl>
                   <FormMessage />
-                </FormItem>} />
+                </FormItem>
+              )}
+            />
 
-            <FormField control={form.control} name="password" render={({
-            field
-          }) => <FormItem>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input
+                      type="password"
+                      {...field}
+                      disabled={isLoading}
+                      autoComplete="current-password"
+                    />
                   </FormControl>
                   <FormMessage />
-                </FormItem>} />
+                </FormItem>
+              )}
+            />
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? <>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
                   <span className="animate-spin mr-2">&#9696;</span> Signing in...
-                </> : 'Sign in'}
+                </>
+              ) : (
+                'Sign in'
+              )}
             </Button>
           </form>
         </Form>

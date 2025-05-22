@@ -1,17 +1,23 @@
-
 import React from 'react';
-import { CheckboxCellEdit } from './CheckboxCell';
-import { DateCellEdit as DateCell } from './DateCell';
-import { MultiSelectCellEdit as MultiSelectCell } from './MultiSelectCell';
-import { NumberCellEdit as NumberCell } from './NumberCell';
-import { SelectCellEdit as SelectCell } from './SelectCell';
-import { TextCellEdit as TextCell } from './TextCell';
-import { UrlCellEdit as UrlCell } from './UrlCell';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContactField } from '@/contexts/ContactsContext';
 import { CompanyField } from '@/contexts/CompaniesContext';
-import { CellRendererProps } from './CellTypes';
 
-export const TableCellRenderer: React.FC<CellRendererProps> = ({
+interface TableCellRendererProps {
+  field: string | ContactField | CompanyField;
+  value: any;
+  row: any;
+  fields: (ContactField | CompanyField)[];
+  onChange?: (field: string, value: any) => void;
+  isEditable?: boolean;
+  onStartEdit?: () => void;
+  onEndEdit?: () => void;
+  entityType: 'contact' | 'company';
+}
+
+export const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   field,
   value,
   row,
@@ -22,101 +28,78 @@ export const TableCellRenderer: React.FC<CellRendererProps> = ({
   onEndEdit,
   entityType
 }) => {
-  // Find the field configuration
-  const fieldConfig = fields.find(f => f.name === field || f.id === field);
-  
+  const fieldName = typeof field === 'string' ? field : field.name;
+  const fieldConfig = fields.find(f => f.name === fieldName);
+
   if (!fieldConfig) {
-    // Default to text cell if field config not found
-    return <TextCell 
-      value={value} 
-      field={null}
-      onSave={(val) => onChange?.(field, val)}
-      onCancel={() => onEndEdit?.()}
-    />;
+    return <span>{value}</span>;
   }
 
-  // Handle cell changes
-  const handleChange = (val: any) => {
-    onChange?.(field, val);
-    onEndEdit?.();
-  };
+  if (isEditable) {
+    switch (fieldConfig.type) {
+      case 'text':
+      case 'email':
+      case 'phone':
+      case 'url':
+        return (
+          <Input
+            type={fieldConfig.type}
+            value={value || ''}
+            onChange={e => onChange?.(fieldName, e.target.value)}
+            onFocus={onStartEdit}
+            onBlur={onEndEdit}
+          />
+        );
+      case 'select':
+        return (
+          <Select value={value} onValueChange={value => onChange?.(fieldName, value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={`Select ${fieldConfig.label}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {fieldConfig.options?.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case 'multi-select':
+        if (!Array.isArray(value)) return null;
+        return (
+          <div className="flex flex-wrap gap-1">
+            {value.map((tag: string) => (
+              <Badge key={tag} variant="outline">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        );
+      default:
+        return <span>{value}</span>;
+    }
+  }
 
-  // Render different cell types based on the field type
+  // Read-only view
   switch (fieldConfig.type) {
-    case 'checkbox':
-      return <CheckboxCellEdit 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
-    case 'date':
-      return <DateCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
     case 'multi-select':
-      return <MultiSelectCell 
-        value={value} 
-        field={fieldConfig}
-        options={fieldConfig.options || []} 
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
-    case 'number':
-      return <NumberCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
+      if (!Array.isArray(value)) return null;
+      return (
+        <div className="flex flex-wrap gap-1">
+          {value.map((tag: string) => (
+            <Badge key={tag} variant="outline">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      );
     case 'select':
-      return <SelectCell 
-        value={value} 
-        field={fieldConfig}
-        options={fieldConfig.options || []} 
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
-    case 'url':
-      return <UrlCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
-    
-    case 'email':
-      return <UrlCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-        protocol="mailto:"
-      />;
-    
-    case 'phone':
-      return <UrlCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-        protocol="tel:"
-      />;
-    
+      const option = fieldConfig.options?.find(opt => opt.value === value);
+      return <span>{option?.label || value}</span>;
     default:
-      return <TextCell 
-        value={value} 
-        field={fieldConfig}
-        onSave={handleChange}
-        onCancel={() => onEndEdit?.()}
-      />;
+      return <span>{value}</span>;
   }
 };
+
+export default TableCellRenderer;

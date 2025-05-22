@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -16,11 +15,10 @@ import {
 import { useCompanies } from '@/contexts/CompaniesContext';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
-import { flexibleUrlSchema } from '@/lib/utils';
 
 const formSchema = z.object({
   company_name: z.string().min(1, { message: 'Company name is required' }),
-  websites: flexibleUrlSchema.optional().or(z.literal('')),
+  websites: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
   assigned_to: z.string().optional(),
 });
 

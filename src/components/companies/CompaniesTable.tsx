@@ -1,30 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
-import { useCompanies } from '@/contexts/CompaniesContext';
+import { useState, useRef } from 'react';
+import { useCompanies, CompanyField } from '@/contexts/CompaniesContext';
 import { TableCellRenderer } from '@/components/contacts/cells/TableCellRenderer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, Search, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { CompanyColumnEditPopover } from './CompanyColumnEditPopover';
 
-const CompaniesTable = () => {
+interface CompaniesTableProps {
+  searchQuery: string;
+}
+
+const CompaniesTable: React.FC<CompaniesTableProps> = ({ searchQuery }) => {
   const { companies, fetchCompanies, createCompany, updateCompany, deleteCompany, fields } = useCompanies();
-  const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<any>({});
   const [isColumnEditOpen, setIsColumnEditOpen] = useState(false);
   const [columnEditAnchorEl, setColumnEditAnchorEl] = useState<HTMLButtonElement | null>(null);
-  const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
+  const [selectedColumn, setSelectedColumn] = useState<CompanyField | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
-
-  useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
 
   const filteredCompanies = companies.filter(company =>
     Object.values(company).some(value =>
@@ -65,7 +60,8 @@ const CompaniesTable = () => {
 
   const handleColumnEditOpen = (event: React.MouseEvent<HTMLButtonElement>, field: string) => {
     setColumnEditAnchorEl(event.currentTarget);
-    setSelectedColumn(field);
+    const fieldObject = fields.find(f => f.name === field);
+    setSelectedColumn(fieldObject || null);
     setIsColumnEditOpen(true);
   };
 
@@ -86,16 +82,6 @@ const CompaniesTable = () => {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <Input
-            type="search"
-            placeholder="Search companies..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="mr-2"
-          />
-          <Search className="h-4 w-4 text-gray-500" />
-        </div>
         <Button onClick={handleCreateClick}>
           <PlusCircle className="h-4 w-4 mr-2" />
           Add Company
@@ -146,7 +132,7 @@ const CompaniesTable = () => {
                   <td key={`${company.id}-${field.name}`} className="px-6 py-4 whitespace-nowrap">
                     {editingCompanyId === company.id ? (
                       <TableCellRenderer
-                        field={field.name}
+                        field={field}
                         value={editedValues[field.name] || ''}
                         row={company}
                         fields={fields}
@@ -158,7 +144,7 @@ const CompaniesTable = () => {
                       />
                     ) : (
                       <TableCellRenderer
-                        field={field.name}
+                        field={field}
                         value={company[field.name] || ''}
                         row={company}
                         fields={fields}
@@ -186,9 +172,6 @@ const CompaniesTable = () => {
         </table>
       </div>
       <CompanyColumnEditPopover
-        open={isColumnEditOpen}
-        anchorEl={columnEditAnchorEl}
-        onClose={handleColumnEditClose}
         field={selectedColumn}
       />
     </div>

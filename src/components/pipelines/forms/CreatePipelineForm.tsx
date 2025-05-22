@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,11 +20,11 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = f
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [stages, setStages] = useState<PipelineStage[]>([
-    { id: uuidv4(), name: 'Lead' },
-    { id: uuidv4(), name: 'Qualified' },
-    { id: uuidv4(), name: 'Proposal' },
-    { id: uuidv4(), name: 'Negotiation' },
-    { id: uuidv4(), name: 'Closed Won' }
+    { id: uuidv4(), name: 'Lead', position: 1 },
+    { id: uuidv4(), name: 'Qualified', position: 2 },
+    { id: uuidv4(), name: 'Proposal', position: 3 },
+    { id: uuidv4(), name: 'Negotiation', position: 4 },
+    { id: uuidv4(), name: 'Closed Won', position: 5 }
   ]);
   
   const [errors, setErrors] = useState<{
@@ -38,7 +37,8 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = f
   const addStage = () => {
     const newStage: PipelineStage = {
       id: uuidv4(),
-      name: ''
+      name: '',
+      position: stages.length + 1
     };
     setStages([...stages, newStage]);
   };
@@ -92,11 +92,11 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = f
         setName('');
         setDescription('');
         setStages([
-          { id: uuidv4(), name: 'Lead' },
-          { id: uuidv4(), name: 'Qualified' },
-          { id: uuidv4(), name: 'Proposal' },
-          { id: uuidv4(), name: 'Negotiation' },
-          { id: uuidv4(), name: 'Closed Won' }
+          { id: uuidv4(), name: 'Lead', position: 1 },
+          { id: uuidv4(), name: 'Qualified', position: 2 },
+          { id: uuidv4(), name: 'Proposal', position: 3 },
+          { id: uuidv4(), name: 'Negotiation', position: 4 },
+          { id: uuidv4(), name: 'Closed Won', position: 5 }
         ]);
         setErrors({});
         

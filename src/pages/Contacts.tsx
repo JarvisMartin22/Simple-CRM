@@ -7,39 +7,23 @@ import { ContactsTable } from '@/components/contacts/ContactsTable';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ContactsFieldManager } from '@/components/contacts/ContactsFieldManager';
 import { CreateContactForm } from '@/components/contacts/CreateContactForm';
-import SimpleContactImport from '@/components/contacts/SimpleContactImport';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import ContactImport from '@/components/contacts/ContactImport';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useContacts } from '@/contexts/ContactsContext';
 
 const Contacts: React.FC = () => {
-  const { user } = useAuth();
+  const { contacts, isLoading } = useContacts();
   const [showAddContactModal, setShowAddContactModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch contacts from Supabase
-  const { data: contacts, isLoading } = useQuery({
-    queryKey: ['contacts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        console.error("Error fetching contacts:", error);
-        throw error;
-      }
-      
-      return data || [];
-    },
-    enabled: !!user?.id,
-  });
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -105,7 +89,7 @@ const Contacts: React.FC = () => {
         />
       </Card>
 
-      {/* Import Contacts Modal - Using simplified component */}
+      {/* Import Contacts Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -114,11 +98,11 @@ const Contacts: React.FC = () => {
               Import contacts from Gmail or upload a CSV file
             </DialogDescription>
           </DialogHeader>
-          <SimpleContactImport />
+          <ContactImport onClose={() => setShowImportModal(false)} />
         </DialogContent>
       </Dialog>
 
-      {/* Restore original CreateContactForm */}
+      {/* Add Contact Modal */}
       <CreateContactForm
         open={showAddContactModal}
         onOpenChange={setShowAddContactModal}

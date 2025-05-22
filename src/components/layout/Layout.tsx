@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Search, Bell, LogOut } from 'lucide-react';
@@ -25,7 +24,11 @@ interface UserProfile {
   avatar_url: string | null;
 }
 
-const Layout: React.FC = () => {
+interface LayoutProps {
+  children?: ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, signOut } = useAuth();
   
@@ -126,7 +129,7 @@ const Layout: React.FC = () => {
         </header>
         
         <main className="flex-1 overflow-auto p-6 bg-gray-50">
-          <Outlet />
+          {children || <Outlet />}
         </main>
       </div>
     </div>

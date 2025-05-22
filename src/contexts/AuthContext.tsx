@@ -1,46 +1,94 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useCallback } from 'react';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
-interface AuthContextProps {
+interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
+  signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ user: User | null; session: Session | null; } | { user: null; session: null; }>;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [loading, setLoading] = React.useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, sessionData) => {
-        setSession(sessionData);
-        setUser(sessionData?.user ?? null);
-        setLoading(false);
-      }
-    );
+  React.useEffect(() => {
+    let mounted = true;
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: sessionData } }) => {
-      setSession(sessionData);
-      setUser(sessionData?.user ?? null);
-      setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          return;
+        }
+        
+        if (mounted) {
+          if (session?.user) {
+            console.log('Initial session found:', session.user.email);
+            setUser(session.user);
+          } else {
+            console.log('No initial session found');
+            setUser(null);
+          }
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in initializeAuth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
+      if (mounted) {
+        switch (event) {
+          case 'INITIAL_SESSION':
+            // Initial session is handled by initializeAuth
+            break;
+          case 'SIGNED_IN':
+            setUser(session?.user ?? null);
+            setLoading(false);
+            break;
+          case 'SIGNED_OUT':
+            setUser(null);
+            setLoading(false);
+            break;
+          case 'TOKEN_REFRESHED':
+            setUser(session?.user ?? null);
+            setLoading(false);
+            break;
+          case 'USER_UPDATED':
+            setUser(session?.user ?? null);
+            setLoading(false);
+            break;
+          default:
+            console.log('Unhandled auth event:', event);
+            setUser(session?.user ?? null);
+            setLoading(false);
+        }
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
@@ -60,15 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  };
+  }, [toast]);
 
-  const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
+  const signUp = useCallback(async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
-      // Get the site URL for redirect
-      const siteUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:8080'
-        : 'https://trygolly.com';
-        
+      const siteUrl = window.location.origin;
+      
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -89,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Registration successful",
         description: "Please check your email for confirmation",
       });
+      
+      return data;
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -97,9 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  };
+  }, [toast]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       const { error } = await supabase.auth.signOut();
       
@@ -117,10 +164,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: error.message,
       });
     }
-  };
+  }, [toast]);
+
+  const value = React.useMemo(() => ({
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+  }), [user, loading, signIn, signUp, signOut]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

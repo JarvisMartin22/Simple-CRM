@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -26,7 +25,7 @@ const contactSchema = z.object({
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
   title: z.string().optional().or(z.literal('')),
-  company_id: z.string().optional().or(z.literal('')),
+  company_id: z.string().optional().or(z.literal('none')),
   website: z.string().optional().or(z.literal('')),
   notes: z.string().optional().or(z.literal(''))
 });
@@ -48,7 +47,7 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
       email: '',
       phone: '',
       title: '',
-      company_id: '',
+      company_id: 'none',
       website: '',
       notes: ''
     },
@@ -61,8 +60,9 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
     try {
       const contactData: Partial<Contact> = {
         ...values,
-        tags,
-        user_id: user.id // Include the user_id from auth context
+        company_id: values.company_id === 'none' ? null : values.company_id,
+        tags: tags.map(tag => ({ id: crypto.randomUUID(), tag_name: tag })),
+        user_id: user.id
       };
 
       await createContact(contactData);
@@ -159,9 +159,9 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id || ''}>
+                    <SelectItem key={company.id} value={company.id || 'none'}>
                       {company.name}
                     </SelectItem>
                   ))}

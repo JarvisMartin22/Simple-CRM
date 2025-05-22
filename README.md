@@ -121,3 +121,78 @@ To properly configure the Gmail OAuth integration:
 - Create and track email campaigns
 - View campaign performance metrics
 - Monitor open and click rates
+
+# Simple CRM
+
+A modern, lightweight CRM system built with React, Supabase, and TailwindCSS.
+
+## Features
+
+- Authentication with email/password
+- Contact management
+- Company management 
+- Email tracking
+- Email integration with Gmail
+- Pipeline management for sales deals
+- Dashboard with key metrics
+
+## Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Run the development server: `npm run dev`
+
+## Database Setup
+
+This application requires a Supabase database with the proper tables and relationships. 
+
+### Using the Setup Script
+
+For detailed setup instructions, run:
+
+```bash
+./setup-database.sh
+```
+
+This script will provide step-by-step guidance on setting up all required database tables.
+
+### Manual Setup
+
+If you encounter errors related to missing tables or relationships (such as "Could not find a relationship between 'companies' and 'deals'"), you need to create the required database tables:
+
+1. Go to your Supabase dashboard (https://app.supabase.com)
+2. Select your project
+3. Go to the SQL Editor
+4. Create a new query
+5. Copy the SQL from the file: `supabase/migrations/20240605000000_create_pipelines_deals_tables.sql`
+6. Run it in the SQL Editor
+
+This will create:
+- `pipelines` table
+- `pipeline_stages` table
+- `deals` table
+- proper relationships between companies and deals
+
+## Setting Up Pipeline Management
+
+After creating the database tables, you can set up your sales pipeline:
+
+1. Navigate to the Pipelines page
+2. Click "Create Pipeline" to create your first pipeline (e.g., "Sales Pipeline")
+3. Once created, click "Manage Stages" to add stages to your pipeline (e.g., "Lead", "Contact Made", "Proposal", "Negotiation", "Closed Won", "Closed Lost")
+4. After setting up stages, you can add deals to your pipeline with the "New Deal" button
+5. Each deal can be associated with a company and/or contact
+
+## Integrations
+
+### Email Integration
+
+The system supports integration with Gmail for email tracking and contact importing:
+
+1. Go to the Integrations page
+2. Connect your Gmail account
+3. Once connected, you can send tracked emails and import contacts
+
+## License
+
+MIT

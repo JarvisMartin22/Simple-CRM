@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Edit, 
@@ -14,12 +13,14 @@ import { Button } from '@/components/ui/button';
 import { CompanyFieldEditDialog } from './CompanyFieldEditDialog';
 
 interface CompanyColumnEditPopoverProps {
-  field: CompanyField;
+  field: CompanyField | null;
 }
 
 export const CompanyColumnEditPopover: React.FC<CompanyColumnEditPopoverProps> = ({ field }) => {
   const { toggleFieldVisibility, deleteField } = useCompanies();
   const [dialogOpen, setDialogOpen] = React.useState(false);
+
+  if (!field) return null;
 
   const handleDelete = () => {
     if (!field.required) {

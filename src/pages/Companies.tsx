@@ -1,16 +1,26 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Filter, Building, Settings } from 'lucide-react';
-import { CompaniesTable } from '@/components/companies/CompaniesTable';
+import CompaniesTable from '@/components/companies/CompaniesTable';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { CompaniesFieldManager } from '@/components/companies/CompaniesFieldManager';
 import { CreateCompanyForm } from '@/components/companies/CreateCompanyForm';
+import { useCompanies } from '@/contexts/CompaniesContext';
 
 const Companies: React.FC = () => {
   const [showAddCompanyModal, setShowAddCompanyModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { companies, isLoading } = useCompanies();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -43,7 +53,12 @@ const Companies: React.FC = () => {
           <div className="flex items-center md:w-1/3">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input placeholder="Search companies..." className="pl-10" />
+              <Input 
+                placeholder="Search companies..." 
+                className="pl-10" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
 
@@ -57,7 +72,7 @@ const Companies: React.FC = () => {
           </div>
         </div>
 
-        <CompaniesTable />
+        <CompaniesTable searchQuery={searchQuery} />
       </Card>
 
       {/* Add Company Form Modal */}

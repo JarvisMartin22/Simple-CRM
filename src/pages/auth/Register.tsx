@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Waves } from '@/components/ui/waves-background';
+import { Checkbox } from '@/components/ui/checkbox';
+import { PrivacyPolicyDialog } from '@/components/legal/PrivacyPolicyDialog';
+import { TermsOfServiceDialog } from '@/components/legal/TermsOfServiceDialog';
 
 const registerSchema = z.object({
   firstName: z.string().min(1, {
@@ -41,9 +44,7 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
-  const {
-    signUp
-  } = useAuth();
+  const { signUp, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +65,8 @@ const Register = () => {
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
+    if (isLoading || authLoading) return;
+    
     setIsLoading(true);
     setError(null);
     try {
@@ -75,6 +78,17 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 relative overflow-hidden">
@@ -114,7 +128,7 @@ const Register = () => {
             }) => <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input placeholder="John" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>} />
@@ -124,7 +138,7 @@ const Register = () => {
             }) => <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} />
+                      <Input placeholder="Doe" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>} />
@@ -135,7 +149,12 @@ const Register = () => {
           }) => <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="email@example.com" {...field} />
+                    <Input 
+                      placeholder="email@example.com" 
+                      {...field} 
+                      disabled={isLoading}
+                      autoComplete="email" 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>} />
@@ -145,7 +164,12 @@ const Register = () => {
           }) => <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input 
+                      type="password" 
+                      {...field} 
+                      disabled={isLoading}
+                      autoComplete="new-password" 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>} />
@@ -155,7 +179,12 @@ const Register = () => {
           }) => <FormItem>
                   <FormLabel>Confirm Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input 
+                      type="password" 
+                      {...field} 
+                      disabled={isLoading}
+                      autoComplete="new-password" 
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>} />
@@ -170,6 +199,7 @@ const Register = () => {
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -198,6 +228,7 @@ const Register = () => {
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={isLoading}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -247,6 +278,6 @@ const Register = () => {
       />
     </div>
   );
-};
+}
 
 export default Register;

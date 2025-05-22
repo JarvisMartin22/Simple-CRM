@@ -87,37 +87,36 @@ const GmailIntegration = () => {
       if (!user?.id) return null;
       
       try {
+        // Try with explicit, minimal fields to avoid schema issues
         const { data, error } = await supabase
           .from('user_integrations')
-          .select('*')
+          .select('id, provider, email, access_token, created_at, refresh_token, expires_at')
           .eq('user_id', user.id)
           .eq('provider', 'gmail')
-          .single();
+          .maybeSingle();
           
         if (error) {
-          if (error.code === 'PGRST116') {
-            // No integration found, this is expected for new users
-            console.log("GmailIntegration: No integration found (PGRST116)");
+          // Handle specific database errors gracefully
+          if (error.code === 'PGRST104' || error.code === 'PGRST105' || error.code === '42P01') {
+            // Table doesn't exist yet - this is expected before migrations are run
+            console.log("GmailIntegration: Table 'user_integrations' might not exist yet", error.code);
             return null;
-          } else if ((error as any).status === 406) {
-            // 406 Not Acceptable error - likely header issue
-            console.error("GmailIntegration: 406 error fetching integration:", error);
-            // Return null instead of throwing to prevent app crash
-            return null;
-          } else {
-            console.error("GmailIntegration: Error fetching integration:", error);
-            throw error;
           }
+          
+          // Handle other errors
+          console.log("GmailIntegration: Integration query error:", error.code, error.message);
+          return null;
         }
         
         return data as Integration | null;
       } catch (e) {
         console.error("GmailIntegration: Unexpected error:", e);
-        // Return null to prevent app from crashing on unexpected errors
         return null;
       }
     },
     enabled: !!user?.id,
+    retry: false,
+    staleTime: 60000 // Cache for 1 minute to reduce DB load
   });
   
   // Get effective integration (prioritize database, fallback to localStorage)

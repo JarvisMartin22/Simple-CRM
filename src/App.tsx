@@ -15,6 +15,7 @@ import Register from './pages/auth/Register';
 import Callback from './pages/auth/Callback';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { useToast } from './components/ui/use-toast';
+import TestSupabase from "./pages/auth/TestSupabase";
 
 // Import pages
 import Dashboard from './pages/Dashboard';
@@ -61,57 +62,130 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <EmailProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/register" element={<Register />} />
-            <Route path="/auth/callback" element={<Callback />} />
-            
-            {/* Protected app routes under /app path */}
-            <Route path="/app" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Dashboard />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="contacts" element={
-                <ContactsProvider>
-                  <Contacts />
-                </ContactsProvider>
-              } />
-              <Route path="companies" element={
-                <CompaniesProvider>
-                  <Companies />
-                </CompaniesProvider>
-              } />
-              <Route path="pipelines" element={
-                <PipelinesProvider>
-                  <Pipelines />
-                </PipelinesProvider>
-              } />
-              <Route path="tasks" element={
+          <ContactsProvider>
+            <CompaniesProvider>
+              <PipelinesProvider>
                 <TasksProvider>
-                  <Tasks />
+                  <NotesProvider>
+                    <Routes>
+                      {/* Auth routes (public) */}
+                      <Route path="/auth/login" element={<Login />} />
+                      <Route path="/auth/register" element={<Register />} />
+                      <Route path="/auth/callback" element={<Callback />} />
+                      <Route path="/auth/test-supabase" element={<TestSupabase />} />
+                      <Route path="/" element={<LandingPage />} />
+                      
+                      {/* Protected routes */}
+                      <Route 
+                        path="/app/dashboard" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Dashboard />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/contacts" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Contacts />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/companies" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Companies />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/pipelines" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Pipelines />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/tasks" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Tasks />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/notes" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Notes />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/campaigns" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Campaigns />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/calendar" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Calendar />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/integrations" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Integrations />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/settings" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Settings />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+
+                      {/* Catch-all route */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                    <Toaster />
+                  </NotesProvider>
                 </TasksProvider>
-              } />
-              <Route path="notes" element={
-                <NotesProvider>
-                  <Notes />
-                </NotesProvider>
-              } />
-              <Route path="campaigns" element={<Campaigns />} />
-              <Route path="calendar" element={<Calendar />} />
-              <Route path="integrations" element={<Integrations />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
+              </PipelinesProvider>
+            </CompaniesProvider>
+          </ContactsProvider>
         </EmailProvider>
       </AuthProvider>
     </QueryClientProvider>

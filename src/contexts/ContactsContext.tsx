@@ -1,31 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
+import { Database, Industry } from '@/types/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
-// Define the Contact type
-export interface Contact {
-  id?: string;
-  user_id: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  email?: string;
-  phone?: string;
-  title?: string;
-  company?: string;
-  company_id?: string;
-  website?: string; // Changed from string[] to string for Supabase compatibility
-  notes?: string;
-  status?: string;
-  tags?: string[];
-  created_at?: string;
-  updated_at?: string;
-  companies?: {
-    name?: string;
-    domain?: string;
-  };
-}
+type ContactRow = Database['public']['Tables']['contacts']['Row'];
+type ContactInsert = Database['public']['Tables']['contacts']['Insert'];
+type ContactUpdate = Database['public']['Tables']['contacts']['Update'];
 
 // Define the field type enum
 export type FieldType = 'text' | 'number' | 'email' | 'phone' | 'date' | 'url' | 'select' | 'multi-select' | 'checkbox';
@@ -48,12 +30,50 @@ export interface SelectOption {
   color?: string;
 }
 
+// Define the Contact type with relationships
+export interface Contact extends ContactRow {
+  company?: {
+    id: string;
+    name: string;
+    industry: Industry;
+  };
+  employment_history?: Array<{
+    id: string;
+    company_id: string;
+    title: string;
+    start_date: string;
+    end_date?: string;
+    is_current: boolean;
+    company?: {
+      name: string;
+      industry: Industry;
+    };
+  }>;
+  custom_fields?: Array<{
+    id: string;
+    field_name: string;
+    value: string;
+    type: 'text' | 'number' | 'date' | 'boolean';
+  }>;
+  tags?: Array<{
+    id: string;
+    tag_name: string;
+  }>;
+  email_stats?: {
+    total_sent: number;
+    replies: number;
+    response_rate: number;
+    linked_deals: number;
+    revenue: number;
+  };
+}
+
 interface ContactsContextType {
   contacts: Contact[];
   setContacts: React.Dispatch<React.SetStateAction<Contact[]>>;
   isLoading: boolean;
-  createContact: (contact: Partial<Contact>) => Promise<Contact>;
-  updateContact: (id: string, updates: Partial<Contact>) => Promise<void>;
+  createContact: (data: Partial<Contact>) => Promise<Contact>;
+  updateContact: (id: string, data: Partial<Contact>) => Promise<Contact>;
   deleteContact: (id: string) => Promise<void>;
   searchContacts: (query: string) => Promise<Contact[]>;
   fields: ContactField[];
@@ -63,149 +83,126 @@ interface ContactsContextType {
   deleteField: (id: string) => void;
   refetchContacts: () => Promise<void>;
   toggleFieldVisibility: (id: string) => void;
+  refreshContacts: () => Promise<void>;
 }
 
-const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
+export const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
 
-export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+export function ContactsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [fields, setFields] = useState<ContactField[]>([
     { id: uuidv4(), name: 'first_name', label: 'First Name', type: 'text', visible: true, required: true },
     { id: uuidv4(), name: 'last_name', label: 'Last Name', type: 'text', visible: true, required: true },
     { id: uuidv4(), name: 'email', label: 'Email', type: 'email', visible: true, required: false },
     { id: uuidv4(), name: 'phone', label: 'Phone', type: 'phone', visible: true, required: false },
-    { id: uuidv4(), name: 'title', label: 'Title', type: 'text', visible: true, required: false },
-    { id: uuidv4(), name: 'company', label: 'Company', type: 'text', visible: true, required: false },
-    { id: uuidv4(), name: 'website', label: 'Website', type: 'url', visible: true, required: false },
-    { id: uuidv4(), name: 'notes', label: 'Notes', type: 'text', visible: true, required: false },
-    { id: uuidv4(), name: 'tags', label: 'Tags', type: 'multi-select', visible: true, required: false },
+    { id: uuidv4(), name: 'linkedin', label: 'LinkedIn', type: 'url', visible: true, required: false },
+    { id: uuidv4(), name: 'company_id', label: 'Company', type: 'select', visible: true, required: false }
   ]);
+  const { toast } = useToast();
 
-  // Load contacts when the user changes
-  useEffect(() => {
-    if (user) {
-      fetchContacts();
-    } else {
-      setContacts([]);
-    }
-  }, [user]);
-
-  const fetchContacts = async () => {
+  const refreshContacts = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select(`
-          *,
-          companies(name, domain)
-        `)
-        .eq('user_id', user.id);
+        .select('*, companies(*)')
+        .order('created_at', { ascending: false });
 
       if (error) {
-        throw error;
+        throw new Error(`Error fetching contacts: ${error.message}`);
       }
 
-      if (data) {
-        setContacts(data as Contact[]);
-      }
-    } catch (error) {
-      console.error('Error fetching contacts:', error);
+      setContacts(data || []);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error fetching contacts",
+        description: error.message,
+      });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  // Add toggleFieldVisibility function
-  const toggleFieldVisibility = (id: string) => {
-    setFields(fields.map(field => 
-      field.id === id && !field.required 
-        ? { ...field, visible: !field.visible } 
-        : field
-    ));
-  };
+  const createContact = useCallback(async (data: Partial<Contact>): Promise<Contact> => {
+    const { data: contact, error } = await supabase
+      .from('contacts')
+      .insert([data])
+      .select()
+      .single();
 
-  const createContact = async (contactData: Partial<Contact>): Promise<Contact> => {
-    if (!user) throw new Error('User not authenticated');
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error creating contact",
+        description: error.message,
+      });
+      throw error;
+    }
+
+    setContacts(prev => [contact, ...prev]);
     
-    try {
-      const contact: Contact = {
-        ...contactData,
-        user_id: user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags: contactData.tags || [],
-      };
+    toast({
+      title: "Contact created",
+      description: "The contact has been created successfully",
+    });
 
-      const { data, error } = await supabase
-        .from('contacts')
-        .insert([{
-          ...contact,
-          // Ensure website is a string for Supabase compatibility
-          website: typeof contact.website === 'string' ? contact.website : undefined
-        }])
-        .select();
+    return contact;
+  }, [toast]);
 
-      if (error) {
-        throw error;
-      }
+  const updateContact = useCallback(async (id: string, data: Partial<Contact>): Promise<Contact> => {
+    const { data: contact, error } = await supabase
+      .from('contacts')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
 
-      const newContact = data[0] as Contact;
-      setContacts(prevContacts => [...prevContacts, newContact]);
-      return newContact;
-    } catch (error) {
-      console.error('Error creating contact:', error);
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error updating contact",
+        description: error.message,
+      });
       throw error;
     }
-  };
 
-  const updateContact = async (id: string, updates: Partial<Contact>) => {
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-          // Ensure website is a string for Supabase compatibility
-          website: typeof updates.website === 'string' ? updates.website : undefined
-        })
-        .eq('id', id);
+    setContacts(prev => prev.map(c => c.id === id ? contact : c));
+    
+    toast({
+      title: "Contact updated",
+      description: "The contact has been updated successfully",
+    });
 
-      if (error) {
-        throw error;
-      }
+    return contact;
+  }, [toast]);
 
-      setContacts(prevContacts => 
-        prevContacts.map(contact => 
-          contact.id === id ? { ...contact, ...updates, updated_at: new Date().toISOString() } : contact
-        )
-      );
-    } catch (error) {
-      console.error('Error updating contact:', error);
+  const deleteContact = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error deleting contact",
+        description: error.message,
+      });
       throw error;
     }
-  };
 
-  const deleteContact = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      setContacts(prevContacts => prevContacts.filter(contact => contact.id !== id));
-    } catch (error) {
-      console.error('Error deleting contact:', error);
-      throw error;
-    }
-  };
+    setContacts(prev => prev.filter(c => c.id !== id));
+    
+    toast({
+      title: "Contact deleted",
+      description: "The contact has been deleted successfully",
+    });
+  }, [toast]);
 
   const searchContacts = async (query: string): Promise<Contact[]> => {
     if (!user) return [];
@@ -216,7 +213,7 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
       contact.first_name?.toLowerCase().includes(lowerQuery) ||
       contact.last_name?.toLowerCase().includes(lowerQuery) ||
       contact.email?.toLowerCase().includes(lowerQuery) ||
-      contact.company?.toLowerCase().includes(lowerQuery)
+      contact.company?.name?.toLowerCase().includes(lowerQuery)
     );
   };
 
@@ -248,10 +245,25 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const refetchContacts = async () => {
-    await fetchContacts();
+    await refreshContacts();
   };
 
-  const contextValue: ContactsContextType = {
+  // Add toggleFieldVisibility function
+  const toggleFieldVisibility = (id: string) => {
+    setFields(fields.map(field => 
+      field.id === id && !field.required 
+        ? { ...field, visible: !field.visible } 
+        : field
+    ));
+  };
+
+  React.useEffect(() => {
+    if (user) {
+      refreshContacts();
+    }
+  }, [user, refreshContacts]);
+
+  const value = React.useMemo(() => ({
     contacts,
     setContacts,
     isLoading,
@@ -266,21 +278,20 @@ export const ContactsProvider: React.FC<{ children: ReactNode }> = ({ children }
     deleteField,
     refetchContacts,
     toggleFieldVisibility,
-  };
+    refreshContacts,
+  }), [contacts, isLoading, createContact, updateContact, deleteContact, searchContacts, fields, setFields, createField, updateField, deleteField, refetchContacts, toggleFieldVisibility, refreshContacts]);
 
   return (
-    <ContactsContext.Provider value={contextValue}>
+    <ContactsContext.Provider value={value}>
       {children}
     </ContactsContext.Provider>
   );
-};
+}
 
-export const useContacts = () => {
+export function useContacts() {
   const context = useContext(ContactsContext);
   if (context === undefined) {
     throw new Error('useContacts must be used within a ContactsProvider');
   }
   return context;
-};
-
-export default ContactsContext;
+}

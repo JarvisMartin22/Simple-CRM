@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useContacts } from '@/contexts/ContactsContext';
+import { useContacts, Contact } from '@/contexts/ContactsContext';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -36,24 +36,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/components/ui/use-toast';
-
-interface Contact {
-  id: string;
-  first_name: string;
-  last_name: string;
-  full_name?: string;
-  email: string;
-  phone?: string;
-  title?: string;
-  tags?: string[];
-  company_id?: string;
-  companies?: {
-    name?: string;
-    domain?: string;
-  };
-  created_at: string;
-  updated_at: string;
-}
 
 interface ContactsTableProps {
   contacts: Contact[];
