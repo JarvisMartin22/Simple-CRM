@@ -1,5 +1,4 @@
-
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface WavesProps {
@@ -136,6 +135,7 @@ export function Waves({
   maxCursorMove = 100,
   className,
 }: WavesProps) {
+  const [isMobile, setIsMobile] = useState(false)
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
   const ctxRef = useRef(null)
@@ -154,6 +154,15 @@ export function Waves({
     a: 0,
     set: false,
   })
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -193,15 +202,22 @@ export function Waves({
       const lines = linesRef.current
       const mouse = mouseRef.current
       const noise = noiseRef.current
+      
+      const mobileAdjustedWaveSpeedX = isMobile ? waveSpeedX * 0.5 : waveSpeedX
+      const mobileAdjustedWaveSpeedY = isMobile ? waveSpeedY * 0.5 : waveSpeedY
+      const mobileAdjustedWaveAmpX = isMobile ? waveAmpX * 0.5 : waveAmpX
+      const mobileAdjustedWaveAmpY = isMobile ? waveAmpY * 0.5 : waveAmpY
+      const mobileAdjustedMaxCursorMove = isMobile ? maxCursorMove * 0.5 : maxCursorMove
+
       lines.forEach((pts) => {
         pts.forEach((p) => {
           const move =
             noise.perlin2(
-              (p.x + time * waveSpeedX) * 0.002,
-              (p.y + time * waveSpeedY) * 0.0015,
+              (p.x + time * mobileAdjustedWaveSpeedX) * 0.002,
+              (p.y + time * mobileAdjustedWaveSpeedY) * 0.0015,
             ) * 12
-          p.wave.x = Math.cos(move) * waveAmpX
-          p.wave.y = Math.sin(move) * waveAmpY
+          p.wave.x = Math.cos(move) * mobileAdjustedWaveAmpX
+          p.wave.y = Math.sin(move) * mobileAdjustedWaveAmpY
 
           const dx = p.x - mouse.sx,
             dy = p.y - mouse.sy
@@ -222,12 +238,12 @@ export function Waves({
           p.cursor.y += p.cursor.vy * 2
 
           p.cursor.x = Math.min(
-            maxCursorMove,
-            Math.max(-maxCursorMove, p.cursor.x),
+            mobileAdjustedMaxCursorMove,
+            Math.max(-mobileAdjustedMaxCursorMove, p.cursor.x),
           )
           p.cursor.y = Math.min(
-            maxCursorMove,
-            Math.max(-maxCursorMove, p.cursor.y),
+            mobileAdjustedMaxCursorMove,
+            Math.max(-mobileAdjustedMaxCursorMove, p.cursor.y),
           )
         })
       })
@@ -294,8 +310,15 @@ export function Waves({
       updateMouse(e.pageX, e.pageY)
     }
     function onTouchMove(e) {
-      e.preventDefault()
       const touch = e.touches[0]
+      const b = boundingRef.current
+      const touchX = touch.clientX - b.left
+      const touchY = touch.clientY - b.top + window.scrollY
+      
+      if (touchX >= 0 && touchX <= b.width && touchY >= 0 && touchY <= b.height) {
+        e.preventDefault()
+      }
+      
       updateMouse(touch.clientX, touch.clientY)
     }
     function updateMouse(x, y) {
@@ -336,6 +359,7 @@ export function Waves({
     maxCursorMove,
     xGap,
     yGap,
+    isMobile,
   ])
 
   return (
@@ -343,6 +367,7 @@ export function Waves({
       ref={containerRef}
       style={{
         backgroundColor,
+        touchAction: 'pan-y',
       }}
       className={cn(
         "absolute top-0 left-0 w-full h-full overflow-hidden",
@@ -358,9 +383,16 @@ export function Waves({
           transform:
             "translate3d(calc(var(--x) - 50%), calc(var(--y) - 50%), 0)",
           willChange: "transform",
+          pointerEvents: "none",
         }}
       />
-      <canvas ref={canvasRef} className="block w-full h-full" />
+      <canvas 
+        ref={canvasRef} 
+        className="block w-full h-full" 
+        style={{
+          touchAction: 'pan-y',
+        }}
+      />
     </div>
   )
 }
