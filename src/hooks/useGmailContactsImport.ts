@@ -12,7 +12,7 @@ interface ImportProgress {
 }
 
 export function useGmailContactsImport() {
-  const { createContact } = useContacts();
+  const { createContact, refreshContacts } = useContacts();
   const { user } = useAuth();
   const [isImporting, setIsImporting] = useState(false);
   const [includeNoEmail, setIncludeNoEmail] = useState(false);
@@ -269,6 +269,7 @@ export function useGmailContactsImport() {
                   first_name: contact.firstName || '',
                   last_name: contact.lastName || '',
                   email: contact.email || '',
+                  website: contact.website || '',
                   tags: '{gmail-import}'  // PostgreSQL array literal syntax
                 };
                 
@@ -309,8 +310,13 @@ export function useGmailContactsImport() {
         }
       }
 
+      console.log(`Import completed: ${successful} successful, ${failed} failed`);
+
+      // Refresh the contacts list
+      await refreshContacts();
+
       toast({
-        title: 'Import Complete',
+        title: "Import Complete",
         description: `Successfully imported ${successful} contacts. ${failed} failed.`
       });
 
@@ -324,7 +330,7 @@ export function useGmailContactsImport() {
     } finally {
       setIsImporting(false);
     }
-  }, [includeNoEmail]);
+  }, [includeNoEmail, createContact, refreshContacts]);
 
   return {
     importFromGmail,
