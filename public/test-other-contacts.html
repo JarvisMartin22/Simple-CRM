@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Other Contacts</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    button {
+      padding: 8px 16px;
+      background: #0070f3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    button:hover {
+      background: #0051cc;
+    }
+    #output {
+      margin-top: 20px;
+    }
+    .config-section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Other Contacts</h1>
+  <p>This page helps debug the Gmail "other contacts" fetching functionality.</p>
+  
+  <div class="config-section">
+    <h3>Configuration</h3>
+    <div>
+      <label for="supabase-url">Supabase Functions URL:</label><br>
+      <input type="text" id="supabase-url" style="width: 100%; margin: 8px 0;" placeholder="e.g. https://xyz.supabase.co/functions/v1">
+    </div>
+    <div>
+      <label for="anon-key">Supabase Anon Key:</label><br>
+      <input type="text" id="anon-key" style="width: 100%; margin: 8px 0;" placeholder="your-anon-key">
+    </div>
+  </div>
+  
+  <div>
+    <label for="access-token">Gmail Access Token:</label><br>
+    <textarea id="access-token" rows="3" style="width: 100%; margin: 8px 0;"></textarea>
+  </div>
+
+  <button id="test-button">Test Other Contacts</button>
+  <div id="output"></div>
+
+  <script>
+    // Initialize the test button
+    document.getElementById('test-button').addEventListener('click', testOtherContacts);
+
+    async function testOtherContacts() {
+      const output = document.getElementById('output');
+      const accessToken = document.getElementById('access-token').value.trim();
+      const supabaseUrl = document.getElementById('supabase-url').value.trim();
+      const anonKey = document.getElementById('anon-key').value.trim();
+      
+      if (!accessToken || !supabaseUrl || !anonKey) {
+        output.innerHTML = '<p style="color: red;">Please fill in all required fields</p>';
+        return;
+      }
+
+      try {
+        output.innerHTML = '<p>Testing...</p>';
+        
+        // First test token info
+        const tokenInfoUrl = `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`;
+        const tokenResponse = await fetch(tokenInfoUrl);
+        const tokenInfo = await tokenResponse.json();
+        
+        output.innerHTML += `
+          <h3>Token Info:</h3>
+          <pre>${JSON.stringify(tokenInfo, null, 2)}</pre>
+        `;
+
+        // Test the preview function
+        const previewResponse = await fetch(`${supabaseUrl}/gmail-contacts-preview`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${anonKey}`,
+            'apikey': anonKey
+          },
+          body: JSON.stringify({ accessToken })
+        });
+
+        const previewData = await previewResponse.json();
+        output.innerHTML += `
+          <h3>Preview Function Response:</h3>
+          <pre>${JSON.stringify(previewData, null, 2)}</pre>
+        `;
+
+        // Test direct API call
+        const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,metadata';
+        const directResponse = await fetch(otherContactsUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        let directData;
+        try {
+          directData = await directResponse.json();
+        } catch (e) {
+          directData = { error: 'Failed to parse response: ' + e.message };
+        }
+
+        output.innerHTML += `
+          <h3>Direct API Response:</h3>
+          <pre>${JSON.stringify(directData, null, 2)}</pre>
+        `;
+
+      } catch (error) {
+        output.innerHTML += `
+          <h3>Error:</h3>
+          <pre style="color: red;">${error.message}</pre>
+          <p style="color: red;">Stack trace:</p>
+          <pre style="color: red;">${error.stack}</pre>
+        `;
+      }
+    }
+
+    // Helper function to get a valid token
+    function getTokenInstructions() {
+      const instructions = document.createElement('div');
+      instructions.innerHTML = `
+        <h3>How to get a valid Gmail token:</h3>
+        <ol>
+          <li>Open your CRM application</li>
+          <li>Start the Gmail contacts import process</li>
+          <li>Open Chrome DevTools (F12 or right-click > Inspect)</li>
+          <li>Go to the Network tab</li>
+          <li>Look for a request to 'gmail-contacts'</li>
+          <li>In the request headers, find 'X-Gmail-Token' or look in the request payload</li>
+          <li>Copy that token and paste it here</li>
+        </ol>
+      `;
+      document.body.insertBefore(instructions, document.getElementById('output'));
+    }
+
+    // Add help button
+    const helpButton = document.createElement('button');
+    helpButton.textContent = 'Show Token Instructions';
+    helpButton.style.marginLeft = '10px';
+    helpButton.onclick = getTokenInstructions;
+    document.getElementById('test-button').after(helpButton);
+  </script>
+</body>
+</html> 

@@ -11,10 +11,53 @@ interface ImportProgress {
   failed: number;
 }
 
+export interface Contact {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  title: string;
+  company: string;
+  website: string;
+  source: string;
+  tags: string[];
+  type: 'main' | 'other';
+  // Raw data from Gmail API
+  names?: Array<{
+    metadata?: { primary?: boolean };
+    givenName?: string;
+    familyName?: string;
+  }>;
+  emailAddresses?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+  phoneNumbers?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+  organizations?: Array<{
+    metadata?: { primary?: boolean };
+    name?: string;
+    title?: string;
+  }>;
+  urls?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+}
+
+interface ImportStats {
+  total: number;
+  mainContacts: number;
+  otherContacts: number;
+}
+
 export function useGmailContactsImport() {
   const { createContact, refreshContacts } = useContacts();
   const { user } = useAuth();
   const [isImporting, setIsImporting] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [includeNoEmail, setIncludeNoEmail] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress>({
     total: 0,
@@ -22,10 +65,14 @@ export function useGmailContactsImport() {
     successful: 0,
     failed: 0
   });
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
+  const [showReview, setShowReview] = useState(false);
+  const [stats, setStats] = useState<ImportStats>({ total: 0, mainContacts: 0, otherContacts: 0 });
 
-  const importFromGmail = useCallback(async () => {
+  const fetchContacts = useCallback(async () => {
     try {
-      setIsImporting(true);
+      setIsFetching(true);
       setImportProgress({
         total: 0,
         processed: 0,
@@ -131,30 +178,33 @@ export function useGmailContactsImport() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
         console.error('Gmail contacts import failed:', { 
           status: response.status, 
           statusText: response.statusText,
           data: errorData,
           headers: Object.fromEntries(response.headers.entries())
         });
-        throw new Error('Failed to fetch Gmail contacts: ' + response.statusText);
+        throw new Error(`Failed to fetch Gmail contacts: ${errorData.error || response.statusText}`);
       }
 
       const data = await response.json();
       console.log('Received contacts data:', {
         totalContacts: data.contacts?.length || 0,
+        stats: data.stats,
         error: data.error,
         firstContact: data.contacts?.[0] ? {
           hasName: !!(data.contacts[0].firstName || data.contacts[0].lastName),
           hasEmail: !!data.contacts[0].email,
           hasCompany: !!data.contacts[0].company,
-          fullContact: data.contacts[0]
+          type: data.contacts[0].type,
+          source: data.contacts[0].source
         } : null
       });
-      const contacts = data.contacts || [];
       
-      if (contacts.length === 0) {
+      const fetchedContacts = data.contacts || [];
+      
+      if (fetchedContacts.length === 0) {
         console.warn('No contacts received from Edge Function - check Gmail API access and response');
         toast({
           title: 'No Contacts Found',
@@ -164,13 +214,33 @@ export function useGmailContactsImport() {
         return;
       }
 
-      // Process each contact
+      setContacts(fetchedContacts);
+      setSelectedContacts(new Set(fetchedContacts.map((_, i) => i))); // Select all by default
+      setStats(data.stats || { total: fetchedContacts.length, mainContacts: 0, otherContacts: 0 });
+      setShowReview(true);
+
+    } catch (error) {
+      console.error('Gmail contact fetch failed:', error);
+      toast({
+        title: 'Fetch Failed',
+        description: error instanceof Error ? error.message : 'Failed to fetch contacts',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsFetching(false);
+    }
+  }, [includeNoEmail]);
+
+  const importSelectedContacts = useCallback(async () => {
+    try {
+      setIsImporting(true);
+      const selectedContactsList = Array.from(selectedContacts).map(index => contacts[index]);
+      const total = selectedContactsList.length;
       let successful = 0;
       let failed = 0;
-      const total = contacts.length;
 
-      for (let i = 0; i < contacts.length; i++) {
-        const contact = contacts[i];
+      for (let i = 0; i < selectedContactsList.length; i++) {
+        const contact = selectedContactsList[i];
         try {
           const userId = (await supabase.auth.getUser()).data.user?.id;
           const companyName = contact.company || contact.organizations?.[0]?.name;
@@ -217,10 +287,11 @@ export function useGmailContactsImport() {
             company_id: companyId,
             website: contact.website || contact.urls?.[0]?.value || '',
             source: 'gmail',
-            tags: Array.isArray(contact.tags) ? contact.tags : ['gmail-import']
+            tags: Array.isArray(contact.tags) ? contact.tags : ['gmail-import'],
+            type: contact.type
           };
           
-          console.log(`Inserting contact ${i+1}/${contacts.length}:`, JSON.stringify(contactData));
+          console.log(`Inserting contact ${i+1}/${selectedContactsList.length}:`, JSON.stringify(contactData));
           
           // Try regular insert first
           const { error: insertError } = await supabase.from('contacts').insert({
@@ -320,6 +391,11 @@ export function useGmailContactsImport() {
         description: `Successfully imported ${successful} contacts. ${failed} failed.`
       });
 
+      // Reset state
+      setShowReview(false);
+      setContacts([]);
+      setSelectedContacts(new Set());
+
     } catch (error) {
       console.error('Gmail contact import failed:', error);
       toast({
@@ -330,14 +406,51 @@ export function useGmailContactsImport() {
     } finally {
       setIsImporting(false);
     }
-  }, [includeNoEmail, createContact, refreshContacts]);
+  }, [contacts, selectedContacts, refreshContacts]);
+
+  const toggleContact = useCallback((index: number) => {
+    setSelectedContacts(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAllContacts = useCallback(() => {
+    setSelectedContacts(prev => {
+      if (prev.size === contacts.length) {
+        return new Set();
+      } else {
+        return new Set(contacts.map((_, i) => i));
+      }
+    });
+  }, [contacts]);
+
+  const cancelReview = useCallback(() => {
+    setShowReview(false);
+    setContacts([]);
+    setSelectedContacts(new Set());
+  }, []);
 
   return {
-    importFromGmail,
+    fetchContacts,
+    importSelectedContacts,
+    isFetching,
     isImporting,
     importProgress,
     includeNoEmail,
-    setIncludeNoEmail
+    setIncludeNoEmail,
+    contacts,
+    selectedContacts,
+    showReview,
+    toggleContact,
+    toggleAllContacts,
+    cancelReview,
+    stats
   };
 }
 

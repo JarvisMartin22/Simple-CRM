@@ -31,6 +31,7 @@ interface Contact {
     value?: string;
   }>;
   resourceName?: string;
+  type?: 'main' | 'other';
 }
 
 // Function to fetch main contacts
@@ -77,16 +78,22 @@ const fetchMainContacts = async (accessToken: string): Promise<{ success: boolea
 const fetchOtherContacts = async (accessToken: string): Promise<{ success: boolean; data: Contact[]; error?: string }> => {
   try {
     console.log("Fetching other contacts...");
-    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,organizations,urls,metadata,photos';
+    // Only include fields that are allowed for other contacts
+    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,metadata';
     
+    console.log("Other contacts request URL:", otherContactsUrl);
     const response = await fetch(otherContactsUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
       },
     });
     
-    console.log('Other contacts response status:', response.status);
-    console.log('Other contacts response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Other contacts response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
     
     if (!response.ok) {
       const error = await response.text();
@@ -95,6 +102,7 @@ const fetchOtherContacts = async (accessToken: string): Promise<{ success: boole
     }
     
     const data = await response.json();
+    console.log('Other contacts raw response:', JSON.stringify(data).substring(0, 500) + '...');
     console.log(`Found ${data.otherContacts?.length || 0} other contacts`);
     
     if (!data.otherContacts || !Array.isArray(data.otherContacts)) {
@@ -144,24 +152,52 @@ serve(async (req) => {
     const gmailToken = req.headers.get('X-Gmail-Token');
     console.log('Gmail token present:', !!gmailToken);
     if (!gmailToken) {
-      throw new Error('No Gmail token provided');
+      return new Response(JSON.stringify({
+        error: 'No Gmail token provided'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
-    // Get the request body
-    const { integration_id, access_token, refresh_token, include_no_email = false } = await req.json();
-    console.log('Request params:', { 
-      has_integration_id: !!integration_id,
-      has_access_token: !!access_token,
-      has_refresh_token: !!refresh_token,
-      include_no_email
-    });
+    // Get and validate the request body
+    let body;
+    try {
+      body = await req.json();
+      console.log('Request body:', {
+        has_integration_id: !!body.integration_id,
+        has_access_token: !!body.access_token,
+        has_refresh_token: !!body.refresh_token,
+        include_no_email: body.include_no_email
+      });
+    } catch (e) {
+      console.error('Failed to parse request body:', e);
+      return new Response(JSON.stringify({
+        error: 'Invalid request body'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    const { integration_id, access_token, refresh_token, include_no_email = false } = body;
 
     if (!integration_id) {
-      throw new Error('No integration ID provided');
+      return new Response(JSON.stringify({
+        error: 'No integration ID provided'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     if (!access_token) {
-      throw new Error('No access token provided');
+      return new Response(JSON.stringify({
+        error: 'No access token provided'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     // Validate the access token first
@@ -171,11 +207,11 @@ serve(async (req) => {
       const tokenResponse = await fetch(tokenInfoUrl);
       
       if (!tokenResponse.ok) {
-        const tokenError = await tokenResponse.json();
+        const tokenError = await tokenResponse.text();
         console.error("Access token validation failed:", tokenError);
         return new Response(JSON.stringify({
-          contacts: [],
-          error: 'Access token is invalid or expired. Please reconnect your Gmail account.'
+          error: 'Access token is invalid or expired. Please reconnect your Gmail account.',
+          details: tokenError
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
@@ -186,7 +222,8 @@ serve(async (req) => {
       console.log("Token validation successful:", {
         expiresIn: tokenInfo.expires_in,
         scope: tokenInfo.scope,
-        hasContactsScope: tokenInfo.scope.includes('contacts')
+        hasContactsScope: tokenInfo.scope.includes('contacts'),
+        hasOtherContactsScope: tokenInfo.scope.includes('contacts.other.readonly')
       });
       
       // Check for any contacts-related scope that might be present
@@ -194,106 +231,133 @@ serve(async (req) => {
         tokenInfo.scope.includes('contacts') || 
         tokenInfo.scope.includes('people') ||
         tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts') || 
-        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.readonly') ||
-        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.other.readonly');
+        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.readonly');
         
-      if (!hasContactsScope) {
+      const hasOtherContactsScope = 
+        tokenInfo.scope.includes('contacts.other.readonly') ||
+        tokenInfo.scope.includes('https://www.googleapis.com/auth/contacts.other.readonly');
+
+      if (!hasContactsScope && !hasOtherContactsScope) {
         console.error("Missing required contacts scope");
         return new Response(JSON.stringify({
-          contacts: [],
           error: 'Gmail integration is missing the required contacts scope. Please reconnect with proper permissions.'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 403,
         });
       }
-    } catch (validationError) {
-      console.error("Error validating token:", validationError);
-      // Continue with the request even if validation fails
-    }
 
-    const contacts: Contact[] = [];
+      console.log("Scopes validation:", {
+        hasContactsScope,
+        hasOtherContactsScope,
+        willFetchMainContacts: hasContactsScope,
+        willFetchOtherContacts: hasOtherContactsScope
+      });
 
-    // Fetch main contacts
-    console.log("Starting main contacts fetch with access token:", access_token.substring(0, 10) + '...');
-    const mainContactsResult = await fetchMainContacts(access_token);
-    if (mainContactsResult.success) {
-      console.log(`Successfully fetched ${mainContactsResult.data.length} main contacts`);
-      contacts.push(...mainContactsResult.data);
-    } else {
-      console.error('Failed to fetch main contacts:', mainContactsResult.error);
-    }
+      const contacts: Contact[] = [];
 
-    // Fetch other contacts
-    console.log("Starting other contacts fetch...");
-    const otherContactsResult = await fetchOtherContacts(access_token);
-    if (otherContactsResult.success) {
-      console.log(`Successfully fetched ${otherContactsResult.data.length} other contacts`);
-      contacts.push(...otherContactsResult.data);
-    } else {
-      console.error('Failed to fetch other contacts:', otherContactsResult.error);
-    }
+      // Fetch main contacts if we have the scope
+      if (hasContactsScope) {
+        console.log("Starting main contacts fetch with access token:", access_token.substring(0, 10) + '...');
+        const mainContactsResult = await fetchMainContacts(access_token);
+        if (mainContactsResult.success) {
+          console.log(`Successfully fetched ${mainContactsResult.data.length} main contacts`);
+          contacts.push(...mainContactsResult.data.map(contact => ({ ...contact, type: 'main' as const })));
+        } else {
+          console.error('Failed to fetch main contacts:', mainContactsResult.error);
+        }
+      }
 
-    console.log(`Total contacts before processing: ${contacts.length}`);
-    console.log('First few contacts:', contacts.slice(0, 2).map(c => ({
-      hasNames: !!c.names?.length,
-      hasEmail: !!c.emailAddresses?.length,
-      resourceName: c.resourceName,
-      fullData: JSON.stringify(c).substring(0, 200) + '...'
-    })));
+      // Fetch other contacts if we have the scope
+      if (hasOtherContactsScope) {
+        console.log("Starting other contacts fetch...");
+        const otherContactsResult = await fetchOtherContacts(access_token);
+        if (otherContactsResult.success) {
+          console.log(`Successfully fetched ${otherContactsResult.data.length} other contacts`);
+          contacts.push(...otherContactsResult.data.map(contact => ({ ...contact, type: 'other' as const })));
+        } else {
+          console.error('Failed to fetch other contacts:', otherContactsResult.error);
+        }
+      }
 
-    if (contacts.length === 0) {
-      console.error('No contacts found from Gmail API - check token validity and API response.');
+      console.log(`Total contacts before processing: ${contacts.length}`);
+      console.log('Contact types breakdown:', {
+        total: contacts.length,
+        main: contacts.filter(c => c.type === 'main').length,
+        other: contacts.filter(c => c.type === 'other').length
+      });
+
+      if (contacts.length === 0) {
+        console.error('No contacts found from Gmail API - check token validity and API response.');
+        return new Response(JSON.stringify({
+          contacts: [],
+          error: 'No contacts found in Gmail account'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      // Process contacts before returning
+      const processedContacts = contacts.map(contact => {
+        // Get primary name
+        const primaryName = contact.names?.find(n => n.metadata?.primary) || contact.names?.[0];
+        
+        // Get primary email
+        const primaryEmail = contact.emailAddresses?.find(e => e.metadata?.primary) || contact.emailAddresses?.[0];
+        
+        // Get primary organization (only for main contacts)
+        const primaryOrg = contact.type === 'main' ? 
+          (contact.organizations?.find(o => o.metadata?.primary) || contact.organizations?.[0]) : null;
+        
+        // Get primary phone
+        const primaryPhone = contact.phoneNumbers?.find(p => p.metadata?.primary) || contact.phoneNumbers?.[0];
+
+        // Determine if this is a main contact or other contact
+        const isOtherContact = contact.resourceName?.startsWith('otherContacts/');
+        
+        return {
+          firstName: primaryName?.givenName || '',
+          lastName: primaryName?.familyName || '',
+          email: primaryEmail?.value || '',
+          phone: primaryPhone?.value || '',
+          title: primaryOrg?.title || '',
+          company: primaryOrg?.name || '',
+          source: isOtherContact ? 'gmail-other' : 'gmail',
+          tags: isOtherContact ? ['gmail-other'] : ['gmail'],
+          type: isOtherContact ? 'other' : 'main'
+        };
+      });
+
+      // Filter contacts based on include_no_email parameter
+      const filteredContacts = include_no_email 
+        ? processedContacts 
+        : processedContacts.filter(contact => contact.email);
+
+      console.log(`Returning ${filteredContacts.length} contacts (${processedContacts.filter(c => c.type === 'other').length} other contacts)`);
+
       return new Response(JSON.stringify({
-        contacts: [],
-        error: 'No contacts found in Gmail account'
+        contacts: filteredContacts,
+        stats: {
+          total: filteredContacts.length,
+          mainContacts: filteredContacts.filter(c => c.type === 'main').length,
+          otherContacts: filteredContacts.filter(c => c.type === 'other').length
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
+
+    } catch (validationError) {
+      console.error("Error validating token:", validationError);
+      return new Response(JSON.stringify({
+        error: 'Failed to validate access token',
+        details: validationError instanceof Error ? validationError.message : String(validationError)
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
-
-    // Process the contacts
-    const processedContacts = contacts.map((contact: Contact) => {
-      const primaryName = contact.names ? contact.names.find(n => n.metadata?.primary) || contact.names[0] : null;
-      const primaryEmail = contact.emailAddresses ? contact.emailAddresses.find(e => e.metadata?.primary) || contact.emailAddresses[0] : null;
-      const primaryOrg = contact.organizations ? contact.organizations.find(o => o.metadata?.primary) || contact.organizations[0] : null;
-      const primaryPhone = contact.phoneNumbers ? contact.phoneNumbers.find(p => p.metadata?.primary) || contact.phoneNumbers[0] : null;
-      const primaryUrl = contact.urls ? contact.urls.find(u => u.metadata?.primary) || contact.urls[0] : null;
-      
-      return {
-        firstName: primaryName?.givenName || '',
-        lastName: primaryName?.familyName || '',
-        email: primaryEmail?.value || '',
-        phone: primaryPhone?.value || '',
-        title: primaryOrg?.title || '',
-        company: primaryOrg?.name || '',
-        website: primaryUrl?.value || '',
-        source: 'gmail',
-        tags: [contact.resourceName?.includes('otherContacts') ? 'gmail-other' : 'gmail-main'],
-        names: contact.names || [],
-        emailAddresses: contact.emailAddresses || [],
-        phoneNumbers: contact.phoneNumbers || [],
-        organizations: contact.organizations || [],
-        urls: contact.urls || []
-      };
-    }).filter(contact => !include_no_email || contact.email); // Only include contacts with email if include_no_email is false
-
-    console.log(`Total contacts after processing: ${processedContacts.length}`);
-
-    // Return the processed contacts
-    return new Response(JSON.stringify({
-      contacts: processedContacts
-    }), {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Gmail-Token, X-Client-Info, apikey, x-api-key, range, cache-control, x-supabase-auth, x-auth-token, Accept, Origin, Referer, User-Agent'
-      },
-      status: 200,
-    });
 
   } catch (error) {
     console.error('Error in request:', error);

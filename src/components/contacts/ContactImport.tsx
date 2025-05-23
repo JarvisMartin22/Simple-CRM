@@ -10,6 +10,7 @@ import { Mail, Upload, Users, Filter, RefreshCw, Loader2, AlertCircle } from "lu
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGmailContactsImport } from '@/hooks/useGmailContactsImport';
+import { ContactReview } from './ContactReview';
 import CsvImport from './CsvImport';
 import { Progress } from "@/components/ui/progress";
 
@@ -28,37 +29,36 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
   });
 
   const { 
-    importFromGmail, 
-    isImporting, 
+    fetchContacts,
+    importSelectedContacts,
+    isFetching,
+    isImporting,
     importProgress,
     includeNoEmail,
-    setIncludeNoEmail
+    setIncludeNoEmail,
+    contacts,
+    selectedContacts,
+    showReview,
+    toggleContact,
+    toggleAllContacts,
+    cancelReview,
+    stats
   } = useGmailContactsImport();
 
-  const handleImport = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to import contacts.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await importFromGmail();
-      if (importProgress.successful > 0) {
-        onClose();
-      }
-    } catch (error) {
-      console.error('Error importing contacts:', error);
-      toast({
-        title: "Import Failed",
-        description: "There was an error importing your contacts. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
+  if (showReview) {
+    return (
+      <ContactReview 
+        contacts={contacts}
+        selectedContacts={selectedContacts}
+        onSelectionChange={toggleContact}
+        onSelectAll={toggleAllContacts}
+        onImport={importSelectedContacts}
+        onCancel={cancelReview}
+        isImporting={isImporting}
+        stats={stats}
+      />
+    );
+  }
 
   return (
     <Card className="w-full">
@@ -83,85 +83,89 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
                   <Filter className="h-4 w-4 mr-2" />
                   Filter Options
                 </h3>
-                
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox 
-                      id="includeNoEmail" 
-                      checked={includeNoEmail} 
-                      onCheckedChange={(checked) => setIncludeNoEmail(checked === true)}
+                      id="include-no-email"
+                      checked={includeNoEmail}
+                      onCheckedChange={(checked) => setIncludeNoEmail(checked as boolean)}
                     />
-                    <Label htmlFor="includeNoEmail">Exclude contacts without email addresses</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="onlyWithName" 
-                      checked={filterOptions.onlyWithName} 
-                      onCheckedChange={(checked) => 
-                        setFilterOptions(prev => ({ ...prev, onlyWithName: checked === true }))
-                      }
-                    />
-                    <Label htmlFor="onlyWithName">Only contacts with names</Label>
+                    <label
+                      htmlFor="include-no-email"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Include contacts without email addresses
+                    </label>
                   </div>
                   
                   <div className="flex items-center space-x-2">
                     <Checkbox 
-                      id="excludeNoReply" 
-                      checked={filterOptions.excludeNoReply} 
+                      id="only-with-name"
+                      checked={filterOptions.onlyWithName}
                       onCheckedChange={(checked) => 
-                        setFilterOptions(prev => ({ ...prev, excludeNoReply: checked === true }))
+                        setFilterOptions(prev => ({ ...prev, onlyWithName: checked as boolean }))
                       }
                     />
-                    <Label htmlFor="excludeNoReply">Exclude no-reply and system emails</Label>
+                    <label
+                      htmlFor="only-with-name"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Only import contacts with names
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="exclude-no-reply"
+                      checked={filterOptions.excludeNoReply}
+                      onCheckedChange={(checked) => 
+                        setFilterOptions(prev => ({ ...prev, excludeNoReply: checked as boolean }))
+                      }
+                    />
+                    <label
+                      htmlFor="exclude-no-reply"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Exclude no-reply and automated emails
+                    </label>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="lastContactedDays">Show contacts from the last:</Label>
+                    <Label htmlFor="last-contacted">Only include contacts contacted in the last:</Label>
                     <Select 
-                      value={filterOptions.lastContactedDays} 
+                      value={filterOptions.lastContactedDays}
                       onValueChange={(value) => 
                         setFilterOptions(prev => ({ ...prev, lastContactedDays: value }))
                       }
                     >
-                      <SelectTrigger id="lastContactedDays" className="w-full">
-                        <SelectValue placeholder="Select time period" />
+                      <SelectTrigger id="last-contacted">
+                        <SelectValue placeholder="Select a time period" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="30">Last 30 days</SelectItem>
-                        <SelectItem value="90">Last 3 months</SelectItem>
-                        <SelectItem value="180">Last 6 months</SelectItem>
-                        <SelectItem value="365">Last year</SelectItem>
+                        <SelectItem value="30">30 days</SelectItem>
+                        <SelectItem value="90">3 months</SelectItem>
+                        <SelectItem value="180">6 months</SelectItem>
+                        <SelectItem value="365">1 year</SelectItem>
                         <SelectItem value="all">All time</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {isImporting && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm text-gray-500">
-                        <span>Importing contacts...</span>
-                        <span>{importProgress.processed} / {importProgress.total}</span>
-                      </div>
-                      <Progress value={(importProgress.processed / importProgress.total) * 100} />
-                    </div>
-                  )}
                   
                   <div className="pt-2">
                     <Button 
-                      onClick={handleImport}
+                      onClick={fetchContacts}
                       className="w-full"
-                      disabled={isImporting}
+                      disabled={isFetching}
                     >
-                      {isImporting ? (
+                      {isFetching ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Importing...
+                          Fetching Contacts...
                         </>
                       ) : (
                         <>
                           <RefreshCw className="mr-2 h-4 w-4" />
-                          Import from Gmail
+                          Fetch from Gmail
                         </>
                       )}
                     </Button>

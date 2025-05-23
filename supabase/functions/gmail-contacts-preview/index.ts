@@ -16,34 +16,117 @@ interface FilterOptions {
   resourceName?: string;
 }
 
-// Function to fetch other contacts
-const fetchOtherContacts = async (accessToken: string) => {
+interface Contact {
+  names?: Array<{
+    metadata?: { primary?: boolean };
+    givenName?: string;
+    familyName?: string;
+  }>;
+  emailAddresses?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+  organizations?: Array<{
+    metadata?: { primary?: boolean };
+    name?: string;
+    title?: string;
+  }>;
+  phoneNumbers?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+  urls?: Array<{
+    metadata?: { primary?: boolean };
+    value?: string;
+  }>;
+  resourceName?: string;
+}
+
+// Function to fetch other contacts with detailed logging
+const fetchOtherContacts = async (accessToken: string): Promise<{ success: boolean; data: Contact[]; error?: string }> => {
   try {
     console.log("Fetching other contacts...");
-    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,metadata,photos';
+    // Only include fields that are allowed for other contacts
+    const otherContactsUrl = 'https://people.googleapis.com/v1/otherContacts?pageSize=1000&readMask=names,emailAddresses,phoneNumbers,metadata';
+    
+    console.log("Other contacts request URL:", otherContactsUrl);
+    console.log("Access token (first 10 chars):", accessToken.substring(0, 10));
+    
+    // First validate the token
+    const tokenInfoUrl = `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`;
+    const tokenResponse = await fetch(tokenInfoUrl);
+    const tokenInfo = await tokenResponse.json();
+    
+    // Check if token is invalid
+    if (tokenInfo.error) {
+      console.error("Token validation failed:", tokenInfo);
+      return { 
+        success: false, 
+        data: [], 
+        error: `Invalid token: ${tokenInfo.error_description || tokenInfo.error}` 
+      };
+    }
+    
+    console.log("Token info:", {
+      expiresIn: tokenInfo.expires_in,
+      scope: tokenInfo.scope,
+      hasContactsScope: tokenInfo.scope?.includes('contacts'),
+      hasOtherContactsScope: tokenInfo.scope?.includes('contacts.other.readonly')
+    });
+    
+    // Check required scopes
+    const hasContactsScope = tokenInfo.scope?.includes('contacts') || 
+      tokenInfo.scope?.includes('people') ||
+      tokenInfo.scope?.includes('https://www.googleapis.com/auth/contacts') || 
+      tokenInfo.scope?.includes('https://www.googleapis.com/auth/contacts.readonly');
+      
+    const hasOtherContactsScope = tokenInfo.scope?.includes('contacts.other.readonly') ||
+      tokenInfo.scope?.includes('https://www.googleapis.com/auth/contacts.other.readonly');
+
+    if (!hasContactsScope && !hasOtherContactsScope) {
+      return {
+        success: false,
+        data: [],
+        error: 'Token is missing required contacts scopes'
+      };
+    }
     
     const response = await fetch(otherContactsUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
       },
+    });
+    
+    console.log('Other contacts response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
     });
     
     if (!response.ok) {
       const error = await response.text();
       console.error(`Error fetching other contacts: ${response.status}`, error);
-      return { success: false, data: null, error };
+      return { success: false, data: [], error };
     }
     
     const data = await response.json();
+    console.log('Other contacts raw response:', JSON.stringify(data).substring(0, 500) + '...');
+    console.log(`Found ${data.otherContacts?.length || 0} other contacts`);
+    
+    if (!data.otherContacts || !Array.isArray(data.otherContacts)) {
+      console.error('Unexpected response format - otherContacts is not an array:', 
+        JSON.stringify(data).substring(0, 200) + '...');
+      return { success: false, data: [], error: 'Invalid response format' };
+    }
+    
     return { 
       success: true, 
-      data: data.otherContacts || [],
-      totalItems: data.otherContacts?.length || 0,
-      nextPageToken: data.nextPageToken
+      data: data.otherContacts || []
     };
   } catch (error) {
     console.error("Error fetching other contacts:", error);
-    return { success: false, data: null, error: error.message };
+    return { success: false, data: [], error: error.message };
   }
 };
 
@@ -57,89 +140,37 @@ serve(async (req) => {
   }
 
   try {
-    const { accessToken, resourceName } = await req.json();
+    const { accessToken } = await req.json();
 
     if (!accessToken) {
       throw new Error('No access token provided');
     }
 
-    if (!resourceName) {
-      throw new Error('No resource name provided');
-    }
-
-    let connections = [];
-
-    // Fetch contacts based on the resource name
-    if (resourceName === "connections") {
-      const result = await fetchMainContacts(accessToken);
-      if (!result.success) {
-        throw new Error(`Failed to fetch main contacts: ${result.error}`);
+    // Fetch other contacts
+    const result = await fetchOtherContacts(accessToken);
+    
+    return new Response(
+      JSON.stringify({
+        success: result.success,
+        data: result.data,
+        error: result.error
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: result.success ? 200 : 400
       }
-      connections = result.data;
-      console.log(`Google API returned ${connections.length} main contacts`);
-    } else if (resourceName === "otherContacts") {
-      const result = await fetchOtherContacts(accessToken);
-      if (!result.success) {
-        throw new Error(`Failed to fetch other contacts: ${result.error}`);
-      }
-      connections = result.data;
-      console.log(`Google API returned ${connections.length} other contacts`);
-    }
-
-    // Process the contacts
-    let processedContacts = connections.map((contact: any) => {
-      const primaryName = contact.names ? contact.names.find((n: any) => n.metadata?.primary) || contact.names[0] : null;
-      const primaryEmail = contact.emailAddresses ? contact.emailAddresses.find((e: any) => e.metadata?.primary) || contact.emailAddresses[0] : null;
-      const primaryOrg = contact.organizations ? contact.organizations.find((o: any) => o.metadata?.primary) || contact.organizations[0] : null;
-      const primaryPhone = contact.phoneNumbers ? contact.phoneNumbers.find((p: any) => p.metadata?.primary) || contact.phoneNumbers[0] : null;
-      const primaryUrl = contact.urls ? contact.urls.find((u: any) => u.metadata?.primary) || contact.urls[0] : null;
-      const photo = contact.photos ? contact.photos.find((p: any) => p.metadata?.primary)?.url : null;
-      
-      // Extract domain from email
-      const email = primaryEmail?.value || null;
-      let domain = null;
-      if (email && typeof email === 'string' && email.includes('@')) {
-        try {
-          domain = email.split('@')[1];
-        } catch (error) {
-          console.error(`Error extracting domain from email ${email}:`, error);
-        }
-      }
-      
-      const resourceId = contact.resourceName?.split('/')[1] || Math.random().toString(36).substring(2, 9);
-      
-      return {
-        id: resourceId,
-        first_name: primaryName?.givenName || '',
-        last_name: primaryName?.familyName || '',
-        email: email,
-        domain: domain,
-        company: primaryOrg?.name || null,
-        title: primaryOrg?.title || null,
-        phone: primaryPhone?.value || null,
-        website: primaryUrl?.value || null,
-        photo_url: photo,
-        external_id: contact.resourceName,
-        // Explicitly include the category
-        category: resourceName === "connections" ? "contacts" : "otherContacts"
-      };
-    });
-
-    // Return the processed contacts
-    return new Response(JSON.stringify({
-      contacts: processedContacts
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    );
 
   } catch (error) {
     console.error('Error in request:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    });
+    return new Response(
+      JSON.stringify({
+        error: error.message
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      }
+    );
   }
 }); 
