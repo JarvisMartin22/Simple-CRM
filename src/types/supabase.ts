@@ -224,6 +224,235 @@ export type Database = {
           updated_at?: string
         }
       }
+      campaigns: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          type: 'one_time' | 'automated' | 'sequence'
+          status: 'draft' | 'scheduled' | 'active' | 'paused' | 'completed' | 'failed'
+          template_id: string | null
+          schedule_config: Json | null
+          audience_filter: Json | null
+          metadata: Json | null
+          stats: Json
+          created_at: string
+          updated_at: string
+          scheduled_at: string | null
+          started_at: string | null
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          type?: 'one_time' | 'automated' | 'sequence'
+          status?: 'draft' | 'scheduled' | 'active' | 'paused' | 'completed' | 'failed'
+          template_id?: string | null
+          schedule_config?: Json | null
+          audience_filter?: Json | null
+          metadata?: Json | null
+          stats?: Json
+          created_at?: string
+          updated_at?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          type?: 'one_time' | 'automated' | 'sequence'
+          status?: 'draft' | 'scheduled' | 'active' | 'paused' | 'completed' | 'failed'
+          template_id?: string | null
+          schedule_config?: Json | null
+          audience_filter?: Json | null
+          metadata?: Json | null
+          stats?: Json
+          created_at?: string
+          updated_at?: string
+          scheduled_at?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            referencedRelation: "campaign_templates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      campaign_templates: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          subject: string
+          content: string
+          variables: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          subject: string
+          content: string
+          variables?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          subject?: string
+          content?: string
+          variables?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_templates_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      campaign_recipients: {
+        Row: {
+          id: string
+          campaign_id: string
+          contact_id: string
+          email: string
+          status: string
+          sent_at: string | null
+          opened_at: string | null
+          clicked_at: string | null
+          replied_at: string | null
+          bounced_at: string | null
+          email_tracking_id: string | null
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          contact_id: string
+          email: string
+          status?: string
+          sent_at?: string | null
+          opened_at?: string | null
+          clicked_at?: string | null
+          replied_at?: string | null
+          bounced_at?: string | null
+          email_tracking_id?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          campaign_id?: string
+          contact_id?: string
+          email?: string
+          status?: string
+          sent_at?: string | null
+          opened_at?: string | null
+          clicked_at?: string | null
+          replied_at?: string | null
+          bounced_at?: string | null
+          email_tracking_id?: string | null
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_recipients_email_tracking_id_fkey"
+            columns: ["email_tracking_id"]
+            referencedRelation: "email_tracking"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      campaign_sequences: {
+        Row: {
+          id: string
+          campaign_id: string
+          step_number: number
+          template_id: string
+          delay_days: number
+          conditions: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          step_number: number
+          template_id: string
+          delay_days?: number
+          conditions?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          campaign_id?: string
+          step_number?: number
+          template_id?: string
+          delay_days?: number
+          conditions?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sequences_template_id_fkey"
+            columns: ["template_id"]
+            referencedRelation: "campaign_templates"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

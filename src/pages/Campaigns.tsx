@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,106 +15,20 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { EmailComposer } from '@/components/email/EmailComposer';
 import { useNavigate } from 'react-router-dom';
 import { useGmailConnect } from '@/hooks/useGmailConnect';
-
-// Sample campaign data
-const campaignData = [
-  {
-    id: 1,
-    name: 'Q3 Newsletter - Software Solutions',
-    type: 'Email',
-    status: 'Active',
-    sent: 3642,
-    opened: 1824,
-    clicked: 621,
-    lastSent: 'Aug 2, 2025',
-    schedule: 'One-time',
-    audienceSize: 5000,
-    progress: 73,
-  },
-  {
-    id: 2,
-    name: 'Product Update - New Features',
-    type: 'Email',
-    status: 'Draft',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    lastSent: '-',
-    schedule: 'Not scheduled',
-    audienceSize: 4200,
-    progress: 60,
-  },
-  {
-    id: 3,
-    name: 'Welcome Sequence - New Signups',
-    type: 'Email Sequence',
-    status: 'Active',
-    sent: 856,
-    opened: 723,
-    clicked: 412,
-    lastSent: 'Today',
-    schedule: 'Automated',
-    audienceSize: 'Auto',
-    progress: 100,
-  },
-  {
-    id: 4,
-    name: 'Follow-up - Trade Show Leads',
-    type: 'Email',
-    status: 'Scheduled',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    lastSent: '-',
-    schedule: 'Aug 15, 2025',
-    audienceSize: 320,
-    progress: 100,
-  },
-  {
-    id: 5,
-    name: 'Summer Promotion - Limited Offer',
-    type: 'Email',
-    status: 'Completed',
-    sent: 12500,
-    opened: 8375,
-    clicked: 3125,
-    lastSent: 'July 15, 2025',
-    schedule: 'One-time',
-    audienceSize: 12500,
-    progress: 100,
-  },
-  {
-    id: 6,
-    name: 'Customer Feedback Survey',
-    type: 'Email',
-    status: 'Paused',
-    sent: 2800,
-    opened: 1400,
-    clicked: 840,
-    lastSent: 'July 28, 2025',
-    schedule: 'Paused',
-    audienceSize: 8000,
-    progress: 35,
-  },
-  {
-    id: 7,
-    name: 'Re-engagement Campaign - Inactive Users',
-    type: 'Email Sequence',
-    status: 'Active',
-    sent: 5600,
-    opened: 1680,
-    clicked: 560,
-    lastSent: 'Today',
-    schedule: 'Weekly',
-    audienceSize: 15000,
-    progress: 37,
-  },
-];
+import { useCampaigns } from '@/hooks/useCampaigns';
+import { useCampaignTemplates } from '@/hooks/useCampaignTemplates';
 
 const Campaigns: React.FC = () => {
   const navigate = useNavigate();
   const { isEmailConnected, emailStats, recentEmails } = useEmail();
   const { connectGmail, isConnecting, resetConnectionState } = useGmailConnect();
+  const { loading: campaignsLoading, error: campaignsError, fetchCampaigns } = useCampaigns();
+  const { loading: templatesLoading, error: templatesError, fetchTemplates } = useCampaignTemplates();
+  
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Handle connection timeout
   useEffect(() => {
@@ -133,6 +47,21 @@ const Campaigns: React.FC = () => {
     };
   }, [isConnecting, resetConnectionState]);
   
+  // Fetch campaigns and templates
+  useEffect(() => {
+    const loadData = async () => {
+      if (isEmailConnected) {
+        const campaignsData = await fetchCampaigns();
+        const templatesData = await fetchTemplates();
+        
+        setCampaigns(campaignsData || []);
+        setTemplates(templatesData || []);
+      }
+    };
+    
+    loadData();
+  }, [isEmailConnected, fetchCampaigns, fetchTemplates]);
+  
   const handleConnect = async () => {
     console.log('Campaign page: initiating Gmail connection');
     try {
@@ -143,11 +72,18 @@ const Campaigns: React.FC = () => {
     }
   };
   
+  // Filter campaigns based on search query and active tab
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = activeTab === 'all' || campaign.status.toLowerCase() === activeTab;
+    return matchesSearch && matchesTab;
+  });
+  
   // Calculate summary metrics
-  const totalCampaigns = campaignData.length;
-  const activeCampaigns = campaignData.filter(c => c.status === 'Active').length;
-  const totalSent = isEmailConnected ? emailStats.sent : 0;
-  const totalOpened = isEmailConnected ? emailStats.opened : 0;
+  const totalCampaigns = campaigns.length;
+  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+  const totalSent = campaigns.reduce((sum, c) => sum + (c.stats?.sent || 0), 0);
+  const totalOpened = campaigns.reduce((sum, c) => sum + (c.stats?.opened || 0), 0);
   const averageOpenRate = totalSent ? Math.round((totalOpened / totalSent) * 100) : 0;
   
   if (!isEmailConnected) {
@@ -198,289 +134,210 @@ const Campaigns: React.FC = () => {
           <h1 className="text-h1 font-medium">Campaigns</h1>
           <p className="text-gray-500 mt-1">Create and manage your email campaigns</p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="bg-primary">
-              <Plus size={16} className="mr-2" />
-              <span>Create Campaign</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[720px] p-0">
-            <EmailComposer />
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => navigate('/campaigns/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Campaign
+        </Button>
       </div>
-      
-      {/* Email Tracker - Show recent activity */}
-      <EmailTracker />
-      
-      {/* Campaign Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription>Total Campaigns</CardDescription>
-            <CardTitle className="text-2xl">{totalCampaigns}</CardTitle>
+
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Campaigns</CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-gray-500">
-              <Badge variant="outline" className="bg-gray-50">{activeCampaigns} active</Badge>
-            </div>
+            <div className="text-2xl font-bold">{totalCampaigns}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeCampaigns} active
+            </p>
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription>Emails Sent</CardDescription>
-            <CardTitle className="text-2xl">{totalSent.toLocaleString()}</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sent</CardTitle>
+            <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-gray-500">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700">+8.3% vs last month</Badge>
-            </div>
+            <div className="text-2xl font-bold">{totalSent}</div>
+            <p className="text-xs text-muted-foreground">
+              across all campaigns
+            </p>
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription>Average Open Rate</CardDescription>
-            <CardTitle className="text-2xl">{averageOpenRate}%</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Open Rate</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-gray-500">
-              <Badge variant="outline" className="bg-green-50 text-green-700">+2.1% vs industry</Badge>
-            </div>
+            <div className="text-2xl font-bold">{averageOpenRate}%</div>
+            <p className="text-xs text-muted-foreground">
+              average across campaigns
+            </p>
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription>Average Click Rate</CardDescription>
-            <CardTitle className="text-2xl">12.5%</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Templates</CardTitle>
+            <Copy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-gray-500">
-              <Badge variant="outline" className="bg-green-50 text-green-700">+3.5% vs industry</Badge>
-            </div>
+            <div className="text-2xl font-bold">{templates.length}</div>
+            <p className="text-xs text-muted-foreground">
+              reusable templates
+            </p>
           </CardContent>
         </Card>
       </div>
-      
-      {/* Campaign List */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <CardTitle>All Campaigns</CardTitle>
-              <CardDescription>Manage your email campaigns</CardDescription>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Tabs defaultValue="all" className="w-[400px]">
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="drafts">Drafts</TabsTrigger>
-                  <TabsTrigger value="completed">Completed</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-4">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input placeholder="Search campaigns..." className="pl-8" />
-            </div>
-            
-            <div className="flex items-center gap-2 ml-auto">
-              <Button variant="outline" size="sm" className="h-9">
-                <Filter className="mr-1 h-4 w-4" />
-                Filter
-              </Button>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    <span>Sort by</span>
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Name</DropdownMenuItem>
-                  <DropdownMenuItem>Date Created</DropdownMenuItem>
-                  <DropdownMenuItem>Status</DropdownMenuItem>
-                  <DropdownMenuItem>Performance</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </CardHeader>
+
+      <div className="flex items-center space-x-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search campaigns..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        <Button variant="outline">
+          <Filter className="mr-2 h-4 w-4" />
+          Filter
+        </Button>
+        <Button variant="outline" onClick={() => {
+          fetchCampaigns();
+          fetchTemplates();
+        }}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="all">All Campaigns</TabsTrigger>
+          <TabsTrigger value="draft">Drafts</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+        </TabsList>
         
-        <CardContent>
-          <div className="relative overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-4 py-3">Campaign</th>
-                  <th scope="col" className="px-4 py-3">Type</th>
-                  <th scope="col" className="px-4 py-3">Status</th>
-                  <th scope="col" className="px-4 py-3">Performance</th>
-                  <th scope="col" className="px-4 py-3">Last Sent</th>
-                  <th scope="col" className="px-4 py-3">Audience</th>
-                  <th scope="col" className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* Show recent emails as campaigns if available, otherwise show sample data */}
-                {recentEmails.length > 0 ? (
-                  recentEmails.map((email) => (
-                    <tr key={email.id} className="bg-white border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">
-                        <div>{email.subject || 'No subject'}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">Email</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={email.opened_at ? 'default' : 'secondary'}>
-                          {email.opened_at ? 'Opened' : 'Sent'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center space-x-4">
-                          <Progress value={email.opened_at ? 100 : 0} className="h-2 w-[60px]" />
-                          <div className="text-xs text-gray-600">{email.opened_at ? 'Opened' : 'Pending'}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {new Date(email.sent_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center">
-                          <Avatar className="h-7 w-7 mr-2">
-                            <AvatarFallback>{email.recipient.charAt(0).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs">{email.recipient}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              <span>View</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Copy className="mr-2 h-4 w-4" />
-                              <span>Duplicate</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  campaignData.map((campaign) => (
-                    <tr key={campaign.id} className="bg-white border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">
-                        <div>{campaign.name}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline">{campaign.type}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={
-                          campaign.status === 'Active' ? 'default' : 
-                          campaign.status === 'Draft' ? 'secondary' : 
-                          campaign.status === 'Completed' ? 'outline' : 
-                          campaign.status === 'Scheduled' ? 'secondary' : 'destructive'
-                        }>
-                          {campaign.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center space-x-4">
-                          <Progress value={campaign.progress} className="h-2 w-[60px]" />
-                          <div className="text-xs text-gray-600">
-                            {campaign.sent > 0 ? 
-                              `${Math.round((campaign.opened / campaign.sent) * 100)}% open rate` : 
-                              'Not sent yet'}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {campaign.lastSent}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2 text-gray-500" />
-                          <span className="text-xs">{typeof campaign.audienceSize === 'number' ? campaign.audienceSize.toLocaleString() : campaign.audienceSize}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              <span>View</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span>Edit</span>
-                            </DropdownMenuItem>
-                            {campaign.status === 'Active' ? (
-                              <DropdownMenuItem>
-                                <Pause className="mr-2 h-4 w-4" />
-                                <span>Pause</span>
-                              </DropdownMenuItem>
-                            ) : campaign.status === 'Paused' ? (
-                              <DropdownMenuItem>
-                                <Play className="mr-2 h-4 w-4" />
-                                <span>Resume</span>
-                              </DropdownMenuItem>
-                            ) : campaign.status === 'Draft' || campaign.status === 'Scheduled' ? (
-                              <DropdownMenuItem>
-                                <Send className="mr-2 h-4 w-4" />
-                                <span>Send Now</span>
-                              </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuItem>
-                              <Settings className="mr-2 h-4 w-4" />
-                              <span>Settings</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Copy className="mr-2 h-4 w-4" />
-                              <span>Duplicate</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value={activeTab} className="space-y-4">
+          {campaignsLoading ? (
+            <Card className="p-8 text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+              <p className="mt-2 text-muted-foreground">Loading campaigns...</p>
+            </Card>
+          ) : campaignsError ? (
+            <Card className="p-8 text-center">
+              <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
+              <p className="mt-2 text-destructive">{campaignsError}</p>
+            </Card>
+          ) : filteredCampaigns.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                  <Mail className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">No campaigns found</h3>
+                <p className="mb-4 mt-2 text-sm text-muted-foreground">
+                  Get started by creating your first campaign
+                </p>
+                <Button onClick={() => navigate('/campaigns/new')}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Campaign
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            filteredCampaigns.map((campaign) => (
+              <Card key={campaign.id} className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 cursor-pointer" onClick={() => navigate(`/app/campaigns/${campaign.id}`)}>
+                    <h3 className="font-semibold">{campaign.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {campaign.type} • Last updated {new Date(campaign.updated_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      variant={
+                        campaign.status === 'active' ? 'default' :
+                        campaign.status === 'completed' ? 'secondary' :
+                        campaign.status === 'draft' ? 'outline' :
+                        'destructive'
+                      }
+                    >
+                      {campaign.status}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate(`/app/campaigns/${campaign.id}`)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate(`/app/campaigns/${campaign.id}/edit`)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        {campaign.status === 'active' ? (
+                          <DropdownMenuItem>
+                            <Pause className="mr-2 h-4 w-4" />
+                            Pause
+                          </DropdownMenuItem>
+                        ) : campaign.status === 'paused' ? (
+                          <DropdownMenuItem>
+                            <Play className="mr-2 h-4 w-4" />
+                            Resume
+                          </DropdownMenuItem>
+                        ) : null}
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div>Progress</div>
+                    <div>{campaign.stats?.sent || 0}/{campaign.audience_filter?.size || 0} sent</div>
+                  </div>
+                  <Progress value={
+                    campaign.audience_filter?.size
+                      ? (campaign.stats?.sent || 0) / campaign.audience_filter.size * 100
+                      : 0
+                  } className="mt-2" />
+                </div>
+                
+                <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Sent</div>
+                    <div className="mt-1 font-medium">{campaign.stats?.sent || 0}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Opened</div>
+                    <div className="mt-1 font-medium">{campaign.stats?.opened || 0}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Clicked</div>
+                    <div className="mt-1 font-medium">{campaign.stats?.clicked || 0}</div>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

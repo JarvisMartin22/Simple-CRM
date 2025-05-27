@@ -25,6 +25,10 @@ import Pipelines from './pages/Pipelines';
 import Tasks from './pages/Tasks';
 import Notes from './pages/Notes';
 import Campaigns from './pages/Campaigns';
+import CampaignCreate from './pages/CampaignCreate';
+import CampaignDetail from './pages/CampaignDetail';
+import CampaignEdit from './pages/CampaignEdit';
+import Templates from './pages/Templates';
 import Calendar from './pages/Calendar';
 import Integrations from './pages/Integrations';
 import Settings from './pages/Settings';
@@ -142,6 +146,46 @@ const App: React.FC = () => {
                           <ProtectedRoute>
                             <Layout>
                               <Campaigns />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/campaigns/new" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <CampaignCreate />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/campaigns/:id" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <CampaignDetail />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/campaigns/:id/edit" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <CampaignEdit />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/app/templates" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <Templates />
                             </Layout>
                           </ProtectedRoute>
                         } 
