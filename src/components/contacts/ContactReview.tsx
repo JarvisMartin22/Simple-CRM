@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Mail, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 export interface Contact {
   firstName: string;
@@ -28,6 +29,13 @@ interface ContactReviewProps {
   onImport: () => void;
   onCancel: () => void;
   isImporting: boolean;
+  importProgress?: {
+    total: number;
+    processed: number;
+    successful: number;
+    failed: number;
+    skipped: number;
+  };
   stats?: {
     total: number;
     mainContacts: number;
@@ -43,18 +51,24 @@ export const ContactReview: React.FC<ContactReviewProps> = ({
   onImport,
   onCancel,
   isImporting,
+  importProgress,
   stats
 }) => {
+  // Calculate progress percentage
+  const progressPercentage = importProgress && importProgress.total > 0
+    ? Math.round((importProgress.processed / importProgress.total) * 100)
+    : 0;
+
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Review Contacts</CardTitle>
-        <CardDescription className="space-y-2">
+        <CardTitle className="text-center">Review Contacts</CardTitle>
+        <CardDescription className="text-center space-y-2">
           <div>
             Select the contacts you want to import
           </div>
           {stats && (
-            <div className="flex gap-4 items-center text-sm">
+            <div className="flex gap-4 items-center justify-center text-sm">
               <div className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
                 <span>Total: {stats.total}</span>
@@ -79,6 +93,7 @@ export const ContactReview: React.FC<ContactReviewProps> = ({
                 id="select-all"
                 checked={selectedContacts.size === contacts.length}
                 onClick={onSelectAll}
+                disabled={isImporting}
               />
               <label htmlFor="select-all" className="text-sm font-medium">
                 Select All ({selectedContacts.size} of {contacts.length} selected)
@@ -104,54 +119,88 @@ export const ContactReview: React.FC<ContactReviewProps> = ({
             </div>
           </div>
 
-          <ScrollArea className="h-[400px] rounded-md border">
+          {isImporting && importProgress && (
+            <div className="space-y-2 py-2">
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Importing contacts...</span>
+                <span>{progressPercentage}%</span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Processed: {importProgress.processed} of {importProgress.total}</span>
+                <span className="flex gap-3">
+                  <span className="text-green-600">Success: {importProgress.successful}</span>
+                  {importProgress.skipped > 0 && (
+                    <span className="text-yellow-600">Skipped: {importProgress.skipped}</span>
+                  )}
+                  {importProgress.failed > 0 && (
+                    <span className="text-red-600">Failed: {importProgress.failed}</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[50px]"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead className="w-[200px]">Name</TableHead>
+                  <TableHead className="w-[250px]">
+                    <div className="truncate">Email</div>
+                  </TableHead>
+                  <TableHead className="w-[150px]">Company</TableHead>
+                  <TableHead className="w-[150px]">Title</TableHead>
+                  <TableHead className="w-[120px]">Phone</TableHead>
+                  <TableHead className="w-[100px]">Type</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {contacts.map((contact, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <Checkbox 
+                      <Checkbox
                         checked={selectedContacts.has(index)}
-                        onClick={() => onSelectionChange(index)}
+                        onCheckedChange={() => onSelectionChange(index)}
+                        disabled={isImporting}
                       />
                     </TableCell>
                     <TableCell>
-                      {contact.firstName} {contact.lastName}
+                      <div className="truncate max-w-[200px]" title={`${contact.firstName} ${contact.lastName}`}>
+                        {contact.firstName} {contact.lastName}
+                      </div>
                     </TableCell>
-                    <TableCell className="flex items-center gap-1">
-                      {contact.email ? (
-                        <>
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          {contact.email}
-                        </>
-                      ) : (
-                        <span className="text-gray-400">No email</span>
-                      )}
+                    <TableCell>
+                      <div className="truncate max-w-[250px]" title={contact.email}>
+                        {contact.email}
+                      </div>
                     </TableCell>
-                    <TableCell>{contact.company}</TableCell>
-                    <TableCell>{contact.title}</TableCell>
-                    <TableCell>{contact.phone}</TableCell>
+                    <TableCell>
+                      <div className="truncate max-w-[150px]" title={contact.company}>
+                        {contact.company}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate max-w-[150px]" title={contact.title}>
+                        {contact.title}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="truncate max-w-[120px]" title={contact.phone}>
+                        {contact.phone}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={contact.type === 'main' ? 'default' : 'secondary'}>
-                        {contact.type === 'main' ? 'Main' : 'Other'}
+                        {contact.type}
                       </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </div>
       </CardContent>
     </Card>

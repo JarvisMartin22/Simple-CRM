@@ -55,6 +55,7 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
         onImport={importSelectedContacts}
         onCancel={cancelReview}
         isImporting={isImporting}
+        importProgress={importProgress}
         stats={stats}
       />
     );
@@ -62,28 +63,22 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Import Contacts</CardTitle>
-        <CardDescription>
-          Import your contacts from various sources
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="gmail">Gmail</TabsTrigger>
             <TabsTrigger value="csv">CSV Upload</TabsTrigger>
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
           </TabsList>
           
           <TabsContent value="gmail">
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                <h3 className="font-medium mb-2 flex items-center">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter Options
+            <div className="space-y-6">
+              <div className="bg-gray-50 p-6 rounded-md border border-gray-200">
+                <h3 className="font-normal mb-4 flex items-center justify-center">
+                  <Filter className="h-5 w-5 mr-2" />
+                  Import Settings
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-4 max-w-md mx-auto">
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="include-no-email"
@@ -130,28 +125,7 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
                     </label>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="last-contacted">Only include contacts contacted in the last:</Label>
-                    <Select 
-                      value={filterOptions.lastContactedDays}
-                      onValueChange={(value) => 
-                        setFilterOptions(prev => ({ ...prev, lastContactedDays: value }))
-                      }
-                    >
-                      <SelectTrigger id="last-contacted">
-                        <SelectValue placeholder="Select a time period" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">30 days</SelectItem>
-                        <SelectItem value="90">3 months</SelectItem>
-                        <SelectItem value="180">6 months</SelectItem>
-                        <SelectItem value="365">1 year</SelectItem>
-                        <SelectItem value="all">All time</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="pt-2">
+                  <div className="pt-4">
                     <Button 
                       onClick={fetchContacts}
                       className="w-full"
@@ -189,9 +163,9 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
           </TabsContent>
           
           <TabsContent value="manual">
-            <div className="p-4 bg-gray-50 border rounded-md text-center">
-              <Users className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-              <h3 className="font-medium mb-1">Manual Entry</h3>
+            <div className="p-6 bg-gray-50 border rounded-md text-center max-w-md mx-auto">
+              <Users className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+              <h3 className="font-normal mb-2">Manual Entry</h3>
               <p className="text-gray-500 text-sm mb-4">
                 Add contacts one by one with detailed information
               </p>

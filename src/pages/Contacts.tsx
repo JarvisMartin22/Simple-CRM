@@ -91,13 +91,7 @@ const Contacts: React.FC = () => {
 
       {/* Import Contacts Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Import Contacts</DialogTitle>
-            <DialogDescription>
-              Import contacts from Gmail or upload a CSV file
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <ContactImport onClose={() => setShowImportModal(false)} />
         </DialogContent>
       </Dialog>

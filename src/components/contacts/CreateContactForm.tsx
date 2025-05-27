@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface CreateContactFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contact?: Contact;
+  mode?: 'create' | 'edit';
 }
 
 const contactSchema = z.object({
@@ -24,16 +26,13 @@ const contactSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional().or(z.literal('')),
-  title: z.string().optional().or(z.literal('')),
-  company_id: z.string().optional().or(z.literal('none')),
-  website: z.string().optional().or(z.literal('')),
-  notes: z.string().optional().or(z.literal(''))
+  company_id: z.string().optional().or(z.literal('none'))
 });
 
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps) {
-  const { createContact } = useContacts();
+export function CreateContactForm({ open, onOpenChange, contact, mode = 'create' }: CreateContactFormProps) {
+  const { createContact, updateContact } = useContacts();
   const { user } = useAuth();
   const { companies } = useCompanies();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,32 +45,53 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
       last_name: '',
       email: '',
       phone: '',
-      title: '',
-      company_id: 'none',
-      website: '',
-      notes: ''
+      company_id: 'none'
     },
   });
+
+  // Set form values when editing a contact
+  useEffect(() => {
+    if (mode === 'edit' && contact) {
+      form.reset({
+        first_name: contact.first_name || '',
+        last_name: contact.last_name || '',
+        email: contact.email || '',
+        phone: contact.phone || '',
+        company_id: contact.company_id || 'none'
+      });
+      setTags(contact.tags || []);
+    }
+  }, [contact, mode, form]);
 
   const onSubmit = async (values: ContactFormValues) => {
     if (!user) return;
     
     setIsSubmitting(true);
     try {
+      console.log('Submitting contact with values:', values);
+      console.log('Tags:', tags);
+      
       const contactData: Partial<Contact> = {
         ...values,
         company_id: values.company_id === 'none' ? null : values.company_id,
-        tags: tags.map(tag => ({ id: crypto.randomUUID(), tag_name: tag })),
+        tags: tags,
         user_id: user.id
       };
 
-      await createContact(contactData);
-      toast.success('Contact created successfully');
+      console.log('Prepared contact data:', contactData);
+
+      if (mode === 'edit' && contact) {
+        await updateContact(contact.id, contactData);
+        toast.success('Contact updated successfully');
+      } else {
+        await createContact(contactData);
+        toast.success('Contact created successfully');
+      }
       resetForm();
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to create contact:', error);
-      toast.error('Failed to create contact');
+      console.error(`Failed to ${mode} contact:`, error);
+      toast.error(`Failed to ${mode} contact`);
     } finally {
       setIsSubmitting(false);
     }
@@ -89,7 +109,7 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
     }}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Contact</DialogTitle>
+          <DialogTitle>{mode === 'edit' ? 'Edit Contact' : 'Create New Contact'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
@@ -142,14 +162,6 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Job Title</Label>
-              <Input 
-                id="title" 
-                {...form.register('title')} 
-                placeholder="Enter job title" 
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="company_id">Company</Label>
               <Select 
                 onValueChange={(value) => form.setValue('company_id', value)} 
@@ -171,15 +183,6 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
-            <Input 
-              id="website" 
-              {...form.register('website')} 
-              placeholder="Enter website URL" 
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="tags">Tags</Label>
             <TagInput 
               id="tags" 
@@ -189,22 +192,12 @@ export function CreateContactForm({ open, onOpenChange }: CreateContactFormProps
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea 
-              id="notes" 
-              {...form.register('notes')} 
-              placeholder="Enter notes about the contact" 
-              className="min-h-[100px]" 
-            />
-          </div>
-
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Contact'}
+              {isSubmitting ? (mode === 'edit' ? 'Updating...' : 'Creating...') : (mode === 'edit' ? 'Update Contact' : 'Create Contact')}
             </Button>
           </DialogFooter>
         </form>

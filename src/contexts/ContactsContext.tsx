@@ -55,10 +55,7 @@ export interface Contact extends ContactRow {
     value: string;
     type: 'text' | 'number' | 'date' | 'boolean';
   }>;
-  tags?: Array<{
-    id: string;
-    tag_name: string;
-  }>;
+  tags?: string[];
   email_stats?: {
     total_sent: number;
     replies: number;
@@ -84,6 +81,8 @@ interface ContactsContextType {
   refetchContacts: () => Promise<void>;
   toggleFieldVisibility: (id: string) => void;
   refreshContacts: () => Promise<void>;
+  availableTags: string[];
+  refreshTags: () => Promise<void>;
 }
 
 export const ContactsContext = createContext<ContactsContextType | undefined>(undefined);
@@ -100,6 +99,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     { id: uuidv4(), name: 'linkedin', label: 'LinkedIn', type: 'url', visible: true, required: false },
     { id: uuidv4(), name: 'company_id', label: 'Company', type: 'select', visible: true, required: false }
   ]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const { toast } = useToast();
 
   const refreshContacts = useCallback(async () => {
@@ -109,7 +109,10 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('*, companies(*)')
+        .select(`
+          *,
+          companies(*)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -257,6 +260,29 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  // Function to refresh available tags
+  const refreshTags = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Get all unique tags from contacts
+      const uniqueTags = new Set<string>();
+      contacts.forEach(contact => {
+        if (contact.tags) {
+          contact.tags.forEach(tag => uniqueTags.add(tag));
+        }
+      });
+      setAvailableTags(Array.from(uniqueTags).sort());
+    } catch (error) {
+      console.error('Error refreshing tags:', error);
+    }
+  }, [contacts, user]);
+
+  // Refresh tags whenever contacts change
+  useEffect(() => {
+    refreshTags();
+  }, [contacts, refreshTags]);
+
   React.useEffect(() => {
     if (user) {
       refreshContacts();
@@ -279,7 +305,9 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     refetchContacts,
     toggleFieldVisibility,
     refreshContacts,
-  }), [contacts, isLoading, createContact, updateContact, deleteContact, searchContacts, fields, setFields, createField, updateField, deleteField, refetchContacts, toggleFieldVisibility, refreshContacts]);
+    availableTags,
+    refreshTags,
+  }), [contacts, isLoading, createContact, updateContact, deleteContact, searchContacts, fields, setFields, createField, updateField, deleteField, refetchContacts, toggleFieldVisibility, refreshContacts, availableTags, refreshTags]);
 
   return (
     <ContactsContext.Provider value={value}>

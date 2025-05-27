@@ -9,6 +9,7 @@ interface ImportProgress {
   processed: number;
   successful: number;
   failed: number;
+  skipped: number;
 }
 
 export interface Contact {
@@ -53,17 +54,66 @@ interface ImportStats {
   otherContacts: number;
 }
 
+// Common email providers to exclude
+const COMMON_EMAIL_PROVIDERS = new Set([
+  'gmail.com',
+  'outlook.com',
+  'hotmail.com',
+  'yahoo.com',
+  'icloud.com',
+  'aol.com',
+  'protonmail.com',
+  'mail.com',
+  'zoho.com',
+  'live.com',
+  'msn.com',
+  'me.com',
+  'spacemail.com'
+]);
+
+// Function to extract company name from email domain
+const extractCompanyFromEmail = (email: string): string | null => {
+  if (!email) return null;
+  
+  try {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return null;
+    
+    // If it's a common email provider, return null
+    if (COMMON_EMAIL_PROVIDERS.has(domain)) return null;
+    
+    // Extract company name from domain (before the first dot)
+    const companyName = domain.split('.')[0];
+    if (!companyName) return null;
+    
+    // Convert to title case and replace hyphens/underscores with spaces
+    return companyName
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  } catch (error) {
+    console.error('Error extracting company from email:', error);
+    return null;
+  }
+};
+
 export function useGmailContactsImport() {
   const { createContact, refreshContacts } = useContacts();
   const { user } = useAuth();
   const [isImporting, setIsImporting] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [includeNoEmail, setIncludeNoEmail] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({
+    onlyWithName: true,
+    excludeNoReply: true,
+    lastContactedDays: "180"
+  });
   const [importProgress, setImportProgress] = useState<ImportProgress>({
     total: 0,
     processed: 0,
     successful: 0,
-    failed: 0
+    failed: 0,
+    skipped: 0
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
@@ -77,7 +127,8 @@ export function useGmailContactsImport() {
         total: 0,
         processed: 0,
         successful: 0,
-        failed: 0
+        failed: 0,
+        skipped: 0
       });
 
       // First check if Gmail is connected
@@ -202,7 +253,7 @@ export function useGmailContactsImport() {
         } : null
       });
       
-      const fetchedContacts = data.contacts || [];
+      let fetchedContacts = data.contacts || [];
       
       if (fetchedContacts.length === 0) {
         console.warn('No contacts received from Edge Function - check Gmail API access and response');
@@ -214,9 +265,51 @@ export function useGmailContactsImport() {
         return;
       }
 
+      // Process contacts to extract company names from emails
+      fetchedContacts = fetchedContacts.map(contact => {
+        // Try to get company name from email if not already set
+        if (!contact.company && contact.email) {
+          const companyFromEmail = extractCompanyFromEmail(contact.email);
+          if (companyFromEmail) {
+            contact.company = companyFromEmail;
+          }
+        }
+        return contact;
+      });
+
+      // Apply filters based on options
+      if (filterOptions.onlyWithName) {
+        fetchedContacts = fetchedContacts.filter(contact => 
+          (contact.firstName && contact.firstName.trim()) || 
+          (contact.lastName && contact.lastName.trim())
+        );
+      }
+
+      if (filterOptions.excludeNoReply) {
+        fetchedContacts = fetchedContacts.filter(contact => {
+          const email = contact.email?.toLowerCase() || '';
+          return !email.includes('noreply') && 
+                 !email.includes('no-reply') &&
+                 !email.includes('donotreply') &&
+                 !email.includes('do-not-reply') &&
+                 !email.includes('automated') &&
+                 !email.includes('notification') &&
+                 !email.includes('mailer-daemon') &&
+                 !email.includes('postmaster');
+        });
+      }
+
+      if (!includeNoEmail) {
+        fetchedContacts = fetchedContacts.filter(contact => contact.email);
+      }
+
       setContacts(fetchedContacts);
       setSelectedContacts(new Set(fetchedContacts.map((_, i) => i))); // Select all by default
-      setStats(data.stats || { total: fetchedContacts.length, mainContacts: 0, otherContacts: 0 });
+      setStats({
+        total: fetchedContacts.length,
+        mainContacts: fetchedContacts.filter(c => c.type === 'main').length,
+        otherContacts: fetchedContacts.filter(c => c.type === 'other').length
+      });
       setShowReview(true);
 
     } catch (error) {
@@ -229,7 +322,7 @@ export function useGmailContactsImport() {
     } finally {
       setIsFetching(false);
     }
-  }, [includeNoEmail]);
+  }, [includeNoEmail, filterOptions, user]);
 
   const importSelectedContacts = useCallback(async () => {
     try {
@@ -238,11 +331,41 @@ export function useGmailContactsImport() {
       const total = selectedContactsList.length;
       let successful = 0;
       let failed = 0;
+      let skipped = 0;
+
+      // Get the user ID once
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) throw new Error('User not found');
+
+      // First, get all existing contact emails for duplicate checking
+      const { data: existingContacts } = await supabase
+        .from('contacts')
+        .select('email')
+        .eq('user_id', userId)
+        .not('email', 'is', null);
+
+      const existingEmails = new Set(
+        existingContacts?.map(contact => contact.email.toLowerCase()) || []
+      );
 
       for (let i = 0; i < selectedContactsList.length; i++) {
         const contact = selectedContactsList[i];
         try {
-          const userId = (await supabase.auth.getUser()).data.user?.id;
+          const email = (contact.email || contact.emailAddresses?.[0]?.value || '').toLowerCase();
+          
+          // Skip if email already exists
+          if (email && existingEmails.has(email)) {
+            skipped++;
+            setImportProgress({
+              total,
+              processed: i + 1,
+              successful,
+              failed,
+              skipped
+            });
+            continue;
+          }
+
           const companyName = contact.company || contact.organizations?.[0]?.name;
           let companyId = null;
 
@@ -286,18 +409,14 @@ export function useGmailContactsImport() {
             title: contact.title || contact.organizations?.[0]?.title || '',
             company_id: companyId,
             website: contact.website || contact.urls?.[0]?.value || '',
-            source: 'gmail',
-            tags: Array.isArray(contact.tags) ? contact.tags : ['gmail-import'],
-            type: contact.type
+            source: contact.type === 'other' ? 'gmail-other' : 'gmail',
+            tags: Array.isArray(contact.tags) ? contact.tags : [contact.type === 'other' ? 'gmail-other' : 'gmail-import']
           };
           
           console.log(`Inserting contact ${i+1}/${selectedContactsList.length}:`, JSON.stringify(contactData));
           
           // Try regular insert first
-          const { error: insertError } = await supabase.from('contacts').insert({
-            ...contactData,
-            tags: Array.isArray(contactData.tags) ? contactData.tags : ['gmail-import']
-          });
+          const { error: insertError } = await supabase.from('contacts').insert(contactData);
 
           if (insertError) {
             console.error('Failed to insert contact:', {
@@ -368,7 +487,8 @@ export function useGmailContactsImport() {
             total,
             processed: i + 1,
             successful,
-            failed
+            failed,
+            skipped
           });
         } catch (error) {
           console.error('Error processing contact:', error);
@@ -381,14 +501,14 @@ export function useGmailContactsImport() {
         }
       }
 
-      console.log(`Import completed: ${successful} successful, ${failed} failed`);
+      console.log(`Import completed: ${successful} successful, ${failed} failed, ${skipped} skipped`);
 
       // Refresh the contacts list
       await refreshContacts();
 
       toast({
         title: "Import Complete",
-        description: `Successfully imported ${successful} contacts. ${failed} failed.`
+        description: `Successfully imported ${successful} contacts. ${failed} failed. ${skipped} skipped (already exist).`
       });
 
       // Reset state

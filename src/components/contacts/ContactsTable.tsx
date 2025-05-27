@@ -36,6 +36,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/components/ui/use-toast';
+import { CreateContactForm } from '@/components/contacts/CreateContactForm';
+import { TagInput } from '@/components/ui/tag-input';
+import { Label } from '@/components/ui/label';
 
 interface ContactsTableProps {
   contacts: Contact[];
@@ -52,9 +55,14 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
   const [emailContact, setEmailContact] = useState<{ id: string, email: string, name: string } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<string | null>(null);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTags, setEditingTags] = useState<string | null>(null);
   const { isEmailConnected } = useEmail();
-  const { deleteContact } = useContacts();
+  const { deleteContact, updateContact, availableTags } = useContacts();
   const { toast } = useToast();
+  
+  console.log('ContactsTable render:', { contacts, isLoading, searchQuery });
   
   // Filter contacts based on search query
   const filteredContacts = contacts.filter(contact => {
@@ -66,11 +74,13 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
     return (
       fullName.includes(query) ||
       (contact.email && contact.email.toLowerCase().includes(query)) ||
-      (contact.companies?.name && contact.companies.name.toLowerCase().includes(query)) ||
-      (contact.title && contact.title.toLowerCase().includes(query)) ||
+      (contact.company?.name && contact.company.name.toLowerCase().includes(query)) ||
+      (contact.employment_history?.[0]?.title && contact.employment_history[0].title.toLowerCase().includes(query)) ||
       (contact.phone && contact.phone.toLowerCase().includes(query))
     );
   });
+  
+  console.log('Filtered contacts:', filteredContacts);
   
   // Handler for deleting a contact
   const handleDeleteContact = async (contactId: string) => {
@@ -116,6 +126,46 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
       });
     }
   };
+
+  // Function to handle tag updates for a single contact
+  const handleTagUpdate = async (contactId: string, newTags: string[]) => {
+    try {
+      await updateContact(contactId, { tags: newTags });
+      setEditingTags(null);
+      toast({
+        title: "Success",
+        description: "Tags updated successfully"
+      });
+    } catch (error) {
+      console.error('Failed to update tags:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update tags",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Function to handle batch tag updates for selected contacts
+  const handleBatchTagUpdate = async (newTags: string[]) => {
+    try {
+      const promises = selectedContacts.map(contactId => 
+        updateContact(contactId, { tags: newTags })
+      );
+      await Promise.all(promises);
+      toast({
+        title: "Success",
+        description: `Tags updated for ${selectedContacts.length} contacts`
+      });
+    } catch (error) {
+      console.error('Failed to update tags:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update tags",
+        variant: "destructive"
+      });
+    }
+  };
   
   if (isLoading) {
     return <ContactsTableSkeleton />;
@@ -149,7 +199,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             <TableHead>Name</TableHead>
             <TableHead>Title</TableHead>
             <TableHead>Company</TableHead>
-            <TableHead>Email</TableHead>
+            <TableHead className="w-[250px]">Email</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>Tags</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -178,22 +228,71 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium">{contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}</div>
+                    <div className="font-normal">
+                      {`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact'}
+                    </div>
                     <div className="text-sm text-muted-foreground">Added {new Date(contact.created_at).toLocaleDateString()}</div>
                   </div>
                 </div>
               </TableCell>
-              <TableCell>{contact.title || '-'}</TableCell>
-              <TableCell>{contact.companies?.name || '-'}</TableCell>
-              <TableCell>{contact.email}</TableCell>
+              <TableCell>
+                <div className="text-muted-foreground text-sm">Not available yet</div>
+              </TableCell>
+              <TableCell>{contact.company?.name || '-'}</TableCell>
+              <TableCell>
+                <div className="truncate max-w-[250px]" title={contact.email || ''}>
+                  {contact.email || '-'}
+                </div>
+              </TableCell>
               <TableCell>{contact.phone || '-'}</TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
-                  {contact.tags && contact.tags.map(tag => (
-                    <Badge key={tag} variant="outline" className="bg-gray-50">
-                      {tag}
-                    </Badge>
-                  ))}
+                  <Popover open={editingTags === contact.id} onOpenChange={(open) => setEditingTags(open ? contact.id : null)}>
+                    <PopoverTrigger asChild>
+                      <div className="flex flex-wrap gap-1 cursor-pointer group">
+                        {contact.tags && contact.tags.map((tag, index) => {
+                          const colors = [
+                            'bg-blue-50 text-blue-700 border-blue-300',
+                            'bg-green-50 text-green-700 border-green-300',
+                            'bg-purple-50 text-purple-700 border-purple-300',
+                            'bg-rose-50 text-rose-700 border-rose-300',
+                            'bg-amber-50 text-amber-700 border-amber-300',
+                            'bg-teal-50 text-teal-700 border-teal-300'
+                          ];
+                          const colorIndex = Math.abs(tag.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                          
+                          return (
+                            <Badge 
+                              key={index} 
+                              variant="outline"
+                              className={`px-2 py-0.5 ${colors[colorIndex]} border rounded-md font-medium text-xs hover:bg-opacity-80 transition-colors group-hover:ring-2 ring-offset-1 ring-primary/20`}
+                            >
+                              {tag}
+                            </Badge>
+                          );
+                        })}
+                        {(!contact.tags || contact.tags.length === 0) && (
+                          <div className="text-sm text-muted-foreground italic group-hover:text-primary">
+                            Click to add tags
+                          </div>
+                        )}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Edit Tags</Label>
+                          <TagInput
+                            id={`tags-${contact.id}`}
+                            tags={contact.tags || []}
+                            setTags={(newTags) => handleTagUpdate(contact.id, newTags)}
+                            placeholder="Add tags..."
+                            availableTags={availableTags}
+                          />
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </TableCell>
               <TableCell className="text-right">
@@ -205,7 +304,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                       onClick={() => setEmailContact({
                         id: contact.id,
                         email: contact.email,
-                        name: contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+                        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
                       })}
                     >
                       <Mail className="h-4 w-4" />
@@ -219,7 +318,12 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          setEditContact(contact);
+                          setEditDialogOpen(true);
+                        }}
+                      >
                         <Pencil className="mr-2 h-4 w-4" />
                         <span>Edit Contact</span>
                       </DropdownMenuItem>
@@ -316,9 +420,17 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Add bulk delete button if contacts are selected */}
+      {/* Edit Contact Dialog */}
+      <CreateContactForm
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        contact={editContact || undefined}
+        mode="edit"
+      />
+      
+      {/* Add batch tag editing when contacts are selected */}
       {selectedContacts.length > 0 && (
-        <div className="mt-4 flex justify-start">
+        <div className="mt-4 flex items-center gap-4">
           <Button 
             variant="destructive" 
             size="sm"
@@ -330,6 +442,17 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             <Trash2 className="mr-2 h-4 w-4" />
             Delete Selected ({selectedContacts.length})
           </Button>
+          
+          <div className="flex-1 max-w-md">
+            <Label>Edit Tags for Selected Contacts</Label>
+            <TagInput
+              id="batch-tags"
+              tags={[]}
+              setTags={handleBatchTagUpdate}
+              placeholder="Add tags to selected contacts..."
+              availableTags={availableTags}
+            />
+          </div>
         </div>
       )}
     </div>

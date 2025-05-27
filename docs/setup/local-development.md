@@ -75,7 +75,7 @@ npm run dev
 ```
 
 2. Access the application:
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:8080
 - Supabase Studio: http://127.0.0.1:54323
 - Email testing: http://127.0.0.1:54324
 
