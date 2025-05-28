@@ -26,7 +26,7 @@ import Tasks from './pages/Tasks';
 import Notes from './pages/Notes';
 import Campaigns from './pages/Campaigns';
 import CampaignCreate from './pages/CampaignCreate';
-import CampaignDetail from './pages/CampaignDetail';
+import CampaignDetails from './pages/CampaignDetails';
 import CampaignEdit from './pages/CampaignEdit';
 import Templates from './pages/Templates';
 import Calendar from './pages/Calendar';
@@ -165,7 +165,7 @@ const App: React.FC = () => {
                         element={
                           <ProtectedRoute>
                             <Layout>
-                              <CampaignDetail />
+                              <CampaignDetails />
                             </Layout>
                           </ProtectedRoute>
                         } 

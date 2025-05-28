@@ -1,5 +1,7 @@
 export interface CampaignAnalytics {
+  id: string;
   campaign_id: string;
+  sequence_id?: string;
   total_recipients: number;
   sent_count: number;
   delivered_count: number;
@@ -10,9 +12,53 @@ export interface CampaignAnalytics {
   bounced_count: number;
   complained_count: number;
   unsubscribed_count: number;
-  last_event_at: string;
+  last_event_at?: string;
+  created_at?: string;
+  updated_at?: string;
   engagementData: EngagementDataPoint[];
   recipientData: RecipientAnalytics[];
+}
+
+export interface RecipientAnalytics {
+  id: string;
+  campaign_id: string;
+  sequence_id?: string;
+  recipient_id: string;
+  sent_at?: string;
+  delivered_at?: string;
+  first_opened_at?: string;
+  last_opened_at?: string;
+  open_count: number;
+  first_clicked_at?: string;
+  last_clicked_at?: string;
+  click_count: number;
+  bounced_at?: string;
+  bounce_reason?: string;
+  unsubscribed_at?: string;
+}
+
+export interface LinkClick {
+  id: string;
+  campaign_id: string;
+  sequence_id?: string;
+  recipient_id: string;
+  link_url: string;
+  click_count: number;
+  first_clicked_at?: string;
+  last_clicked_at?: string;
+}
+
+export interface EmailEvent {
+  id: string;
+  campaign_id: string;
+  sequence_id?: string;
+  recipient_id: string;
+  event_type: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed';
+  event_data?: any;
+  ip_address?: string;
+  user_agent?: string;
+  link_url?: string;
+  created_at?: string;
 }
 
 export interface EngagementDataPoint {
@@ -23,27 +69,7 @@ export interface EngagementDataPoint {
   complaints: number;
 }
 
-export interface RecipientAnalytics {
-  id: string;
-  campaign_id: string;
-  email: string;
-  sent_at: string | null;
-  delivered_at: string | null;
-  first_opened_at: string | null;
-  last_opened_at: string | null;
-  open_count: number;
-  first_clicked_at: string | null;
-  last_clicked_at: string | null;
-  click_count: number;
-  bounced_at: string | null;
-  bounce_reason: string | null;
-  unsubscribed_at: string | null;
-  links_clicked: LinkClick[];
-}
-
-export interface LinkClick {
-  url: string;
-  clicks: number;
-  first_clicked: string;
-  last_clicked: string;
+export interface AnalyticsPeriod {
+  start_date: Date;
+  end_date: Date;
 } 

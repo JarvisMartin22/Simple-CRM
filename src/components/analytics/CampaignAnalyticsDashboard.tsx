@@ -20,22 +20,23 @@ import {
 import { Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
-import { EngagementOverTime, EngagementRates, LinkClicksChart } from './AnalyticsCharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EngagementChart } from './charts/EngagementChart';
 import { PerformanceMetrics } from './metrics/PerformanceMetrics';
 import { RecipientTable } from './tables/RecipientTable';
-import { useParams } from 'react-router-dom';
-import { exportAnalyticsData } from '../../lib/analytics';
 
-export const CampaignAnalyticsDashboard: React.FC = () => {
-  const { campaignId } = useParams<{ campaignId: string }>();
+interface CampaignAnalyticsDashboardProps {
+  campaignId: string;
+}
+
+const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({ campaignId }) => {
   const {
     analytics,
     recipientAnalytics,
     linkClicks,
     events,
     loading,
+    error,
     fetchAnalytics,
     fetchRecipientAnalytics,
     fetchLinkClicks,
@@ -78,11 +79,6 @@ export const CampaignAnalyticsDashboard: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const linkClicksData = linkClicks.map(click => ({
-    url: click.link_url,
-    clicks: click.click_count,
-  }));
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -91,19 +87,36 @@ export const CampaignAnalyticsDashboard: React.FC = () => {
     );
   }
 
-  const handleExport = async () => {
-    if (!campaignId) return;
-    await exportAnalyticsData(campaignId);
-  };
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-destructive">Error: {error}</p>
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">No analytics data available</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 p-4">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Campaign Analytics</h2>
-        <Button onClick={handleExport} variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Export Data
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={refreshData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={exportAnalytics} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -135,12 +148,28 @@ export const CampaignAnalyticsDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Recipient Activity</CardTitle>
-              <CardDescription>
-                Detailed breakdown of individual recipient engagement
-              </CardDescription>
+              <div className="flex items-center gap-4 mt-2">
+                <Input
+                  placeholder="Search recipients..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Recipients</SelectItem>
+                    <SelectItem value="opened">Opened</SelectItem>
+                    <SelectItem value="clicked">Clicked</SelectItem>
+                    <SelectItem value="bounced">Bounced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              <RecipientTable recipients={analytics.recipientData} />
+              <RecipientTable recipients={filteredRecipients} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -154,11 +183,47 @@ export const CampaignAnalyticsDashboard: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Link performance table/chart will go here */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Link URL</TableHead>
+                    <TableHead className="text-right">Clicks</TableHead>
+                    <TableHead>First Click</TableHead>
+                    <TableHead>Last Click</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {linkClicks.map((link) => (
+                    <TableRow key={link.id}>
+                      <TableCell className="font-medium">{link.link_url}</TableCell>
+                      <TableCell className="text-right">{link.click_count}</TableCell>
+                      <TableCell>
+                        {link.first_clicked_at
+                          ? format(new Date(link.first_clicked_at), 'PPp')
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {link.last_clicked_at
+                          ? format(new Date(link.last_clicked_at), 'PPp')
+                          : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {linkClicks.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No link clicks recorded
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
   );
-}; 
+};
+
+export default CampaignAnalyticsDashboard; 

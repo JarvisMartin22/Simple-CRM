@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { CampaignAnalytics, EngagementDataPoint, RecipientAnalytics } from '../types/analytics';
+import { CampaignAnalytics, EngagementDataPoint, RecipientAnalytics, LinkClick, EmailEvent, AnalyticsPeriod } from '../types/analytics';
 import { useToast } from '@/components/ui/use-toast';
 
 export interface CampaignAnalytics {
@@ -66,88 +66,18 @@ export interface EmailEvent {
   created_at?: string;
 }
 
-export interface AnalyticsPeriod {
-  start_date: Date;
-  end_date: Date;
-}
-
 interface UseCampaignAnalyticsResult {
-  data: CampaignAnalytics | null;
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-}
-
-export function useCampaignAnalytics(campaignId: string | undefined): UseCampaignAnalyticsResult {
-  const [data, setData] = useState<CampaignAnalytics | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const { toast } = useToast();
-
-  const fetchAnalytics = async () => {
-    if (!campaignId) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch campaign analytics
-      const { data: analyticsData, error: analyticsError } = await supabase
-        .from('campaign_analytics')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .single();
-
-      if (analyticsError) throw analyticsError;
-
-      // Fetch engagement data
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('email_events')
-        .select('event_type, created_at')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true });
-
-      if (eventsError) throw eventsError;
-
-      // Process events into time series data
-      const engagementData: EngagementDataPoint[] = processEventsData(eventsData);
-
-      // Fetch recipient analytics
-      const { data: recipientData, error: recipientError } = await supabase
-        .from('recipient_analytics')
-        .select(`
-          *,
-          links_clicked:link_clicks(*)
-        `)
-        .eq('campaign_id', campaignId);
-
-      if (recipientError) throw recipientError;
-
-      setData({
-        ...analyticsData,
-        engagementData,
-        recipientData,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch analytics'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [campaignId]);
-
-  return {
-    data,
-    isLoading,
-    error,
-    refetch: fetchAnalytics,
-  };
+  analytics: CampaignAnalytics | null;
+  recipientAnalytics: RecipientAnalytics[];
+  linkClicks: LinkClick[];
+  events: EmailEvent[];
+  loading: boolean;
+  error: string | null;
+  fetchAnalytics: () => Promise<void>;
+  fetchRecipientAnalytics: () => Promise<void>;
+  fetchLinkClicks: () => Promise<void>;
+  fetchEvents: (period?: AnalyticsPeriod) => Promise<void>;
+  exportAnalytics: () => Promise<void>;
 }
 
 function processEventsData(events: any[]): EngagementDataPoint[] {
@@ -186,7 +116,7 @@ function processEventsData(events: any[]): EngagementDataPoint[] {
   );
 }
 
-export const useCampaignAnalytics = (campaignId?: string) => {
+export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsResult {
   const [analytics, setAnalytics] = useState<CampaignAnalytics | null>(null);
   const [recipientAnalytics, setRecipientAnalytics] = useState<RecipientAnalytics[]>([]);
   const [linkClicks, setLinkClicks] = useState<LinkClick[]>([]);
@@ -244,41 +174,34 @@ export const useCampaignAnalytics = (campaignId?: string) => {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+      toast({
+        title: "Error",
+        description: "Failed to fetch analytics data",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [campaignId]);
-
   const fetchRecipientAnalytics = async () => {
     if (!campaignId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('recipient_analytics')
         .select('*')
         .eq('campaign_id', campaignId);
 
-      if (fetchError) throw fetchError;
-
+      if (error) throw error;
       setRecipientAnalytics(data || []);
-      return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error('Error fetching recipient analytics:', err);
       toast({
-        title: 'Error fetching recipient analytics',
-        description: err.message,
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to fetch recipient analytics",
+        variant: "destructive",
       });
-      return [];
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -286,28 +209,20 @@ export const useCampaignAnalytics = (campaignId?: string) => {
     if (!campaignId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from('link_clicks')
         .select('*')
         .eq('campaign_id', campaignId);
 
-      if (fetchError) throw fetchError;
-
+      if (error) throw error;
       setLinkClicks(data || []);
-      return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error('Error fetching link clicks:', err);
       toast({
-        title: 'Error fetching link clicks',
-        description: err.message,
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to fetch link click data",
+        variant: "destructive",
       });
-      return [];
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -315,9 +230,6 @@ export const useCampaignAnalytics = (campaignId?: string) => {
     if (!campaignId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-
       let query = supabase
         .from('email_events')
         .select('*')
@@ -329,74 +241,60 @@ export const useCampaignAnalytics = (campaignId?: string) => {
           .lte('created_at', period.end_date.toISOString());
       }
 
-      const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: true });
 
-      if (fetchError) throw fetchError;
-
+      if (error) throw error;
       setEvents(data || []);
-      return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error('Error fetching events:', err);
       toast({
-        title: 'Error fetching events',
-        description: err.message,
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to fetch event data",
+        variant: "destructive",
       });
-      return [];
-    } finally {
-      setLoading(false);
     }
   };
 
   const exportAnalytics = async () => {
     if (!campaignId) return;
-
+    
     try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch all necessary data
-      const [analyticsData, recipientData, linkData, eventData] = await Promise.all([
-        fetchAnalytics(),
-        fetchRecipientAnalytics(),
-        fetchLinkClicks(),
-        fetchEvents(),
-      ]);
-
-      // Prepare export data
       const exportData = {
-        campaign_analytics: analyticsData,
-        recipient_analytics: recipientData,
-        link_clicks: linkData,
-        events: eventData,
+        analytics,
+        recipientAnalytics,
+        linkClicks,
+        events,
+        exported_at: new Date().toISOString(),
       };
 
-      // Create and download CSV
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `campaign-analytics-${campaignId}-${new Date().toISOString()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
 
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `campaign-analytics-${campaignId}-${new Date().toISOString()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting analytics:', err);
       toast({
-        title: 'Analytics exported',
-        description: 'Successfully exported analytics data.',
+        title: "Error",
+        description: "Failed to export analytics data",
+        variant: "destructive",
       });
-    } catch (err: any) {
-      setError(err.message);
-      toast({
-        title: 'Error exporting analytics',
-        description: err.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAnalytics();
+    fetchRecipientAnalytics();
+    fetchLinkClicks();
+    fetchEvents();
+  }, [campaignId]);
 
   return {
     analytics,
@@ -411,4 +309,4 @@ export const useCampaignAnalytics = (campaignId?: string) => {
     fetchEvents,
     exportAnalytics,
   };
-}; 
+} 
