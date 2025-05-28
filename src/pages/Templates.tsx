@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,9 @@ const templateSchema = z.object({
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
 const Templates: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnUrl = searchParams.get('returnUrl');
   const { loading, error, fetchTemplates, createTemplate, updateTemplate, deleteTemplate } = useCampaignTemplates();
   const [templates, setTemplates] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,6 +74,10 @@ const Templates: React.FC = () => {
         setTemplates([template, ...templates]);
         form.reset();
         setIsEditing(false);
+        
+        if (returnUrl) {
+          navigate(returnUrl);
+        }
       }
     } finally {
       setIsSubmitting(false);

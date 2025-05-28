@@ -73,23 +73,28 @@ ALTER TABLE public.campaign_recipients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaign_sequences ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for campaign_templates
+DROP POLICY IF EXISTS "Users can view their own templates" ON public.campaign_templates;
 CREATE POLICY "Users can view their own templates"
   ON public.campaign_templates FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create their own templates" ON public.campaign_templates;
 CREATE POLICY "Users can create their own templates"
   ON public.campaign_templates FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own templates" ON public.campaign_templates;
 CREATE POLICY "Users can update their own templates"
   ON public.campaign_templates FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own templates" ON public.campaign_templates;
 CREATE POLICY "Users can delete their own templates"
   ON public.campaign_templates FOR DELETE
   USING (auth.uid() = user_id);
 
 -- RLS Policies for campaign_recipients
+DROP POLICY IF EXISTS "Users can view their own campaign recipients" ON public.campaign_recipients;
 CREATE POLICY "Users can view their own campaign recipients"
   ON public.campaign_recipients FOR SELECT
   USING (EXISTS (
@@ -98,6 +103,7 @@ CREATE POLICY "Users can view their own campaign recipients"
     AND campaigns.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "Users can manage their own campaign recipients" ON public.campaign_recipients;
 CREATE POLICY "Users can manage their own campaign recipients"
   ON public.campaign_recipients FOR ALL
   USING (EXISTS (
@@ -107,6 +113,7 @@ CREATE POLICY "Users can manage their own campaign recipients"
   ));
 
 -- RLS Policies for campaign_sequences
+DROP POLICY IF EXISTS "Users can view their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can view their own campaign sequences"
   ON public.campaign_sequences FOR SELECT
   USING (EXISTS (
@@ -115,6 +122,7 @@ CREATE POLICY "Users can view their own campaign sequences"
     AND campaigns.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "Users can manage their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can manage their own campaign sequences"
   ON public.campaign_sequences FOR ALL
   USING (EXISTS (

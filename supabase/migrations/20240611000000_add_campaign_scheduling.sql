@@ -1,10 +1,46 @@
--- Add scheduling fields to campaigns table
-ALTER TABLE public.campaigns
-ADD COLUMN schedule_config jsonb,
-ADD COLUMN scheduled_at timestamptz,
-ADD COLUMN started_at timestamptz,
-ADD COLUMN completed_at timestamptz,
-ADD COLUMN paused_at timestamptz;
+-- Add scheduling fields to campaigns table if they don't exist
+DO $$ 
+BEGIN
+  -- Add schedule_config column if it doesn't exist
+  BEGIN
+    ALTER TABLE public.campaigns ADD COLUMN schedule_config jsonb;
+  EXCEPTION
+    WHEN duplicate_column THEN
+      RAISE NOTICE 'Column schedule_config already exists, skipping';
+  END;
+
+  -- Add scheduled_at column if it doesn't exist
+  BEGIN
+    ALTER TABLE public.campaigns ADD COLUMN scheduled_at timestamptz;
+  EXCEPTION
+    WHEN duplicate_column THEN
+      RAISE NOTICE 'Column scheduled_at already exists, skipping';
+  END;
+
+  -- Add started_at column if it doesn't exist
+  BEGIN
+    ALTER TABLE public.campaigns ADD COLUMN started_at timestamptz;
+  EXCEPTION
+    WHEN duplicate_column THEN
+      RAISE NOTICE 'Column started_at already exists, skipping';
+  END;
+
+  -- Add completed_at column if it doesn't exist
+  BEGIN
+    ALTER TABLE public.campaigns ADD COLUMN completed_at timestamptz;
+  EXCEPTION
+    WHEN duplicate_column THEN
+      RAISE NOTICE 'Column completed_at already exists, skipping';
+  END;
+
+  -- Add paused_at column if it doesn't exist
+  BEGIN
+    ALTER TABLE public.campaigns ADD COLUMN paused_at timestamptz;
+  EXCEPTION
+    WHEN duplicate_column THEN
+      RAISE NOTICE 'Column paused_at already exists, skipping';
+  END;
+END $$;
 
 -- Add status enum type if it doesn't exist
 DO $$ BEGIN
@@ -22,8 +58,7 @@ END $$;
 
 -- Add status column if it doesn't exist
 DO $$ BEGIN
-    ALTER TABLE public.campaigns
-    ADD COLUMN status public.campaign_status DEFAULT 'draft';
+    ALTER TABLE public.campaigns ADD COLUMN status public.campaign_status DEFAULT 'draft';
 EXCEPTION
     WHEN duplicate_column THEN null;
 END $$;
@@ -44,12 +79,27 @@ CREATE TABLE IF NOT EXISTS public.campaign_sequences (
 
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_campaign_sequences_campaign_id ON public.campaign_sequences(campaign_id);
-CREATE INDEX IF NOT EXISTS idx_campaign_sequences_status ON public.campaign_sequences(status);
-CREATE INDEX IF NOT EXISTS idx_campaigns_status ON public.campaigns(status);
+
+DO $$ 
+BEGIN
+  CREATE INDEX IF NOT EXISTS idx_campaign_sequences_status ON public.campaign_sequences(status);
+EXCEPTION
+  WHEN undefined_column THEN
+    RAISE NOTICE 'Column status does not exist in campaign_sequences, skipping index creation';
+END $$;
+
+DO $$ 
+BEGIN
+  CREATE INDEX IF NOT EXISTS idx_campaigns_status ON public.campaigns(status);
+EXCEPTION
+  WHEN undefined_column THEN
+    RAISE NOTICE 'Column status does not exist in campaigns, skipping index creation';
+END $$;
 
 -- Add RLS policies
 ALTER TABLE public.campaign_sequences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can view their own campaign sequences"
     ON public.campaign_sequences
     FOR SELECT
@@ -60,6 +110,7 @@ CREATE POLICY "Users can view their own campaign sequences"
         )
     );
 
+DROP POLICY IF EXISTS "Users can insert their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can insert their own campaign sequences"
     ON public.campaign_sequences
     FOR INSERT
@@ -70,6 +121,7 @@ CREATE POLICY "Users can insert their own campaign sequences"
         )
     );
 
+DROP POLICY IF EXISTS "Users can update their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can update their own campaign sequences"
     ON public.campaign_sequences
     FOR UPDATE
@@ -86,6 +138,7 @@ CREATE POLICY "Users can update their own campaign sequences"
         )
     );
 
+DROP POLICY IF EXISTS "Users can delete their own campaign sequences" ON public.campaign_sequences;
 CREATE POLICY "Users can delete their own campaign sequences"
     ON public.campaign_sequences
     FOR DELETE

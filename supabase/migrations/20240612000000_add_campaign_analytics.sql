@@ -243,24 +243,17 @@ ALTER TABLE public.recipient_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.link_clicks ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for email_events
+DROP POLICY IF EXISTS "Users can view their own email events" ON public.email_events;
 CREATE POLICY "Users can view their own email events"
     ON public.email_events
     FOR SELECT
-    USING (
-        campaign_id IN (
-            SELECT id FROM public.campaigns
-            WHERE user_id = auth.uid()
-        )
-    );
+    USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Service role can insert email events" ON public.email_events;
 CREATE POLICY "Service role can insert email events"
     ON public.email_events
     FOR INSERT
-    WITH CHECK (
-        campaign_id IN (
-            SELECT id FROM public.campaigns
-        )
-    );
+    WITH CHECK (true);
 
 -- RLS Policies for campaign_analytics
 CREATE POLICY "Users can view their own campaign analytics"
@@ -388,10 +381,50 @@ BEGIN
 END;
 $$;
 
--- Drop existing trigger if it exists
-DROP TRIGGER IF EXISTS update_analytics_on_event ON public.email_events;
+-- Create function to update campaign analytics
+CREATE OR REPLACE FUNCTION public.update_campaign_analytics()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update campaign analytics based on the event type
+    UPDATE public.campaign_analytics
+    SET
+        sent_count = CASE 
+            WHEN NEW.event_type = 'sent' THEN sent_count + 1
+            ELSE sent_count
+        END,
+        delivered_count = CASE 
+            WHEN NEW.event_type = 'delivered' THEN delivered_count + 1
+            ELSE delivered_count
+        END,
+        opened_count = CASE 
+            WHEN NEW.event_type = 'opened' THEN opened_count + 1
+            ELSE opened_count
+        END,
+        clicked_count = CASE 
+            WHEN NEW.event_type = 'clicked' THEN clicked_count + 1
+            ELSE clicked_count
+        END,
+        bounced_count = CASE 
+            WHEN NEW.event_type = 'bounced' THEN bounced_count + 1
+            ELSE bounced_count
+        END,
+        complained_count = CASE 
+            WHEN NEW.event_type = 'complained' THEN complained_count + 1
+            ELSE complained_count
+        END,
+        unsubscribed_count = CASE 
+            WHEN NEW.event_type = 'unsubscribed' THEN unsubscribed_count + 1
+            ELSE unsubscribed_count
+        END,
+        last_event_at = NOW()
+    WHERE campaign_id = NEW.campaign_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Create trigger for email events
+DROP TRIGGER IF EXISTS update_analytics_on_event ON public.email_events;
 CREATE TRIGGER update_analytics_on_event
     AFTER INSERT ON public.email_events
     FOR EACH ROW

@@ -8,7 +8,7 @@ export interface Campaign {
   user_id: string;
   name: string;
   description?: string;
-  type: 'one-time' | 'sequence';
+  type: 'one_time' | 'automated' | 'sequence';
   status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'failed';
   template_id?: string;
   audience_filter?: {
@@ -62,8 +62,13 @@ export const useCampaigns = () => {
       setLoading(true);
       setError(null);
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const status = campaign.schedule_config?.enabled ? 'scheduled' : 'draft';
-      const scheduled_at = campaign.schedule_config?.enabled && campaign.schedule_config.startDate
+      
+      // Convert schedule config to start_date
+      const start_date = campaign.schedule_config?.enabled && campaign.schedule_config.startDate
         ? new Date(
             campaign.schedule_config.startDate.setHours(
               parseInt(campaign.schedule_config.startTime?.split(':')[0] || '0'),
@@ -72,12 +77,48 @@ export const useCampaigns = () => {
           ).toISOString()
         : null;
 
+      // Calculate end_date based on campaign type and schedule
+      let end_date = null;
+      if (campaign.schedule_config?.enabled && campaign.schedule_config.recurringSchedule) {
+        const { frequency, interval } = campaign.schedule_config.recurringSchedule;
+        const startDate = new Date(start_date!);
+        
+        switch (frequency) {
+          case 'daily':
+            end_date = new Date(startDate.setDate(startDate.getDate() + interval)).toISOString();
+            break;
+          case 'weekly':
+            end_date = new Date(startDate.setDate(startDate.getDate() + (interval * 7))).toISOString();
+            break;
+          case 'monthly':
+            end_date = new Date(startDate.setMonth(startDate.getMonth() + interval)).toISOString();
+            break;
+        }
+      }
+
+      // Combine schedule config and audience filter into one JSONB object
+      const schedule_config = campaign.schedule_config?.enabled ? JSON.stringify({
+        ...campaign.schedule_config,
+        audience: campaign.audience_filter ? {
+          contacts: campaign.audience_filter.contacts.map(contact => ({
+            id: contact.id,
+            email: contact.email || null
+          })),
+          size: campaign.audience_filter.size
+        } : null
+      }) : null;
+
       const { data, error: createError } = await supabase
         .from('campaigns')
         .insert([{
-          ...campaign,
+          user_id: user.id,
+          name: campaign.name,
+          description: campaign.description,
+          type: campaign.type,
+          template_id: campaign.template_id,
           status,
-          scheduled_at,
+          scheduled_at: start_date,
+          schedule_config
         }])
         .select()
         .single();
@@ -88,7 +129,7 @@ export const useCampaigns = () => {
       if (campaign.type === 'sequence' && campaign.schedule_config?.enabled && campaign.schedule_config.recurringSchedule) {
         const { frequency, interval, daysOfWeek, timeOfDay } = campaign.schedule_config.recurringSchedule;
         const sequences = [];
-        let currentDate = new Date(scheduled_at!);
+        let currentDate = new Date(start_date!);
 
         // Generate the next 10 sequences
         for (let i = 1; i <= 10; i++) {

@@ -51,10 +51,19 @@ export const useCampaignTemplates = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Get the current user's ID
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
       
       const { data, error: createError } = await supabase
         .from('campaign_templates')
-        .insert([template])
+        .insert([{
+          ...template,
+          user_id: user.id
+        }])
         .select()
         .single();
       

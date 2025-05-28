@@ -1,70 +1,19 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { CampaignAnalytics, EngagementDataPoint, RecipientAnalytics, LinkClick, EmailEvent, AnalyticsPeriod } from '../types/analytics';
+import { useCallback, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import type { 
+  CampaignAnalytics as ICampaignAnalytics,
+  EngagementDataPoint,
+  RecipientAnalytics as IRecipientAnalytics,
+  LinkClick as ILinkClick,
+  EmailEvent as IEmailEvent,
+  AnalyticsPeriod 
+} from '../types/analytics';
 import { useToast } from '@/components/ui/use-toast';
 
-export interface CampaignAnalytics {
-  id: string;
-  campaign_id: string;
-  sequence_id?: string;
-  total_recipients: number;
-  sent_count: number;
-  delivered_count: number;
-  opened_count: number;
-  unique_opened_count: number;
-  clicked_count: number;
-  unique_clicked_count: number;
-  bounced_count: number;
-  complained_count: number;
-  unsubscribed_count: number;
-  last_event_at?: string;
-  created_at?: string;
-  updated_at?: string;
-  engagementData: EngagementDataPoint[];
-  recipientData: RecipientAnalytics[];
-}
-
-export interface RecipientAnalytics {
-  id: string;
-  campaign_id: string;
-  sequence_id?: string;
-  recipient_id: string;
-  sent_at?: string;
-  delivered_at?: string;
-  first_opened_at?: string;
-  last_opened_at?: string;
-  open_count: number;
-  first_clicked_at?: string;
-  last_clicked_at?: string;
-  click_count: number;
-  bounced_at?: string;
-  bounce_reason?: string;
-  unsubscribed_at?: string;
-}
-
-export interface LinkClick {
-  id: string;
-  campaign_id: string;
-  sequence_id?: string;
-  recipient_id: string;
-  link_url: string;
-  click_count: number;
-  first_clicked_at?: string;
-  last_clicked_at?: string;
-}
-
-export interface EmailEvent {
-  id: string;
-  campaign_id: string;
-  sequence_id?: string;
-  recipient_id: string;
-  event_type: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed';
-  event_data?: any;
-  ip_address?: string;
-  user_agent?: string;
-  link_url?: string;
-  created_at?: string;
-}
+export interface CampaignAnalytics extends ICampaignAnalytics {}
+export interface RecipientAnalytics extends IRecipientAnalytics {}
+export interface LinkClick extends ILinkClick {}
+export interface EmailEvent extends IEmailEvent {}
 
 interface UseCampaignAnalyticsResult {
   analytics: CampaignAnalytics | null;
@@ -125,11 +74,8 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchAnalytics = async () => {
-    if (!campaignId) {
-      setLoading(false);
-      return;
-    }
+  const fetchAnalytics = useCallback(async () => {
+    if (!campaignId) return;
 
     try {
       setLoading(true);
@@ -142,49 +88,43 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         .eq('campaign_id', campaignId)
         .single();
 
-      if (analyticsError) throw analyticsError;
+      if (analyticsError && analyticsError.code !== 'PGRST116') { // Not found error
+        throw analyticsError;
+      }
 
-      // Fetch engagement data
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('email_events')
-        .select('event_type, created_at')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true });
+      // Initialize default analytics if none exist
+      const baseAnalytics = analyticsData || {
+        id: '',
+        campaign_id: campaignId,
+        total_recipients: 0,
+        sent_count: 0,
+        delivered_count: 0,
+        opened_count: 0,
+        unique_opened_count: 0,
+        clicked_count: 0,
+        unique_clicked_count: 0,
+        bounced_count: 0,
+        complained_count: 0,
+        unsubscribed_count: 0,
+        engagementData: [],
+        recipientData: []
+      };
 
-      if (eventsError) throw eventsError;
-
-      // Process events into time series data
-      const engagementData: EngagementDataPoint[] = processEventsData(eventsData);
-
-      // Fetch recipient analytics
-      const { data: recipientData, error: recipientError } = await supabase
-        .from('recipient_analytics')
-        .select(`
-          *,
-          links_clicked:link_clicks(*)
-        `)
-        .eq('campaign_id', campaignId);
-
-      if (recipientError) throw recipientError;
-
-      setAnalytics({
-        ...analyticsData,
-        engagementData,
-        recipientData,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch analytics');
+      setAnalytics(baseAnalytics);
+    } catch (err: any) {
+      console.error('Error fetching analytics:', err);
+      setError(err.message);
       toast({
-        title: "Error",
-        description: "Failed to fetch analytics data",
-        variant: "destructive",
+        title: "Note",
+        description: "No analytics data available yet",
+        variant: "default",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [campaignId, toast]);
 
-  const fetchRecipientAnalytics = async () => {
+  const fetchRecipientAnalytics = useCallback(async () => {
     if (!campaignId) return;
 
     try {
@@ -195,17 +135,20 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
 
       if (error) throw error;
       setRecipientAnalytics(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching recipient analytics:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch recipient analytics",
-        variant: "destructive",
-      });
+      // Don't show error toast for missing data
+      if (err.code !== 'PGRST116') {
+        toast({
+          title: "Note",
+          description: "No recipient analytics available yet",
+          variant: "default",
+        });
+      }
     }
-  };
+  }, [campaignId, toast]);
 
-  const fetchLinkClicks = async () => {
+  const fetchLinkClicks = useCallback(async () => {
     if (!campaignId) return;
 
     try {
@@ -216,17 +159,20 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
 
       if (error) throw error;
       setLinkClicks(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching link clicks:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch link click data",
-        variant: "destructive",
-      });
+      // Don't show error toast for missing data
+      if (err.code !== 'PGRST116') {
+        toast({
+          title: "Note",
+          description: "No link click data available yet",
+          variant: "default",
+        });
+      }
     }
-  };
+  }, [campaignId, toast]);
 
-  const fetchEvents = async (period?: AnalyticsPeriod) => {
+  const fetchEvents = useCallback(async (period?: AnalyticsPeriod) => {
     if (!campaignId) return;
 
     try {
@@ -245,17 +191,20 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
 
       if (error) throw error;
       setEvents(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching events:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch event data",
-        variant: "destructive",
-      });
+      // Don't show error toast for missing data
+      if (err.code !== 'PGRST116') {
+        toast({
+          title: "Note",
+          description: "No event data available yet",
+          variant: "default",
+        });
+      }
     }
-  };
+  }, [campaignId, toast]);
 
-  const exportAnalytics = async () => {
+  const exportAnalytics = useCallback(async () => {
     if (!campaignId) return;
     
     try {
@@ -279,7 +228,7 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error exporting analytics:', err);
       toast({
         title: "Error",
@@ -287,14 +236,7 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         variant: "destructive",
       });
     }
-  };
-
-  useEffect(() => {
-    fetchAnalytics();
-    fetchRecipientAnalytics();
-    fetchLinkClicks();
-    fetchEvents();
-  }, [campaignId]);
+  }, [campaignId, analytics, recipientAnalytics, linkClicks, events, toast]);
 
   return {
     analytics,
