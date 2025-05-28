@@ -24,10 +24,11 @@ export const useContacts = () => {
       setContacts(data || []);
       return data;
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Failed to fetch contacts';
+      setError(errorMessage);
       toast({
         title: 'Error fetching contacts',
-        description: err.message,
+        description: errorMessage,
         variant: 'destructive',
       });
       return [];
@@ -36,7 +37,7 @@ export const useContacts = () => {
     }
   }, [toast]);
 
-  const addContact = useCallback(async (contact: Omit<Contact, 'id'>) => {
+  const addContact = useCallback(async (contact: Omit<Contact, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setLoading(true);
       setError(null);
@@ -57,10 +58,11 @@ export const useContacts = () => {
 
       return data;
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Failed to add contact';
+      setError(errorMessage);
       toast({
         title: 'Error adding contact',
-        description: err.message,
+        description: errorMessage,
         variant: 'destructive',
       });
       return null;
@@ -94,10 +96,11 @@ export const useContacts = () => {
 
       return data;
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Failed to update contact';
+      setError(errorMessage);
       toast({
         title: 'Error updating contact',
-        description: err.message,
+        description: errorMessage,
         variant: 'destructive',
       });
       return null;
@@ -126,10 +129,11 @@ export const useContacts = () => {
 
       return true;
     } catch (err: any) {
-      setError(err.message);
+      const errorMessage = err.message || 'Failed to delete contact';
+      setError(errorMessage);
       toast({
         title: 'Error deleting contact',
-        description: err.message,
+        description: errorMessage,
         variant: 'destructive',
       });
       return false;

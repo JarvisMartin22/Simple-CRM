@@ -30,7 +30,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useContacts } from '@/hooks/useContacts';
 import { Contact } from '@/types/contacts';
-import { Filter, Search, Settings, Users, X } from 'lucide-react';
+import { Filter, Search, Settings, Users, X, Loader2, RefreshCw } from 'lucide-react';
 
 interface RecipientSelectorProps {
   onSelectionChange: (selectedContacts: Contact[]) => void;
@@ -48,7 +48,7 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
   onSelectionChange,
   initialSelection = [],
 }) => {
-  const { contacts, loading, error } = useContacts();
+  const { contacts, loading, error, fetchContacts } = useContacts();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>(initialSelection);
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({
@@ -56,8 +56,13 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  // Fetch contacts when component mounts
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
+
   // Get unique companies and tags for filter options
-  const companies = [...new Set(contacts.map(contact => contact.company).filter(Boolean))];
+  const companies = [...new Set(contacts.map(contact => contact.company || '').filter(Boolean))];
   const allTags = [...new Set(contacts.flatMap(contact => contact.tags || []))];
 
   // Filter contacts based on search query and criteria
@@ -104,6 +109,26 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
     setFilterCriteria({ hasEmail: true });
     setSearchQuery('');
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <p className="text-destructive">{error}</p>
+        <Button onClick={fetchContacts} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -238,7 +263,7 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">
-              Select Recipients
+              Select Recipients ({selectedContacts.length} selected)
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -248,13 +273,11 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
                 }
                 onCheckedChange={toggleAllContacts}
               />
-              <span className="text-sm text-muted-foreground">
-                {selectedContacts.length} selected
-              </span>
+              <span className="text-sm text-muted-foreground">Select All</span>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           <ScrollArea className="h-[400px]">
             <Table>
               <TableHeader>
@@ -267,77 +290,45 @@ const RecipientSelector: React.FC<RecipientSelectorProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      Loading contacts...
+                {filteredContacts.map((contact) => (
+                  <TableRow key={contact.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedContacts.some((c) => c.id === contact.id)}
+                        onCheckedChange={() => toggleContactSelection(contact)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {contact.first_name} {contact.last_name}
+                    </TableCell>
+                    <TableCell>{contact.email}</TableCell>
+                    <TableCell>{contact.company}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {contact.tags?.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredContacts.length === 0 ? (
+                ))}
+                {filteredContacts.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      No contacts found
+                      <div className="flex flex-col items-center space-y-2">
+                        <Users className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">No contacts found</p>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredContacts.map((contact) => (
-                    <TableRow key={contact.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedContacts.some(
-                            (c) => c.id === contact.id
-                          )}
-                          onCheckedChange={() => toggleContactSelection(contact)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {contact.first_name} {contact.last_name}
-                      </TableCell>
-                      <TableCell>{contact.email}</TableCell>
-                      <TableCell>{contact.company}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {contact.tags?.map((tag) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
                 )}
               </TableBody>
             </Table>
           </ScrollArea>
         </CardContent>
       </Card>
-
-      {selectedContacts.length > 0 && (
-        <Card>
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">
-                  {selectedContacts.length} recipients selected
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedContacts([]);
-                  onSelectionChange([]);
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Clear Selection
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

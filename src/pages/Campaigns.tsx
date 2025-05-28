@@ -134,7 +134,7 @@ const Campaigns: React.FC = () => {
           <h1 className="text-h1 font-medium">Campaigns</h1>
           <p className="text-gray-500 mt-1">Create and manage your email campaigns</p>
         </div>
-        <Button onClick={() => navigate('/campaigns/new')}>
+        <Button onClick={() => navigate('/app/campaigns/new')}>
           <Plus className="mr-2 h-4 w-4" />
           New Campaign
         </Button>
@@ -245,7 +245,7 @@ const Campaigns: React.FC = () => {
                 <p className="mb-4 mt-2 text-sm text-muted-foreground">
                   Get started by creating your first campaign
                 </p>
-                <Button onClick={() => navigate('/campaigns/new')}>
+                <Button onClick={() => navigate('/app/campaigns/new')}>
                   <Plus className="mr-2 h-4 w-4" />
                   New Campaign
                 </Button>

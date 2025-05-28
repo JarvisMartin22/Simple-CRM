@@ -6,6 +6,6 @@ export interface Contact {
   company?: string;
   tags?: string[];
   last_contacted?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 } 
