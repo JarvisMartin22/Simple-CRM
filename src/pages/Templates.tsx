@@ -11,6 +11,8 @@ import * as z from 'zod';
 import { useCampaignTemplates } from '@/hooks/useCampaignTemplates';
 import TemplateEditor from '@/components/email/TemplateEditor';
 import { Plus, Search, Edit2, Trash2, Copy, Eye, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { useEmail } from '@/hooks/useEmail';
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -29,6 +31,8 @@ const Templates: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const { toast } = useToast();
+  const { sendEmail } = useEmail();
   
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
@@ -118,6 +122,32 @@ const Templates: React.FC = () => {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  const handleSendTest = async (email: string) => {
+    if (!selectedTemplate) return;
+
+    try {
+      await sendEmail({
+        to: email,
+        subject: selectedTemplate.subject,
+        body: selectedTemplate.content,
+        trackOpens: true,
+        trackClicks: true,
+        isTest: true,
+      });
+
+      toast({
+        title: 'Test email sent',
+        description: 'Check your inbox for the test email',
+      });
+    } catch (error) {
+      toast({
+        title: 'Failed to send test email',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
     }
   };
   
@@ -228,9 +258,17 @@ const Templates: React.FC = () => {
                       <FormControl>
                         <TemplateEditor
                           content={field.value}
+                          subject={form.getValues('subject')}
                           onChange={field.onChange}
+                          onSubjectChange={(subject) => form.setValue('subject', subject)}
                           variables={availableVariables}
-                          onPreview={() => setShowPreview(true)}
+                          recipientData={{
+                            email: 'example@test.com',
+                            firstName: 'John',
+                            lastName: 'Doe',
+                            company: 'Example Corp',
+                          }}
+                          onSendTest={handleSendTest}
                         />
                       </FormControl>
                       <FormDescription>

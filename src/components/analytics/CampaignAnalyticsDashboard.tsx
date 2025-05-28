@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -21,14 +21,15 @@ import { Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCampaignAnalytics } from '@/hooks/useCampaignAnalytics';
 import { EngagementOverTime, EngagementRates, LinkClicksChart } from './AnalyticsCharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EngagementChart } from './charts/EngagementChart';
+import { PerformanceMetrics } from './metrics/PerformanceMetrics';
+import { RecipientTable } from './tables/RecipientTable';
+import { useParams } from 'react-router-dom';
+import { exportAnalyticsData } from '../../lib/analytics';
 
-interface CampaignAnalyticsDashboardProps {
-  campaignId: string;
-}
-
-const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({
-  campaignId,
-}) => {
+export const CampaignAnalyticsDashboard: React.FC = () => {
+  const { campaignId } = useParams<{ campaignId: string }>();
   const {
     analytics,
     recipientAnalytics,
@@ -82,7 +83,7 @@ const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({
     clicks: click.click_count,
   }));
 
-  if (!analytics) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">Loading analytics...</p>
@@ -90,163 +91,74 @@ const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({
     );
   }
 
+  const handleExport = async () => {
+    if (!campaignId) return;
+    await exportAnalyticsData(campaignId);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Campaign Analytics</h2>
-          <p className="text-muted-foreground">
-            Track and analyze your campaign performance
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={refreshData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button onClick={exportAnalytics}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
+    <div className="space-y-4 p-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold">Campaign Analytics</h2>
+        <Button onClick={handleExport} variant="outline">
+          <Download className="mr-2 h-4 w-4" />
+          Export Data
+        </Button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Open Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {((analytics.opened_count / analytics.delivered_count) * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.opened_count} of {analytics.delivered_count} opened
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Click Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {((analytics.clicked_count / analytics.delivered_count) * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.clicked_count} of {analytics.delivered_count} clicked
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {((analytics.bounced_count / analytics.sent_count) * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.bounced_count} of {analytics.sent_count} bounced
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Unsubscribe Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {((analytics.unsubscribed_count / analytics.delivered_count) * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {analytics.unsubscribed_count} unsubscribed
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <PerformanceMetrics analytics={analytics} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <EngagementOverTime events={events} />
-        <EngagementRates analytics={analytics} />
-      </div>
+      <Tabs defaultValue="engagement" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="engagement">Engagement Over Time</TabsTrigger>
+          <TabsTrigger value="recipients">Recipient Activity</TabsTrigger>
+          <TabsTrigger value="links">Link Performance</TabsTrigger>
+        </TabsList>
 
-      <LinkClicksChart data={linkClicksData} />
+        <TabsContent value="engagement" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Engagement Metrics</CardTitle>
+              <CardDescription>
+                Track opens, clicks, and other engagement metrics over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[400px]">
+              <EngagementChart data={analytics.engagementData} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recipient Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <Input
-              placeholder="Search recipients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Recipients</SelectItem>
-                <SelectItem value="opened">Opened</SelectItem>
-                <SelectItem value="clicked">Clicked</SelectItem>
-                <SelectItem value="bounced">Bounced</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <TabsContent value="recipients">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recipient Activity</CardTitle>
+              <CardDescription>
+                Detailed breakdown of individual recipient engagement
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RecipientTable recipients={analytics.recipientData} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Opens</TableHead>
-                  <TableHead>Clicks</TableHead>
-                  <TableHead>First Opened</TableHead>
-                  <TableHead>Last Clicked</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecipients.map((recipient) => (
-                  <TableRow key={recipient.id}>
-                    <TableCell>{recipient.recipient_id}</TableCell>
-                    <TableCell>
-                      {recipient.bounced_at
-                        ? 'Bounced'
-                        : recipient.click_count > 0
-                        ? 'Clicked'
-                        : recipient.open_count > 0
-                        ? 'Opened'
-                        : 'Sent'}
-                    </TableCell>
-                    <TableCell>{recipient.open_count}</TableCell>
-                    <TableCell>{recipient.click_count}</TableCell>
-                    <TableCell>
-                      {recipient.first_opened_at
-                        ? format(new Date(recipient.first_opened_at), 'PPp')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {recipient.last_clicked_at
-                        ? format(new Date(recipient.last_clicked_at), 'PPp')
-                        : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="links">
+          <Card>
+            <CardHeader>
+              <CardTitle>Link Performance</CardTitle>
+              <CardDescription>
+                Track which links are getting the most engagement
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Link performance table/chart will go here */}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
-
-export default CampaignAnalyticsDashboard; 
+}; 

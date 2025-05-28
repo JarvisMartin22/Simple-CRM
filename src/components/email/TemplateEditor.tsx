@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import {
   Bold,
   Italic,
@@ -23,20 +24,34 @@ import {
   AlignCenter,
   AlignRight,
 } from 'lucide-react';
+import { EmailPreview } from './EmailPreview';
 
 interface TemplateEditorProps {
   content: string;
+  subject?: string;
   onChange: (content: string) => void;
+  onSubjectChange?: (subject: string) => void;
   variables?: Record<string, string>;
-  onPreview?: () => void;
+  recipientData?: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    company?: string;
+  };
+  onSendTest?: (email: string) => Promise<void>;
 }
 
 const TemplateEditor: React.FC<TemplateEditorProps> = ({
   content,
+  subject = '',
   onChange,
+  onSubjectChange,
   variables = {},
-  onPreview,
+  recipientData,
+  onSendTest,
 }) => {
+  const [showPreview, setShowPreview] = useState(false);
+  
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -90,33 +105,28 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap bg-muted p-2 rounded-md">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          data-active={editor.isActive('bold')}
-          className={editor.isActive('bold') ? 'bg-secondary' : ''}
+          className={editor.isActive('bold') ? 'bg-accent' : ''}
         >
           <Bold className="h-4 w-4" />
         </Button>
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          data-active={editor.isActive('italic')}
-          className={editor.isActive('italic') ? 'bg-secondary' : ''}
+          className={editor.isActive('italic') ? 'bg-accent' : ''}
         >
           <Italic className="h-4 w-4" />
         </Button>
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
-          data-active={editor.isActive('underline')}
-          className={editor.isActive('underline') ? 'bg-secondary' : ''}
+          className={editor.isActive('underline') ? 'bg-accent' : ''}
         >
           <UnderlineIcon className="h-4 w-4" />
         </Button>
@@ -127,18 +137,15 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          data-active={editor.isActive('bulletList')}
-          className={editor.isActive('bulletList') ? 'bg-secondary' : ''}
+          className={editor.isActive('bulletList') ? 'bg-accent' : ''}
         >
           <List className="h-4 w-4" />
         </Button>
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          data-active={editor.isActive('orderedList')}
-          className={editor.isActive('orderedList') ? 'bg-secondary' : ''}
+          className={editor.isActive('orderedList') ? 'bg-accent' : ''}
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
@@ -149,28 +156,23 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          data-active={editor.isActive({ textAlign: 'left' })}
-          className={editor.isActive({ textAlign: 'left' }) ? 'bg-secondary' : ''}
+          className={editor.isActive({ textAlign: 'left' }) ? 'bg-accent' : ''}
         >
           <AlignLeft className="h-4 w-4" />
         </Button>
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          data-active={editor.isActive({ textAlign: 'center' })}
-          className={editor.isActive({ textAlign: 'center' }) ? 'bg-secondary' : ''}
+          className={editor.isActive({ textAlign: 'center' }) ? 'bg-accent' : ''}
         >
           <AlignCenter className="h-4 w-4" />
         </Button>
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          data-active={editor.isActive({ textAlign: 'right' })}
-          className={editor.isActive({ textAlign: 'right' }) ? 'bg-secondary' : ''}
+          className={editor.isActive({ textAlign: 'right' }) ? 'bg-accent' : ''}
         >
           <AlignRight className="h-4 w-4" />
         </Button>
@@ -181,8 +183,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({
           variant="ghost"
           size="sm"
           onClick={setLink}
-          data-active={editor.isActive('link')}
-          className={editor.isActive('link') ? 'bg-secondary' : ''}
+          className={editor.isActive('link') ? 'bg-accent' : ''}
         >
           <LinkIcon className="h-4 w-4" />
         </Button>
@@ -217,18 +218,21 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({
           </PopoverContent>
         </Popover>
         
-        {onPreview && (
-          <>
-            <div className="w-px h-4 bg-border mx-2" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onPreview}
-            >
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm">
               <Eye className="h-4 w-4" />
             </Button>
-          </>
-        )}
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl">
+            <EmailPreview
+              subject={subject}
+              content={editor.getHTML()}
+              recipientData={recipientData}
+              onSendTest={onSendTest}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
       
       <Card>
