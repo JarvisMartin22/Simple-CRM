@@ -57,31 +57,33 @@ serve(async (req) => {
       console.log("Token expired, refreshing...");
       try {
         // Refresh the token
-        const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+        const response = await fetch(`https://oauth2.googleapis.com/token`, {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`
-          },
-          body: JSON.stringify({ refresh_token: integration.refresh_token }),
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: Deno.env.get("GOOGLE_CLIENT_ID") || "",
+            client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET") || "",
+            refresh_token: integration.refresh_token,
+            grant_type: "refresh_token",
+          }),
         });
         
         if (!response.ok) {
           throw new Error(`Failed to refresh token: ${response.statusText}`);
         }
         
-        const refreshData = await response.json();
+        const data = await response.json();
         
         // Update token in database
         await supabase
           .from('user_integrations')
           .update({
-            access_token: refreshData.access_token,
-            expires_at: refreshData.expires_at,
+            access_token: data.access_token,
+            expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
           })
           .eq('id', integration.id);
           
-        accessToken = refreshData.access_token;
+        accessToken = data.access_token;
         console.log("Token refreshed successfully");
       } catch (error) {
         console.error("Token refresh error:", error);

@@ -1,6 +1,9 @@
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Max-Age': '86400',
 };
 
 // Helper function to handle OPTIONS preflight requests
@@ -9,7 +12,10 @@ export function handleCors(req: Request) {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204, // No content
-      headers: corsHeaders
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+      }
     });
   }
   

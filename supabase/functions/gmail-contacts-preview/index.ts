@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
 
 // Create a Supabase client
@@ -135,7 +135,11 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
-      headers: corsHeaders
+      status: 204,
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+      }
     });
   }
 
@@ -143,21 +147,84 @@ serve(async (req) => {
     const { accessToken } = await req.json();
 
     if (!accessToken) {
-      throw new Error('No access token provided');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No access token provided'
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+          }
+        }
+      );
     }
 
-    // Fetch other contacts
-    const result = await fetchOtherContacts(accessToken);
-    
+    // Validate the token first
+    const tokenInfoUrl = `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`;
+    const tokenResponse = await fetch(tokenInfoUrl);
+    const tokenInfo = await tokenResponse.json();
+
+    if (tokenInfo.error) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Invalid token: ${tokenInfo.error_description || tokenInfo.error}`
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+          }
+        }
+      );
+    }
+
+    // Fetch contacts preview
+    const contactsUrl = 'https://people.googleapis.com/v1/people/me/connections?pageSize=10&personFields=names,emailAddresses,organizations,phoneNumbers';
+    const response = await fetch(contactsUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error fetching contacts:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Failed to fetch contacts: ${error}`
+        }),
+        {
+          status: response.status,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+          }
+        }
+      );
+    }
+
+    const data = await response.json();
     return new Response(
       JSON.stringify({
-        success: result.success,
-        data: result.data,
-        error: result.error
+        success: true,
+        data: data.connections || []
       }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: result.success ? 200 : 400
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+        }
       }
     );
 
@@ -165,11 +232,16 @@ serve(async (req) => {
     console.error('Error in request:', error);
     return new Response(
       JSON.stringify({
+        success: false,
         error: error.message
       }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+        }
       }
     );
   }
