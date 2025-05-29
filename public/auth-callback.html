@@ -46,9 +46,9 @@
       text-align: left;
       font-family: monospace;
       font-size: 12px;
-      max-height: 150px;
+      max-height: 200px;
       overflow-y: auto;
-      display: none;
+      display: block;
     }
     button {
       background-color: #4285f4;
@@ -68,122 +68,97 @@
 <body>
   <div class="container">
     <h1>Gmail Authorization</h1>
-    <div id="message">
-      <p>Processing authentication...</p>
+    <div id="status" class="status info">Processing authorization...</div>
+    <div id="logs"></div>
+    <div id="timerSection" style="margin-top: 20px;">
+      Window will close in <span id="closeTimer">30</span> seconds
+      <button onclick="cancelAutoClose()">Keep Window Open</button>
+      <button onclick="window.close()">Close Now</button>
     </div>
-    <div id="debug"></div>
   </div>
 
   <script>
-    // Debug function to log messages
-    function debugLog(message) {
-      console.log(message);
-      const debugEl = document.getElementById('debug');
-      debugEl.style.display = 'block';
-      debugEl.innerHTML += `<div>${message}</div>`;
+    let closeTimeout;
+    let countdownInterval;
+    let secondsLeft = 30;
+    const logsDiv = document.getElementById('logs');
+    const statusDiv = document.getElementById('status');
+    const timerSpan = document.getElementById('closeTimer');
+
+    function addLog(message, data = null) {
+      const logEntry = document.createElement('div');
+      logEntry.innerHTML = `<pre>${new Date().toISOString()}: ${message}${data ? '\n' + JSON.stringify(data, null, 2) : ''}</pre>`;
+      logsDiv.appendChild(logEntry);
     }
 
-    // Use localStorage as fallback
-    function storeCodeInLocalStorage(code) {
-      try {
-        localStorage.setItem('gmail_auth_code', code);
-        localStorage.setItem('gmail_auth_timestamp', new Date().toISOString());
-        debugLog('Stored auth code in localStorage as fallback');
-        return true;
-      } catch (e) {
-        debugLog(`Error storing in localStorage: ${e.message}`);
-        return false;
-      }
+    function updateStatus(message, type = 'info') {
+      statusDiv.className = `status ${type}`;
+      statusDiv.textContent = message;
     }
 
-    // Try all possible message strategies to parent window
-    function sendMessageToParent(code) {
-      debugLog('Sending code to parent window using multiple approaches');
-      
-      // Try direct postMessage with origin targeting
-      if (window.opener) {
-        try {
-          const origin = window.location.origin;
-          debugLog(`Sending message to: ${origin}`);
-          
-          window.opener.postMessage({ 
-            type: 'GMAIL_AUTH_CODE', 
-            code,
-            timestamp: new Date().toISOString() 
-          }, origin);
-          
-          // Also try with wildcard origin as backup
-          window.opener.postMessage({ 
-            type: 'GMAIL_AUTH_CODE', 
-            code,
-            timestamp: new Date().toISOString(),
-            fallback: true
-          }, '*');
-          
-          return true;
-        } catch (err) {
-          debugLog(`Error with postMessage: ${err.message}`);
+    function startCloseTimer() {
+      countdownInterval = setInterval(() => {
+        secondsLeft--;
+        timerSpan.textContent = secondsLeft;
+        if (secondsLeft <= 0) {
+          clearInterval(countdownInterval);
         }
-      } else {
-        debugLog('No parent window found for postMessage');
-      }
-      
-      // Store in localStorage as last resort
-      return storeCodeInLocalStorage(code);
+      }, 1000);
+
+      closeTimeout = setTimeout(() => {
+        window.close();
+      }, secondsLeft * 1000);
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      debugLog('Auth callback page loaded');
+    function cancelAutoClose() {
+      clearTimeout(closeTimeout);
+      clearInterval(countdownInterval);
+      timerSpan.textContent = "cancelled";
+    }
+
+    window.onload = function() {
+      addLog('Auth callback page loaded');
       
+      // Get the authorization code from URL
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const error = urlParams.get('error');
-      const messageEl = document.getElementById('message');
-      
-      debugLog(`URL params - code: ${code ? 'present' : 'missing'}, error: ${error || 'none'}`);
-      
+
       if (error) {
-        // Handle error
-        debugLog(`Authorization error: ${error}`);
-        messageEl.innerHTML = `
-          <p class="error">Authorization failed: ${error}</p>
-          <p>You can close this window and try again.</p>
-          <button onclick="window.close()">Close Window</button>
-        `;
-      } else if (code) {
-        // Send code to parent window
-        debugLog(`Code received: ${code.substring(0, 10)}...`);
-        
-        const success = sendMessageToParent(code);
-        
-        if (success) {
-          messageEl.innerHTML = `
-            <p class="success">Authorization successful!</p>
-            <p>This window will close automatically in a few seconds.</p>
-            <button onclick="window.close()">Close Now</button>
-          `;
-          
-          // Close window after a delay
-          setTimeout(() => {
-            debugLog('Closing popup window');
-            window.close();
-          }, 3000);
-        } else {
-          messageEl.innerHTML = `
-            <p class="error">Error: Could not communicate with the main application.</p>
-            <p>Please close this window and try again.</p>
-            <button onclick="window.close()">Close Window</button>
-          `;
-        }
-      } else {
-        debugLog('No code or error parameter found in URL');
-        messageEl.innerHTML = `
-          <p class="error">Error: No authorization code received.</p>
-          <p>Please close this window and try again.</p>
-          <button onclick="window.close()">Close Window</button>
-        `;
+        updateStatus(`Authorization failed: ${error}`, 'error');
+        addLog('Authorization error', { error });
+        return;
       }
-    });
+
+      if (!code) {
+        updateStatus('No authorization code received', 'error');
+        addLog('No code in URL parameters');
+        return;
+      }
+
+      addLog('Authorization code received', { codeLength: code.length });
+
+      // Store the code in localStorage
+      localStorage.setItem('gmail_auth_code', code);
+      localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
+      console.log('Code saved to localStorage');
+
+      // Send message to main window
+      try {
+        // Try sending to specific origin first
+        window.opener.postMessage({ type: 'GMAIL_AUTH_CODE', code }, window.location.origin);
+        console.log('Sent message with specific origin');
+        
+        // Also try with wildcard origin as fallback
+        window.opener.postMessage({ type: 'GMAIL_AUTH_CODE', code }, '*');
+        console.log('Sent message with wildcard origin');
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
+
+      // Start the close timer
+      startCloseTimer();
+    };
   </script>
 </body>
 </html> 

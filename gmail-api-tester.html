@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail API Functionality Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #0070f3;
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-button {
+            background-color: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background-color: #0056b3;
+        }
+        .test-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .data-container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .data-container pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .scope-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+        .scope-used {
+            background-color: #d4edda;
+        }
+        .scope-unused {
+            background-color: #f8d7da;
+        }
+        .scope-potential {
+            background-color: #fff3cd;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0070f3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .endpoint-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .endpoint-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .endpoint-card h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        .code-block {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        .config-section {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        #connectionStatus {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="status info">Checking Gmail Connection...</div>
+    
+    <h1>🔧 Gmail API Functionality Tester</h1>
+    <p>Comprehensive testing tool for all Gmail integration functionality in your Simple-CRM application.</p>
+
+    <div class="config-section">
+        <h3>⚙️ Configuration</h3>
+        <div>
+            <label for="supabaseUrl">Supabase URL:</label>
+            <input type="text" id="supabaseUrl" style="width: 400px; margin: 5px;" placeholder="https://your-project.supabase.co">
+        </div>
+        <div>
+            <label for="supabaseKey">Supabase Anon Key:</label>
+            <input type="text" id="supabaseKey" style="width: 400px; margin: 5px;" placeholder="Your anon key">
+        </div>
+        <div>
+            <label for="userEmail">Email:</label>
+            <input type="email" id="userEmail" style="width: 300px; margin: 5px;" placeholder="Your email">
+            <label for="userPassword">Password:</label>
+            <input type="password" id="userPassword" style="width: 200px; margin: 5px;" placeholder="Your password">
+        </div>
+        <button class="test-button" onclick="saveConfig()">Save Configuration</button>
+        <button class="test-button" onclick="loadConfig()">Load from Local Storage</button>
+        <button class="test-button" onclick="signIn()">Sign In</button>
+        <button class="test-button" onclick="signOut()">Sign Out</button>
+    </div>
+
+    <div class="section">
+        <h2>📊 Google Console Scopes Analysis</h2>
+        <p>Your configured scopes and their usage in the CRM:</p>
+        <div id="scopeAnalysis">
+            <div class="scope-item scope-used">
+                <strong>✅ auth/gmail.send</strong> - Used by <code>send-email</code> function
+            </div>
+            <div class="scope-item scope-used">
+                <strong>✅ auth/gmail.readonly</strong> - Used by <code>gmail-sync</code>, email tracking
+            </div>
+            <div class="scope-item scope-used">
+                <strong>✅ auth/contacts.readonly</strong> - Used by <code>gmail-contacts</code>
+            </div>
+            <div class="scope-item scope-used">
+                <strong>✅ auth/contacts.other.readonly</strong> - Used by <code>gmail-contacts</code>
+            </div>
+            <div class="scope-item scope-used">
+                <strong>✅ auth/user.emails.read</strong> - Used by <code>gmail-auth</code>
+            </div>
+            <div class="scope-item scope-potential">
+                <strong>⚠️ auth/gmail.modify</strong> - Could be used for email management (archive, labels)
+            </div>
+            <div class="scope-item scope-potential">
+                <strong>⚠️ auth/gmail.labels</strong> - Could be used for email organization
+            </div>
+            <div class="scope-item scope-potential">
+                <strong>⚠️ auth/gmail.metadata</strong> - Could be used for enhanced email analysis
+            </div>
+            <div class="scope-item scope-potential">
+                <strong>⚠️ auth/user.phonenumbers.read</strong> - Could enhance contact data
+            </div>
+            <div class="scope-item scope-unused">
+                <strong>❌ auth/gmail.addons.current.message.action</strong> - Gmail Add-on specific
+            </div>
+            <div class="scope-item scope-unused">
+                <strong>❌ auth/profile.emails.read</strong> - Duplicate of user.emails.read
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🔗 Authentication & Connection</h2>
+        <button class="test-button" onclick="testGmailConnection()">
+            <span id="connectionLoader" style="display: none;" class="loading"></span>
+            Test Gmail Connection
+        </button>
+        <button class="test-button" onclick="refreshGmailToken()">Refresh Token</button>
+        <button class="test-button" onclick="viewTokenDetails()">View Token Details</button>
+        <div id="connectionResult" class="data-container" style="display: none;"></div>
+    </div>
+
+    <div class="endpoint-grid">
+        <div class="endpoint-card">
+            <h3>📧 Email Sending</h3>
+            <h4>Endpoint: <code>/functions/v1/send-email</code></h4>
+            <p><strong>Scope:</strong> gmail.send</p>
+            <button class="test-button" onclick="testSendEmail()">Test Send Email</button>
+            <button class="test-button" onclick="testEmailWithTracking()">Test with Tracking</button>
+            <div class="code-block">
+                POST body: { userId, to, subject, body, trackOpens, trackClicks }
+            </div>
+            <div id="sendEmailResult" class="data-container" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-card">
+            <h3>👥 Contacts Import</h3>
+            <h4>Endpoint: <code>/functions/v1/gmail-contacts</code></h4>
+            <p><strong>Scope:</strong> contacts.readonly, contacts.other.readonly</p>
+            <button class="test-button" onclick="testContactsImport()">Test Contacts Import</button>
+            <button class="test-button" onclick="testContactsPreview()">Test Contacts Preview</button>
+            <div class="code-block">
+                Headers: X-Gmail-Token, POST body: { integration_id, access_token }
+            </div>
+            <div id="contactsResult" class="data-container" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-card">
+            <h3>📬 Email Sync</h3>
+            <h4>Endpoint: <code>/functions/v1/gmail-sync</code></h4>
+            <p><strong>Scope:</strong> gmail.readonly</p>
+            <button class="test-button" onclick="testEmailSync()">Test Email Sync</button>
+            <button class="test-button" onclick="testEmailMetadata()">Test Email Metadata</button>
+            <div class="code-block">
+                POST body: { userId, syncType: 'pull'|'push', forceSync }
+            </div>
+            <div id="syncResult" class="data-container" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-card">
+            <h3>📊 Email Tracking</h3>
+            <h4>Endpoints: <code>/functions/v1/email-tracker</code>, <code>/functions/v1/link-tracker</code></h4>
+            <p><strong>Scope:</strong> gmail.readonly (for metadata)</p>
+            <button class="test-button" onclick="testEmailTracking()">Test Email Tracking</button>
+            <button class="test-button" onclick="testLinkTracking()">Test Link Tracking</button>
+            <div class="code-block">
+                GET: ?id={tracking_id} | ?id={link_id}&url={original_url}
+            </div>
+            <div id="trackingResult" class="data-container" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-card">
+            <h3>🏷️ Gmail Labels (Potential)</h3>
+            <h4>Endpoint: <em>Not implemented yet</em></h4>
+            <p><strong>Scope:</strong> gmail.labels</p>
+            <button class="test-button" onclick="testLabelsAPI()">Test Labels API</button>
+            <button class="test-button" onclick="createTestLabel()">Create Test Label</button>
+            <div class="code-block">
+                Direct Gmail API: /gmail/v1/users/me/labels
+            </div>
+            <div id="labelsResult" class="data-container" style="display: none;"></div>
+        </div>
+
+        <div class="endpoint-card">
+            <h3>📱 Contact Phone Numbers (Potential)</h3>
+            <h4>Endpoint: <em>Enhancement to contacts import</em></h4>
+            <p><strong>Scope:</strong> user.phonenumbers.read</p>
+            <button class="test-button" onclick="testPhoneNumbers()">Test Phone Numbers</button>
+            <div class="code-block">
+                Google People API: /v1/people/me?personFields=phoneNumbers
+            </div>
+            <div id="phoneResult" class="data-container" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🧪 Integration Tests</h2>
+        <p>Run comprehensive tests to validate all functionality:</p>
+        <button class="test-button" onclick="runFullTest()">Run All Tests</button>
+        <button class="test-button" onclick="runQuickTest()">Quick Health Check</button>
+        <button class="test-button" onclick="exportTestResults()">Export Results</button>
+        <div id="integrationTestResult" class="data-container" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+        <h2>🛠️ Database Schema Analysis</h2>
+        <p>Check if your database schema supports all the data we can retrieve:</p>
+        <button class="test-button" onclick="analyzeSchema()">Analyze Database Schema</button>
+        <button class="test-button" onclick="suggestSchemaUpdates()">Suggest Schema Updates</button>
+        <div id="schemaResult" class="data-container" style="display: none;"></div>
+    </div>
+
+    <script>
+        let supabaseUrl = '';
+        let supabaseKey = '';
+        let userToken = '';
+        let currentIntegration = null;
+
+        // Add message deduplication
+        const processedCodes = new Set();
+        
+        window.addEventListener('message', async function(event) {
+            // Verify the origin
+            if (event.origin !== window.location.origin) {
+                console.log('Ignoring message from unknown origin:', event.origin);
+                return;
+            }
+
+            // Ignore React DevTools messages
+            if (event.data?.source === 'react-devtools-content-script') {
+                return;
+            }
+            
+            if (event.data && event.data.type === 'GMAIL_AUTH_CODE') {
+                const code = event.data.code;
+                
+                // Check if we've already processed this code
+                if (processedCodes.has(code)) {
+                    console.log('Ignoring duplicate auth code');
+                    return;
+                }
+                processedCodes.add(code);
+                
+                console.log('Processing auth code from callback, length:', code?.length);
+                showStatus('Processing authorization...', 'info');
+                
+                try {
+                    showResult('connectionResult', {
+                        status: 'Processing',
+                        message: 'Exchanging authorization code for tokens...',
+                        timestamp: new Date().toISOString()
+                    }, 'info');
+
+                    console.log('Making token exchange request to:', `${supabaseUrl}/functions/v1/gmail-auth`);
+
+                    const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${userToken}`,
+                            'apikey': supabaseKey
+                        },
+                        body: JSON.stringify({ code })
+                    });
+
+                    const data = await response.json();
+                    console.log('Token exchange response:', {
+                        status: response.status,
+                        ok: response.ok,
+                        provider: data.provider,
+                        email: data.email,
+                        hasAccessToken: !!data.access_token,
+                        hasRefreshToken: !!data.refresh_token,
+                        integration: data.integration
+                    });
+                    
+                    if (response.ok) {
+                        showStatus('Gmail Connected Successfully! ✅', 'success');
+                        showResult('connectionResult', {
+                            status: 'Success',
+                            message: 'Authorization successful',
+                            provider: data.provider,
+                            email: data.email,
+                            hasAccessToken: !!data.access_token,
+                            hasRefreshToken: !!data.refresh_token,
+                            expiresAt: data.expires_at,
+                            integration: data.integration,
+                            timestamp: new Date().toISOString()
+                        }, 'success');
+                        
+                        // Add delay before checking connection
+                        console.log('Waiting before checking connection status...');
+                        try {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            console.log('Checking connection status...');
+                            await checkGmailConnection();
+                        } catch (error) {
+                            console.error('Error in delayed connection check:', error);
+                            // Even if connection check fails, we're still connected since token exchange worked
+                            showStatus('Gmail Connected (with warning) ⚠️', 'warning');
+                        }
+                    } else {
+                        console.error('Token exchange failed:', data);
+                        showStatus('Failed to exchange code for tokens ❌', 'error');
+                        showResult('connectionResult', {
+                            status: 'Error',
+                            message: 'Failed to exchange authorization code',
+                            error: data.error || 'Unknown error',
+                            errorDetails: data.error_description || data.message,
+                            responseStatus: response.status,
+                            timestamp: new Date().toISOString()
+                        }, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error exchanging code:', error);
+                    showStatus(`Error: ${error.message}`, 'error');
+                    showResult('connectionResult', {
+                        status: 'Error',
+                        message: 'Exception during token exchange',
+                        error: error.message,
+                        stack: error.stack,
+                        timestamp: new Date().toISOString()
+                    }, 'error');
+                }
+            }
+        });
+
+        // Load configuration on page load
+        window.onload = async function() {
+            loadConfig();
+            await checkGmailConnection();
+            
+            // Check for stored auth code from callback
+            const storedCode = localStorage.getItem('gmail_auth_code');
+            const storedTimestamp = localStorage.getItem('gmail_auth_timestamp');
+            
+            if (storedCode) {
+                console.log('Found stored auth code, checking validity...');
+                
+                // Check if code is too old (5 minutes max)
+                const timestamp = parseInt(storedTimestamp || '0', 10);
+                const now = Date.now();
+                const fiveMinutes = 5 * 60 * 1000;
+                
+                if (now - timestamp > fiveMinutes) {
+                    console.log('Stored auth code is too old, removing');
+                    localStorage.removeItem('gmail_auth_code');
+                    localStorage.removeItem('gmail_auth_timestamp');
+                    return;
+                }
+                
+                try {
+                    console.log('Processing stored auth code');
+                    const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${userToken}`,
+                            'apikey': supabaseKey
+                        },
+                        body: JSON.stringify({ code: storedCode })
+                    });
+
+                    const data = await response.json();
+                    console.log('Token exchange response:', data);
+                    
+                    if (response.ok) {
+                        showStatus('Gmail Connected Successfully! ✅', 'success');
+                        await checkGmailConnection();
+                    } else {
+                        showStatus('Failed to exchange code for tokens ❌', 'error');
+                    }
+                    
+                    // Always remove the code after attempting to use it
+                    localStorage.removeItem('gmail_auth_code');
+                    localStorage.removeItem('gmail_auth_timestamp');
+                } catch (error) {
+                    console.error('Error exchanging code:', error);
+                    showStatus(`Error: ${error.message}`, 'error');
+                    // Remove the code if there was an error
+                    localStorage.removeItem('gmail_auth_code');
+                    localStorage.removeItem('gmail_auth_timestamp');
+                }
+            }
+        };
+
+        function saveConfig() {
+            supabaseUrl = document.getElementById('supabaseUrl').value;
+            supabaseKey = document.getElementById('supabaseKey').value;
+            
+            localStorage.setItem('gmail_tester_config', JSON.stringify({
+                supabaseUrl,
+                supabaseKey
+            }));
+            
+            showStatus('Configuration saved!', 'success');
+        }
+
+        function loadConfig() {
+            const config = localStorage.getItem('gmail_tester_config');
+            const auth = localStorage.getItem('gmail_tester_auth');
+            
+            if (config) {
+                const { supabaseUrl: url, supabaseKey: key } = JSON.parse(config);
+                document.getElementById('supabaseUrl').value = url;
+                document.getElementById('supabaseKey').value = key;
+                supabaseUrl = url;
+                supabaseKey = key;
+                showStatus('Configuration loaded from storage', 'success');
+            }
+
+            if (auth) {
+                const { access_token, expires_at } = JSON.parse(auth);
+                if (access_token && new Date(expires_at) > new Date()) {
+                    userToken = access_token;
+                    checkGmailConnection();
+                } else {
+                    localStorage.removeItem('gmail_tester_auth');
+                }
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+
+        function showResult(elementId, data, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.className = `data-container ${type}`;
+            
+            if (typeof data === 'object') {
+                el.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } else {
+                el.innerHTML = `<pre>${data}</pre>`;
+            }
+        }
+
+        async function checkGmailConnection() {
+            if (!supabaseUrl || !supabaseKey || !userToken) {
+                showStatus('Please configure settings and sign in first', 'warning');
+                return;
+            }
+
+            try {
+                console.log('Starting connection check...');
+                
+                // First get the user ID from the auth token
+                console.log('Fetching user data...');
+                const userResponse = await fetch(
+                    `${supabaseUrl}/auth/v1/user`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${userToken}`,
+                            'apikey': supabaseKey
+                        }
+                    }
+                );
+
+                const userData = await userResponse.json();
+                console.log('User data response:', {
+                    status: userResponse.status,
+                    hasUserId: !!userData.id,
+                    error: userData.error
+                });
+
+                if (!userData.id) {
+                    console.error('No user ID in response:', userData);
+                    showStatus('Not authenticated', 'error');
+                    return;
+                }
+
+                console.log('Checking Gmail integration with:', {
+                    url: `${supabaseUrl}/rest/v1/user_integrations`,
+                    hasKey: !!supabaseKey,
+                    userId: userData.id
+                });
+
+                const integrationResponse = await fetch(
+                    `${supabaseUrl}/rest/v1/user_integrations?provider=eq.gmail&user_id=eq.${userData.id}&select=*`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${userToken}`,
+                            'apikey': supabaseKey,
+                            'Content-Profile': 'public',
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                console.log('Integration check response status:', integrationResponse.status);
+                console.log('Integration check response headers:', Object.fromEntries(integrationResponse.headers.entries()));
+
+                const responseText = await integrationResponse.text();
+                console.log('Raw integration response:', responseText);
+
+                let integrations;
+                try {
+                    integrations = JSON.parse(responseText);
+                    console.log('Parsed integrations:', integrations);
+                } catch (e) {
+                    console.error('Failed to parse integration response:', e);
+                    throw new Error('Failed to parse integration response: ' + e.message);
+                }
+
+                if (integrationResponse.ok) {
+                    if (integrations && integrations.length > 0) {
+                        currentIntegration = integrations[0];
+                        console.log('Found integration:', {
+                            provider: currentIntegration.provider,
+                            email: currentIntegration.email,
+                            userId: currentIntegration.user_id
+                        });
+                        showStatus('Gmail Connected ✅', 'success');
+                        showResult('connectionResult', {
+                            status: 'Connected',
+                            provider: currentIntegration.provider,
+                            email: currentIntegration.email,
+                            hasAccessToken: !!currentIntegration.access_token,
+                            hasRefreshToken: !!currentIntegration.refresh_token,
+                            expiresAt: currentIntegration.expires_at,
+                            created_at: currentIntegration.created_at,
+                            updated_at: currentIntegration.updated_at,
+                            user_id: currentIntegration.user_id
+                        }, 'success');
+                    } else {
+                        console.log('No integrations found for user:', userData.id);
+                        showStatus('Gmail Not Connected ❌', 'error');
+                        showResult('connectionResult', {
+                            status: 'Not Connected',
+                            message: 'No Gmail integration found in database',
+                            timestamp: new Date().toISOString(),
+                            user_id: userData.id
+                        }, 'error');
+                    }
+                } else {
+                    console.error('Integration check failed:', {
+                        status: integrationResponse.status,
+                        response: responseText
+                    });
+                    showStatus('Error checking integration', 'error');
+                    showResult('connectionResult', {
+                        status: 'Error',
+                        statusCode: integrationResponse.status,
+                        headers: Object.fromEntries(integrationResponse.headers.entries()),
+                        error: responseText,
+                        timestamp: new Date().toISOString(),
+                        user_id: userData.id
+                    }, 'error');
+                }
+            } catch (error) {
+                console.error('Connection check error:', error);
+                throw error; // Re-throw to be handled by caller
+            }
+        }
+
+        async function testGmailConnection() {
+            document.getElementById('connectionLoader').style.display = 'inline-block';
+            
+            try {
+                // First check if we already have a valid integration
+                if (currentIntegration && currentIntegration.access_token) {
+                    // Try to use the existing token
+                    try {
+                        const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+                            headers: {
+                                'Authorization': `Bearer ${currentIntegration.access_token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            showResult('connectionResult', {
+                                status: 'Connected',
+                                message: 'Existing connection is valid',
+                                userInfo: data,
+                                integration: {
+                                    provider: currentIntegration.provider,
+                                    email: currentIntegration.email,
+                                    expiresAt: currentIntegration.expires_at
+                                }
+                            }, 'success');
+                            showStatus('Gmail Connected ✅', 'success');
+                            document.getElementById('connectionLoader').style.display = 'none';
+                            return;
+                        }
+                    } catch (error) {
+                        console.log('Error checking existing token:', error);
+                    }
+                }
+                
+                // If we get here, we need to start a new auth flow
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+
+                const data = await response.json();
+                console.log('Auth test response:', data);
+                
+                if (response.ok && data.url) {
+                    // Open the auth URL in a new window
+                    window.open(data.url, 'gmail_auth', 'width=600,height=600');
+                    
+                    showResult('connectionResult', {
+                        status: 'Authorizing',
+                        message: 'Please complete the authorization in the popup window',
+                        timestamp: new Date().toISOString()
+                    }, 'info');
+                } else {
+                    showResult('connectionResult', {
+                        status: 'Error',
+                        error: data.error || 'Failed to start authorization',
+                        response: data,
+                        timestamp: new Date().toISOString()
+                    }, 'error');
+                }
+            } catch (error) {
+                console.error('Connection test error:', error);
+                showResult('connectionResult', {
+                    status: 'Error',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+            
+            document.getElementById('connectionLoader').style.display = 'none';
+        }
+
+        async function refreshGmailToken() {
+            if (!currentIntegration?.refresh_token) {
+                showResult('connectionResult', 'No refresh token available', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ 
+                        refresh_token: currentIntegration.refresh_token 
+                    })
+                });
+
+                const data = await response.json();
+                showResult('connectionResult', {
+                    action: 'Token Refresh',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+                if (response.ok) {
+                    // Update current integration
+                    currentIntegration.access_token = data.access_token;
+                    currentIntegration.expires_at = data.expires_at;
+                }
+
+            } catch (error) {
+                showResult('connectionResult', {
+                    action: 'Token Refresh',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function viewTokenDetails() {
+            if (!currentIntegration) {
+                showResult('connectionResult', 'No Gmail integration found', 'error');
+                return;
+            }
+
+            const tokenData = {
+                provider: currentIntegration.provider,
+                email: currentIntegration.email,
+                hasAccessToken: !!currentIntegration.access_token,
+                hasRefreshToken: !!currentIntegration.refresh_token,
+                expiresAt: currentIntegration.expires_at,
+                isExpired: new Date(currentIntegration.expires_at) < new Date(),
+                scope: currentIntegration.scope,
+                createdAt: currentIntegration.created_at,
+                updatedAt: currentIntegration.updated_at
+            };
+
+            showResult('connectionResult', tokenData, 'info');
+        }
+
+        async function testSendEmail() {
+            if (!currentIntegration) {
+                showResult('sendEmailResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        userId: currentIntegration.user_id,
+                        to: 'test@example.com',
+                        subject: 'Test Email from CRM',
+                        body: '<p>This is a test email from your CRM system.</p>',
+                        trackOpens: false,
+                        trackClicks: false
+                    })
+                });
+
+                const data = await response.json();
+                showResult('sendEmailResult', {
+                    action: 'Send Email Test',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('sendEmailResult', {
+                    action: 'Send Email Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testEmailWithTracking() {
+            if (!currentIntegration) {
+                showResult('sendEmailResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        userId: currentIntegration.user_id,
+                        to: 'test@example.com',
+                        subject: 'Test Tracked Email from CRM',
+                        body: '<p>This is a test email with tracking. <a href="https://example.com">Click here</a></p>',
+                        trackOpens: true,
+                        trackClicks: true
+                    })
+                });
+
+                const data = await response.json();
+                showResult('sendEmailResult', {
+                    action: 'Send Tracked Email Test',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('sendEmailResult', {
+                    action: 'Send Tracked Email Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testContactsImport() {
+            if (!currentIntegration) {
+                showResult('contactsResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-contacts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'X-Gmail-Token': currentIntegration.access_token,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        integration_id: currentIntegration.id,
+                        access_token: currentIntegration.access_token,
+                        refresh_token: currentIntegration.refresh_token,
+                        include_no_email: false
+                    })
+                });
+
+                const data = await response.json();
+                showResult('contactsResult', {
+                    action: 'Contacts Import Test',
+                    status: response.status,
+                    contactCount: data.contacts?.length || 0,
+                    stats: data.stats,
+                    sampleContact: data.contacts?.[0],
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('contactsResult', {
+                    action: 'Contacts Import Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testContactsPreview() {
+            if (!currentIntegration) {
+                showResult('contactsResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-contacts-preview`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        userId: currentIntegration.user_id
+                    })
+                });
+
+                const data = await response.json();
+                showResult('contactsResult', {
+                    action: 'Contacts Preview Test',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('contactsResult', {
+                    action: 'Contacts Preview Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testEmailSync() {
+            if (!currentIntegration) {
+                showResult('syncResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        userId: currentIntegration.user_id,
+                        syncType: 'pull',
+                        forceSync: false
+                    })
+                });
+
+                const data = await response.json();
+                showResult('syncResult', {
+                    action: 'Email Sync Test',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('syncResult', {
+                    action: 'Email Sync Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testEmailMetadata() {
+            if (!currentIntegration) {
+                showResult('syncResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            // Test direct Gmail API call for metadata
+            try {
+                console.log('Making Gmail API call with token:', {
+                    hasAccessToken: !!currentIntegration.access_token,
+                    tokenPrefix: currentIntegration.access_token?.substring(0, 10) + '...',
+                    expiresAt: currentIntegration.expires_at
+                });
+
+                const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5&q=is:unread', {
+                    headers: {
+                        'Authorization': `Bearer ${currentIntegration.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                showResult('syncResult', {
+                    action: 'Email Metadata Test',
+                    status: response.status,
+                    messageCount: data.messages?.length || 0,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('syncResult', {
+                    action: 'Email Metadata Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testEmailTracking() {
+            // Test tracking pixel endpoint
+            try {
+                const testId = 'test-tracking-' + Date.now();
+                const response = await fetch(`${supabaseUrl}/functions/v1/email-tracker?id=${testId}`, {
+                    method: 'GET'
+                });
+
+                showResult('trackingResult', {
+                    action: 'Email Tracking Test',
+                    status: response.status,
+                    trackingId: testId,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('trackingResult', {
+                    action: 'Email Tracking Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testLinkTracking() {
+            // Test link tracking endpoint
+            try {
+                const testId = 'test-link-' + Date.now();
+                const testUrl = 'https://example.com';
+                const response = await fetch(`${supabaseUrl}/functions/v1/link-tracker?id=${testId}&url=${encodeURIComponent(testUrl)}`, {
+                    method: 'GET'
+                });
+
+                showResult('trackingResult', {
+                    action: 'Link Tracking Test',
+                    status: response.status,
+                    trackingId: testId,
+                    originalUrl: testUrl,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('trackingResult', {
+                    action: 'Link Tracking Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testLabelsAPI() {
+            if (!currentIntegration) {
+                showResult('labelsResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                console.log('Making Gmail Labels API call with token:', {
+                    hasAccessToken: !!currentIntegration.access_token,
+                    tokenPrefix: currentIntegration.access_token?.substring(0, 10) + '...',
+                    expiresAt: currentIntegration.expires_at
+                });
+
+                const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+                    headers: {
+                        'Authorization': `Bearer ${currentIntegration.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                showResult('labelsResult', {
+                    action: 'Gmail Labels API Test',
+                    status: response.status,
+                    labelCount: data.labels?.length || 0,
+                    labels: data.labels?.map(l => ({ id: l.id, name: l.name, type: l.type })),
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('labelsResult', {
+                    action: 'Gmail Labels API Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function createTestLabel() {
+            if (!currentIntegration) {
+                showResult('labelsResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                console.log('Creating test label with token:', {
+                    hasAccessToken: !!currentIntegration.access_token,
+                    tokenPrefix: currentIntegration.access_token?.substring(0, 10) + '...',
+                    expiresAt: currentIntegration.expires_at
+                });
+
+                const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentIntegration.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: `CRM-Test-${Date.now()}`,
+                        labelListVisibility: 'labelShow',
+                        messageListVisibility: 'show'
+                    })
+                });
+
+                const data = await response.json();
+                showResult('labelsResult', {
+                    action: 'Create Test Label',
+                    status: response.status,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('labelsResult', {
+                    action: 'Create Test Label',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function testPhoneNumbers() {
+            if (!currentIntegration) {
+                showResult('phoneResult', 'Gmail not connected', 'error');
+                return;
+            }
+
+            try {
+                console.log('Making People API call with token:', {
+                    hasAccessToken: !!currentIntegration.access_token,
+                    tokenPrefix: currentIntegration.access_token?.substring(0, 10) + '...',
+                    expiresAt: currentIntegration.expires_at
+                });
+
+                const response = await fetch('https://people.googleapis.com/v1/people/me?personFields=phoneNumbers,emailAddresses,names', {
+                    headers: {
+                        'Authorization': `Bearer ${currentIntegration.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                showResult('phoneResult', {
+                    action: 'Phone Numbers API Test',
+                    status: response.status,
+                    phoneNumbers: data.phoneNumbers,
+                    emailAddresses: data.emailAddresses,
+                    names: data.names,
+                    response: data,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('phoneResult', {
+                    action: 'Phone Numbers API Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        async function runFullTest() {
+            showResult('integrationTestResult', 'Running comprehensive tests...', 'info');
+            
+            const results = {
+                timestamp: new Date().toISOString(),
+                tests: []
+            };
+
+            // Test connection
+            try {
+                await checkGmailConnection();
+                results.tests.push({ name: 'Gmail Connection', status: 'PASS' });
+            } catch (error) {
+                results.tests.push({ name: 'Gmail Connection', status: 'FAIL', error: error.message });
+            }
+
+            // Test each endpoint
+            const tests = [
+                { name: 'Contacts Import', func: testContactsImport },
+                { name: 'Email Sync', func: testEmailSync },
+                { name: 'Email Tracking', func: testEmailTracking },
+                { name: 'Link Tracking', func: testLinkTracking },
+                { name: 'Labels API', func: testLabelsAPI },
+                { name: 'Phone Numbers', func: testPhoneNumbers }
+            ];
+
+            for (const test of tests) {
+                try {
+                    await test.func();
+                    results.tests.push({ name: test.name, status: 'COMPLETED' });
+                } catch (error) {
+                    results.tests.push({ name: test.name, status: 'FAIL', error: error.message });
+                }
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            showResult('integrationTestResult', results, 'success');
+        }
+
+        async function runQuickTest() {
+            showResult('integrationTestResult', 'Running quick health check...', 'info');
+            
+            const results = {
+                timestamp: new Date().toISOString(),
+                healthCheck: {
+                    gmailConnected: !!currentIntegration,
+                    tokenValid: currentIntegration && new Date(currentIntegration.expires_at) > new Date(),
+                    requiredScopes: currentIntegration?.scope?.split(' ') || [],
+                    edgeFunctionsReachable: false
+                }
+            };
+
+            // Test if edge functions are reachable
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ test: true })
+                });
+                results.healthCheck.edgeFunctionsReachable = true;
+                results.healthCheck.edgeFunctionStatus = response.status;
+            } catch (error) {
+                results.healthCheck.edgeFunctionError = error.message;
+            }
+
+            showResult('integrationTestResult', results, 'info');
+        }
+
+        function exportTestResults() {
+            const results = {
+                timestamp: new Date().toISOString(),
+                configuration: { supabaseUrl, hasKey: !!supabaseKey },
+                integration: currentIntegration,
+                scopeAnalysis: {
+                    configured: [
+                        'auth/gmail.send', 'auth/gmail.readonly', 'auth/contacts.readonly',
+                        'auth/contacts.other.readonly', 'auth/user.emails.read',
+                        'auth/gmail.modify', 'auth/gmail.labels', 'auth/gmail.metadata',
+                        'auth/user.phonenumbers.read', 'auth/gmail.addons.current.message.action',
+                        'auth/profile.emails.read'
+                    ],
+                    currentlyUsed: [
+                        'auth/gmail.send', 'auth/gmail.readonly', 'auth/contacts.readonly',
+                        'auth/contacts.other.readonly', 'auth/user.emails.read'
+                    ],
+                    potential: [
+                        'auth/gmail.modify', 'auth/gmail.labels', 'auth/gmail.metadata',
+                        'auth/user.phonenumbers.read'
+                    ]
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gmail-api-test-results-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showStatus('Test results exported!', 'success');
+        }
+
+        async function analyzeSchema() {
+            try {
+                // Check existing tables and columns
+                const tables = ['user_integrations', 'email_tracking', 'contacts', 'companies'];
+                const schemaAnalysis = {};
+
+                for (const table of tables) {
+                    try {
+                        const response = await fetch(`${supabaseUrl}/rest/v1/${table}?limit=1`, {
+                            headers: {
+                                'Authorization': `Bearer ${userToken}`,
+                                'apikey': supabaseKey,
+                                'Prefer': 'count=exact'
+                            }
+                        });
+
+                        if (response.ok) {
+                            schemaAnalysis[table] = {
+                                exists: true,
+                                status: 'OK'
+                            };
+                        } else {
+                            schemaAnalysis[table] = {
+                                exists: false,
+                                error: response.statusText
+                            };
+                        }
+                    } catch (error) {
+                        schemaAnalysis[table] = {
+                            exists: false,
+                            error: error.message
+                        };
+                    }
+                }
+
+                showResult('schemaResult', {
+                    action: 'Database Schema Analysis',
+                    tables: schemaAnalysis,
+                    timestamp: new Date().toISOString()
+                }, 'info');
+
+            } catch (error) {
+                showResult('schemaResult', {
+                    action: 'Database Schema Analysis',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        function suggestSchemaUpdates() {
+            const suggestions = {
+                action: 'Schema Update Suggestions',
+                timestamp: new Date().toISOString(),
+                recommendations: [
+                    {
+                        table: 'contacts',
+                        field: 'phone_numbers',
+                        type: 'jsonb',
+                        reason: 'Store multiple phone numbers from Google People API',
+                        scope: 'user.phonenumbers.read'
+                    },
+                    {
+                        table: 'email_tracking',
+                        field: 'gmail_label_ids',
+                        type: 'text[]',
+                        reason: 'Track Gmail labels applied to sent emails',
+                        scope: 'gmail.labels'
+                    },
+                    {
+                        table: 'email_tracking',
+                        field: 'gmail_thread_id',
+                        type: 'text',
+                        reason: 'Link emails to Gmail conversations',
+                        scope: 'gmail.readonly'
+                    },
+                    {
+                        table: 'gmail_labels',
+                        field: 'new_table',
+                        type: 'table',
+                        reason: 'Store custom Gmail labels for organization',
+                        scope: 'gmail.labels',
+                        schema: {
+                            id: 'uuid primary key',
+                            user_id: 'uuid references auth.users(id)',
+                            gmail_label_id: 'text',
+                            name: 'text',
+                            color: 'text',
+                            created_at: 'timestamptz'
+                        }
+                    },
+                    {
+                        table: 'user_integrations',
+                        field: 'last_sync_timestamp',
+                        type: 'timestamptz',
+                        reason: 'Track last successful sync for incremental updates',
+                        scope: 'gmail.readonly'
+                    },
+                    {
+                        table: 'user_integrations',
+                        field: 'sync_settings',
+                        type: 'jsonb',
+                        reason: 'Store user sync preferences and filters',
+                        scope: 'all'
+                    }
+                ]
+            };
+
+            showResult('schemaResult', suggestions, 'warning');
+        }
+
+        async function signIn() {
+            const email = document.getElementById('userEmail').value;
+            const password = document.getElementById('userPassword').value;
+
+            try {
+                const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Sign in response:', {
+                    status: response.status,
+                    ok: response.ok,
+                    hasAccessToken: !!data.access_token
+                });
+
+                if (response.ok && data.access_token) {
+                    userToken = data.access_token;
+                    localStorage.setItem('gmail_tester_auth', JSON.stringify({
+                        access_token: data.access_token,
+                        refresh_token: data.refresh_token,
+                        expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+                    }));
+                    showStatus('Signed in successfully!', 'success');
+                    await checkGmailConnection();
+                } else {
+                    showStatus('Sign in failed: ' + (data.error_description || data.msg), 'error');
+                }
+            } catch (error) {
+                console.error('Sign in error:', error);
+                showStatus('Sign in error: ' + error.message, 'error');
+            }
+        }
+
+        async function signOut() {
+            userToken = '';
+            localStorage.removeItem('gmail_tester_auth');
+            showStatus('Signed out', 'success');
+            currentIntegration = null;
+            showResult('connectionResult', {
+                status: 'Signed Out',
+                message: 'Please sign in to continue',
+                timestamp: new Date().toISOString()
+            }, 'warning');
+        }
+
+        // Add token refresh helper
+        async function refreshTokenIfNeeded() {
+            if (!currentIntegration?.refresh_token) {
+                console.log('No refresh token available');
+                return false;
+            }
+
+            const expiresAt = new Date(currentIntegration.expires_at);
+            const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+            if (expiresAt > fiveMinutesFromNow) {
+                console.log('Token still valid until:', expiresAt);
+                return true;
+            }
+
+            console.log('Token expired or expiring soon, refreshing...');
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/gmail-auth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({ 
+                        refresh_token: currentIntegration.refresh_token 
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.access_token) {
+                    currentIntegration.access_token = data.access_token;
+                    currentIntegration.expires_at = data.expires_at;
+                    console.log('Token refreshed successfully');
+                    return true;
+                } else {
+                    console.error('Token refresh failed:', data);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error refreshing token:', error);
+                return false;
+            }
+        }
+
+        // Add token check before API calls
+        async function makeGmailApiCall(endpoint, options = {}) {
+            if (!currentIntegration) {
+                throw new Error('Gmail not connected');
+            }
+
+            if (!(await refreshTokenIfNeeded())) {
+                throw new Error('Failed to refresh expired token');
+            }
+
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${currentIntegration.access_token}`
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error?.message || 'API call failed');
+            }
+
+            return response.json();
+        }
+    </script>
+</body>
+</html> 
