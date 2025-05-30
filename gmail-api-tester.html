@@ -219,6 +219,70 @@
     </div>
 
     <div class="section">
+        <h2>🚀 ENHANCED Stealth Email Tracking Tests</h2>
+        <p><strong>NEW:</strong> Test the enhanced stealth tracking capabilities that bypass Gmail's privacy protection.</p>
+        
+        <div class="endpoint-grid">
+            <div class="endpoint-card">
+                <h4>🕵️ Stealth Email Send</h4>
+                <p>Send emails with invisible tracking that bypasses Gmail blocks</p>
+                <div>
+                    <input type="email" id="stealthTestEmail" placeholder="Recipient email" style="width: 100%; margin: 5px 0;">
+                    <input type="text" id="stealthTestSubject" placeholder="Email subject" value="CRM Enhanced Test" style="width: 100%; margin: 5px 0;">
+                    <textarea id="stealthTestBody" placeholder="Email body (HTML)" rows="3" style="width: 100%; margin: 5px 0;">
+<h2>Enhanced CRM Test Email</h2>
+<p>This email uses enhanced stealth tracking features:</p>
+<ul>
+    <li>Invisible tracking pixel with absolute positioning</li>
+    <li>Personal Gmail-like headers</li>
+    <li>Auto-labeling for organization</li>
+    <li>Link tracking: <a href="https://example.com">Test Link</a></li>
+</ul>
+<p>Test opening and clicking to verify tracking works!</p>
+                    </textarea>
+                </div>
+                <button class="test-button" onclick="testStealthEmailSend()">🚀 Send Enhanced Email</button>
+                <div id="stealthSendResult" class="data-container" style="display:none;"></div>
+            </div>
+
+            <div class="endpoint-card">
+                <h4>🏷️ Gmail Labels Test</h4>
+                <p>Test automatic label creation and application</p>
+                <button class="test-button" onclick="testGmailLabelsFeature()">Test Label Creation</button>
+                <button class="test-button" onclick="listGmailLabels()">List All Labels</button>
+                <div id="labelsResult" class="data-container" style="display:none;"></div>
+            </div>
+
+            <div class="endpoint-card">
+                <h4>📊 Enhanced Analytics</h4>
+                <p>Test improved tracking data collection</p>
+                <button class="test-button" onclick="testEnhancedAnalytics()">Test Analytics</button>
+                <button class="test-button" onclick="simulateEmailOpens()">Simulate Opens</button>
+                <div id="enhancedAnalyticsResult" class="data-container" style="display:none;"></div>
+            </div>
+
+            <div class="endpoint-card">
+                <h4>🔍 Tracking Verification</h4>
+                <p>Verify stealth tracking implementation</p>
+                <button class="test-button" onclick="verifyTrackingPixel()">Verify Pixel Stealth</button>
+                <button class="test-button" onclick="testLinkTracking()">Test Link Tracking</button>
+                <div id="trackingVerifyResult" class="data-container" style="display:none;"></div>
+            </div>
+        </div>
+        
+        <div class="status info">
+            <strong>✨ Enhanced Features:</strong>
+            <ul>
+                <li><strong>Stealth Pixel:</strong> Positioned with absolute positioning for invisibility</li>
+                <li><strong>Personal Headers:</strong> X-Mailer: Gmail, X-Priority: 3 for natural appearance</li>
+                <li><strong>Auto-Labeling:</strong> CRM-Sent and CRM-Campaign-[ID] labels</li>
+                <li><strong>Improved Placement:</strong> Tracking pixel inserted before </body> tag</li>
+                <li><strong>Better Deliverability:</strong> Gmail-like headers reduce spam filtering</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
         <h2>🔗 Authentication & Connection</h2>
         <button class="test-button" onclick="testGmailConnection()">
             <span id="connectionLoader" style="display: none;" class="loading"></span>
@@ -1996,6 +2060,287 @@
             }
 
             return response.json();
+        }
+
+        // ENHANCED: Test stealth email sending
+        async function testStealthEmailSend() {
+            const email = document.getElementById('stealthTestEmail').value;
+            const subject = document.getElementById('stealthTestSubject').value;
+            const body = document.getElementById('stealthTestBody').value;
+
+            if (!email || !subject || !body) {
+                showResult('stealthSendResult', { error: 'Please fill in all fields' }, 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey
+                    },
+                    body: JSON.stringify({
+                        userId: 'test-user-id', // Would be actual user ID in production
+                        to: email,
+                        subject: subject,
+                        html: body,
+                        trackOpens: true,
+                        trackClicks: true
+                    })
+                });
+
+                const data = await response.json();
+                showResult('stealthSendResult', {
+                    action: 'Enhanced Stealth Email Send',
+                    status: response.status,
+                    success: response.ok,
+                    enhanced_features: data.enhanced_features || {},
+                    tracking_details: {
+                        email_id: data.email_id,
+                        tracking_pixel_id: data.tracking_pixel_id,
+                        links_tracked: data.links_tracked
+                    },
+                    labels_applied: data.enhanced_features?.labels_applied || 0,
+                    timestamp: new Date().toISOString(),
+                    full_response: data
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('stealthSendResult', {
+                    action: 'Enhanced Stealth Email Send',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        // ENHANCED: Test Gmail labels functionality
+        async function testGmailLabelsFeature() {
+            try {
+                if (!currentIntegration) {
+                    throw new Error('Gmail not connected');
+                }
+
+                showResult('labelsResult', {
+                    action: 'Testing Gmail Labels Feature',
+                    message: 'This feature is automatically tested when sending emails',
+                    expected_labels: [
+                        'CRM-Sent (for all CRM emails)',
+                        'CRM-Campaign-[ID] (for campaign emails)'
+                    ],
+                    instructions: [
+                        '1. Send an enhanced email using the button above',
+                        '2. Check your Gmail account',
+                        '3. Look for new labels in the left sidebar',
+                        '4. Verify the sent email appears under CRM-Sent'
+                    ],
+                    timestamp: new Date().toISOString()
+                }, 'info');
+
+            } catch (error) {
+                showResult('labelsResult', {
+                    action: 'Gmail Labels Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        // ENHANCED: List Gmail labels
+        async function listGmailLabels() {
+            try {
+                if (!currentIntegration) {
+                    throw new Error('Gmail not connected');
+                }
+
+                const labelsData = await makeGmailApiCall('https://gmail.googleapis.com/gmail/v1/users/me/labels');
+                
+                const crmLabels = labelsData.labels.filter(label => 
+                    label.name.startsWith('CRM-') || 
+                    label.name.includes('Campaign')
+                );
+
+                showResult('labelsResult', {
+                    action: 'Gmail Labels List',
+                    total_labels: labelsData.labels.length,
+                    crm_labels: crmLabels,
+                    all_labels: labelsData.labels.map(l => ({
+                        id: l.id,
+                        name: l.name,
+                        type: l.type
+                    })),
+                    timestamp: new Date().toISOString()
+                }, 'success');
+
+            } catch (error) {
+                showResult('labelsResult', {
+                    action: 'Gmail Labels List',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        // ENHANCED: Test enhanced analytics
+        async function testEnhancedAnalytics() {
+            try {
+                const response = await fetch(`${supabaseUrl}/rest/v1/email_tracking?select=*&order=created_at.desc&limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult('enhancedAnalyticsResult', {
+                    action: 'Enhanced Analytics Test',
+                    status: response.status,
+                    tracking_records: data.length,
+                    recent_emails: data.map(record => ({
+                        email_id: record.email_id,
+                        recipient: record.recipient,
+                        sent_at: record.sent_at,
+                        has_tracking_pixel: !!record.tracking_pixel_id,
+                        open_count: record.open_count,
+                        click_count: record.click_count
+                    })),
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('enhancedAnalyticsResult', {
+                    action: 'Enhanced Analytics Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        // ENHANCED: Simulate email opens for testing
+        async function simulateEmailOpens() {
+            try {
+                // Get the most recent email tracking record
+                const response = await fetch(`${supabaseUrl}/rest/v1/email_tracking?select=*&order=created_at.desc&limit=1`, {
+                    headers: {
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                if (data.length === 0) {
+                    throw new Error('No email tracking records found. Send an email first.');
+                }
+
+                const trackingRecord = data[0];
+                
+                if (!trackingRecord.tracking_pixel_id) {
+                    throw new Error('No tracking pixel ID found for the most recent email.');
+                }
+
+                // Simulate tracking pixel access
+                const pixelResponse = await fetch(`${supabaseUrl}/functions/v1/email-tracker?id=${trackingRecord.tracking_pixel_id}`);
+
+                showResult('enhancedAnalyticsResult', {
+                    action: 'Simulated Email Open',
+                    tracking_pixel_id: trackingRecord.tracking_pixel_id,
+                    pixel_response_status: pixelResponse.status,
+                    email_id: trackingRecord.email_id,
+                    recipient: trackingRecord.recipient,
+                    message: 'Open event should be recorded in analytics',
+                    timestamp: new Date().toISOString()
+                }, pixelResponse.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('enhancedAnalyticsResult', {
+                    action: 'Simulate Email Opens',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
+        }
+
+        // ENHANCED: Verify tracking pixel stealth
+        async function verifyTrackingPixel() {
+            showResult('trackingVerifyResult', {
+                action: 'Tracking Pixel Stealth Verification',
+                enhanced_attributes: {
+                    position: 'absolute',
+                    left: '-9999px',
+                    top: '-9999px', 
+                    visibility: 'hidden',
+                    opacity: '0',
+                    border: '0',
+                    outline: '0'
+                },
+                placement: 'Before </body> tag for natural integration',
+                stealth_features: [
+                    'Invisible to recipient (off-screen positioning)',
+                    'Hidden from view (visibility:hidden + opacity:0)',
+                    'No visual impact (border:0, outline:0)',
+                    'Lazy loading attribute for natural behavior'
+                ],
+                verification_steps: [
+                    '1. Send test email with enhanced tracking',
+                    '2. Check received email HTML source',
+                    '3. Look for tracking pixel before </body>',
+                    '4. Verify pixel has stealth attributes',
+                    '5. Confirm pixel is not visible when email is opened'
+                ],
+                bypass_techniques: [
+                    'Absolute positioning moves pixel off-screen',
+                    'Multiple hiding attributes for redundancy',
+                    'Natural placement in email structure',
+                    'Personal headers reduce spam filtering'
+                ],
+                timestamp: new Date().toISOString()
+            }, 'info');
+        }
+
+        // ENHANCED: Test link tracking
+        async function testLinkTracking() {
+            try {
+                const response = await fetch(`${supabaseUrl}/rest/v1/tracked_links?select=*&order=created_at.desc&limit=5`, {
+                    headers: {
+                        'Authorization': `Bearer ${userToken}`,
+                        'apikey': supabaseKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                showResult('trackingVerifyResult', {
+                    action: 'Link Tracking Test',
+                    status: response.status,
+                    tracked_links_count: data.length,
+                    recent_links: data.map(link => ({
+                        tracking_id: link.tracking_id,
+                        original_url: link.original_url,
+                        email_id: link.email_id,
+                        created_at: link.created_at
+                    })),
+                    test_instructions: [
+                        '1. Send email with links using enhanced send',
+                        '2. Recipient clicks on links in email',
+                        '3. Clicks are redirected through tracking URL',
+                        '4. Original URL is accessed after tracking',
+                        '5. Click events are recorded in analytics'
+                    ],
+                    tracking_pattern: `${supabaseUrl}/functions/v1/link-tracker?id=[TRACKING_ID]&url=[ENCODED_URL]`,
+                    timestamp: new Date().toISOString()
+                }, response.ok ? 'success' : 'error');
+
+            } catch (error) {
+                showResult('trackingVerifyResult', {
+                    action: 'Link Tracking Test',
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }, 'error');
+            }
         }
     </script>
 </body>

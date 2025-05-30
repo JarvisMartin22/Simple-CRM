@@ -83,9 +83,14 @@ CREATE TRIGGER initialize_analytics_on_campaign_create
     EXECUTE FUNCTION public.initialize_campaign_analytics();
 
 -- Recreate the email tracking policy
-CREATE POLICY IF NOT EXISTS "Users can view their own email tracking"
-  ON public.email_tracking FOR SELECT
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+    CREATE POLICY "Users can view their own email tracking"
+      ON public.email_tracking FOR SELECT
+      USING (auth.uid() = user_id);
+EXCEPTION
+    WHEN duplicate_object THEN
+        NULL;
+END $$;
 
 -- Add RLS policies
 DROP POLICY IF EXISTS "Users can update their own campaign analytics" ON public.campaign_analytics;

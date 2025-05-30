@@ -29,15 +29,17 @@ serve(async (req) => {
     const userAgent = req.headers.get("user-agent") || "Unknown";
     const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "Unknown";
 
-    console.log(`Processing email open tracking:`, {
+    console.log(`🔍 DEBUG: Processing email open tracking:`, {
       trackingId,
       userAgent: userAgent.substring(0, 50),
       ip: ipAddress,
-      method: req.method
+      method: req.method,
+      hasServiceKey: !!SERVICE_ROLE_KEY,
+      apiUrl: API_URL
     });
 
     if (!trackingId) {
-      console.warn("Missing tracking ID in request");
+      console.warn("⚠️ Missing tracking ID in request");
       // Still return the pixel but don't track
       return returnTrackingPixel();
     }
@@ -50,17 +52,21 @@ serve(async (req) => {
       }
     });
 
+    console.log(`🔍 DEBUG: Looking up tracking record for ID: ${trackingId}`);
+
     // Get the tracking record first
     const { data: trackingData, error: fetchError } = await supabase
       .from("email_tracking")
-      .select("id, user_id, email_id, recipient, subject, campaign_id, contact_id")
+      .select("id, user_id, email_id, recipient, subject")
       .eq("tracking_pixel_id", trackingId)
       .single();
 
     if (fetchError) {
-      console.error("Error fetching tracking data:", fetchError);
+      console.error("❌ Error fetching tracking data:", fetchError);
       return returnTrackingPixel();
     }
+
+    console.log(`✅ DEBUG: Found tracking record:`, trackingData);
 
     // Record the open event
     const { error: updateError } = await supabase
@@ -72,9 +78,9 @@ serve(async (req) => {
       .eq("tracking_pixel_id", trackingId);
 
     if (updateError) {
-      console.error("Error updating tracking record:", updateError);
+      console.error("❌ Error updating tracking record:", updateError);
     } else {
-      console.log(`Successfully recorded open for tracking ID: ${trackingId}`);
+      console.log(`✅ Successfully recorded open for tracking ID: ${trackingId}`);
 
       // Record the event in email_events
       const { error: eventError } = await supabase
@@ -91,120 +97,13 @@ serve(async (req) => {
         });
 
       if (eventError) {
-        console.error("Error recording event:", eventError);
-      }
-      
-      // Check if this is part of a campaign
-      if (trackingData.campaign_id) {
-        // Also update the campaign analytics tables
-        console.log(`Updating campaign analytics for campaign ${trackingData.campaign_id}`);
-        
-        try {
-          // 1. First, update the campaign_analytics table
-          const { data: campaignAnalytics, error: fetchAnalyticsError } = await supabase
-            .from("campaign_analytics")
-            .select("id, opened_count")
-            .eq("campaign_id", trackingData.campaign_id)
-            .single();
-            
-          if (fetchAnalyticsError) {
-            console.error("Error fetching campaign analytics:", fetchAnalyticsError);
-            
-            // If the record doesn't exist, try to create it
-            if (fetchAnalyticsError.code === "PGRST116") {
-              console.log("Campaign analytics record not found, creating new record");
-              const { error: insertError } = await supabase
-                .from("campaign_analytics")
-                .insert({
-                  campaign_id: trackingData.campaign_id,
-                  opened_count: 1,
-                  last_event_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-                
-              if (insertError) {
-                console.error("Error creating campaign analytics:", insertError);
-              } else {
-                console.log("Created new campaign analytics record");
-              }
-            }
-          } else {
-            console.log("Found campaign analytics record:", campaignAnalytics);
-            const { error: campaignAnalyticsError } = await supabase
-              .from("campaign_analytics")
-              .update({
-                opened_count: (campaignAnalytics?.opened_count || 0) + 1,
-                last_event_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq("id", campaignAnalytics.id);
-              
-            if (campaignAnalyticsError) {
-              console.error("Error updating campaign analytics:", campaignAnalyticsError);
-            } else {
-              console.log("Successfully updated campaign analytics");
-            }
-          }
-        } catch (error) {
-          console.error("Unexpected error updating campaign analytics:", error);
-        }
-        
-        // 2. Next, update the recipient_analytics table if we have a contact_id
-        if (trackingData.contact_id) {
-          const { data: recipientAnalytics, error: fetchRecipientError } = await supabase
-            .from("recipient_analytics")
-            .select("open_count, first_opened_at")
-            .eq("campaign_id", trackingData.campaign_id)
-            .eq("recipient_id", trackingData.contact_id)
-            .single();
-            
-          if (fetchRecipientError) {
-            console.error("Error fetching recipient analytics:", fetchRecipientError);
-          } else {
-            const { error: recipientAnalyticsError } = await supabase
-              .from("recipient_analytics")
-              .update({
-                last_opened_at: new Date().toISOString(),
-                open_count: (recipientAnalytics?.open_count || 0) + 1,
-                updated_at: new Date().toISOString(),
-                first_opened_at: recipientAnalytics?.first_opened_at || new Date().toISOString()
-              })
-              .eq("campaign_id", trackingData.campaign_id)
-              .eq("recipient_id", trackingData.contact_id);
-              
-            if (recipientAnalyticsError) {
-              console.error("Error updating recipient analytics:", recipientAnalyticsError);
-            }
-          }
-        }
-        
-        // 3. Record in the newer email_events table for campaign analytics
-        const { error: campaignEventError } = await supabase
-          .from("email_events")
-          .insert({
-            campaign_id: trackingData.campaign_id,
-            recipient_id: trackingData.contact_id,
-            event_type: "opened",
-            event_data: {
-              user_agent: userAgent,
-              ip_address: ipAddress,
-              tracking_id: trackingId
-            },
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-          
-        if (campaignEventError) {
-          console.error("Error recording campaign event:", campaignEventError);
-        }
+        console.error("⚠️ Error recording event:", eventError);
       }
     }
 
     return returnTrackingPixel();
   } catch (error) {
-    console.error("Error processing tracking:", error);
+    console.error("💥 Error processing tracking:", error);
     // Always return the tracking pixel, even on error
     return returnTrackingPixel();
   }

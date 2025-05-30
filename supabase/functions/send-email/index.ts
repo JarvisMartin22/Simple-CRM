@@ -7,6 +7,103 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// ENHANCED: Helper function to auto-label emails for organization
+async function labelSentEmail(emailId: string, accessToken: string, campaignId?: string) {
+  try {
+    console.log(`🏷️  Auto-labeling email ${emailId}...`);
+    
+    // First, ensure CRM labels exist
+    const labels = await ensureCRMLabels(accessToken, campaignId);
+    
+    // Apply labels to the sent email
+    if (labels.length > 0) {
+      const response = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}/modify`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            addLabelIds: labels
+          })
+        }
+      );
+      
+      if (response.ok) {
+        console.log(`✅ Successfully labeled email ${emailId} with CRM labels`);
+        return labels;
+      } else {
+        console.log(`⚠️  Label application failed with status ${response.status}`);
+      }
+    }
+    return [];
+  } catch (error) {
+    console.log('⚠️  Label application failed (non-critical):', error.message);
+    // Don't fail the email send for labeling errors
+    return [];
+  }
+}
+
+// ENHANCED: Helper function to ensure CRM labels exist
+async function ensureCRMLabels(accessToken: string, campaignId?: string) {
+  const labelNames = ['CRM-Sent'];
+  if (campaignId) {
+    labelNames.push(`CRM-Campaign-${campaignId.substring(0, 8)}`);
+  }
+  
+  const labelIds = [];
+  
+  for (const labelName of labelNames) {
+    try {
+      // Check if label exists
+      const existingLabels = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        }
+      );
+      
+      const labelsData = await existingLabels.json();
+      let label = labelsData.labels?.find(l => l.name === labelName);
+      
+      if (!label) {
+        // Create the label
+        const createResponse = await fetch(
+          'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              name: labelName,
+              labelListVisibility: 'labelShow',
+              messageListVisibility: 'show',
+              color: { backgroundColor: '#4285f4' } // CRM blue
+            })
+          }
+        );
+        
+        if (createResponse.ok) {
+          label = await createResponse.json();
+          console.log(`🆕 Created label: ${labelName}`);
+        }
+      }
+      
+      if (label?.id) {
+        labelIds.push(label.id);
+      }
+    } catch (error) {
+      console.log(`⚠️  Failed to create/find label ${labelName}:`, error.message);
+    }
+  }
+  
+  return labelIds;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -77,9 +174,9 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Preparing to send email from user ${userIdToUse} to ${to}`);
+    console.log(`📧 Preparing ENHANCED email send from user ${userIdToUse} to ${to}`);
     if (campaign_id) {
-      console.log(`As part of campaign ${campaign_id}`);
+      console.log(`🎯 Campaign email: ${campaign_id}`);
     }
     
     // 1. Get the user's Gmail integration
@@ -148,17 +245,30 @@ serve(async (req) => {
       }
     }
     
-    // 3. Generate tracking pixel ID if needed
+    // ENHANCED: 3. Generate tracking pixel with stealth placement
     let trackingPixelId = null;
     let modifiedBody = emailContent;
     
     if (trackOpens) {
       // Generate a unique ID for tracking
       trackingPixelId = crypto.randomUUID();
-      const trackingUrl = `${supabaseUrl}/functions/v1/email-tracker?id=${trackingPixelId}`;
+      // Use direct REST API endpoint instead of edge function
+      const trackingUrl = `${supabaseUrl}/rest/v1/rpc/track_email_open?tracking_id=${trackingPixelId}`;
       
-      // Append tracking pixel to email body
-      modifiedBody += `<img src="${trackingUrl}" width="1" height="1" alt="" style="display:none;"/>`;
+      // ENHANCED: Use more natural tracking pixel placement for better stealth
+      const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;opacity:0;border:0;outline:0;" loading="lazy" />`;
+      
+      // Insert near the end but before closing body tag for better stealth
+      if (modifiedBody.includes('</body>')) {
+        modifiedBody = modifiedBody.replace('</body>', `${trackingPixel}</body>`);
+      } else if (modifiedBody.includes('</html>')) {
+        modifiedBody = modifiedBody.replace('</html>', `${trackingPixel}</html>`);
+      } else {
+        // Add tracking pixel with some spacing to appear more natural
+        modifiedBody += `\n\n${trackingPixel}`;
+      }
+      
+      console.log(`🎯 Enhanced tracking pixel added with ID: ${trackingPixelId}`);
     }
     
     // 4. Process links for click tracking if needed
@@ -184,15 +294,21 @@ serve(async (req) => {
         // Replace the link in the email
         modifiedBody = modifiedBody.replace(fullMatch, fullMatch.replace(url, trackingUrl));
       }
+      
+      if (trackedLinks.length > 0) {
+        console.log(`🔗 Enhanced click tracking added for ${trackedLinks.length} links`);
+      }
     }
     
-    // 5. Encode the email for Gmail API
+    // ENHANCED: 5. Create more personal email headers for better deliverability
     const emailLines = [
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
       `To: ${to}`,
       `Subject: ${subject}`,
-      '',
+      `X-Mailer: Gmail`,  // ENHANCED: Appear more personal
+      `X-Priority: 3`,    // ENHANCED: Normal priority
+      '', 
       modifiedBody
     ];
     
@@ -210,13 +326,14 @@ serve(async (req) => {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
     
-    // 6. Send the email via Gmail API
-    console.log("Sending email via Gmail API");
-    console.log("Email recipient:", to);
-    console.log("Email subject:", subject);
-    console.log("Using Gmail token (first 10 chars):", accessToken.substring(0, 10) + "...");
+    // ENHANCED: 6. Send email with improved personal appearance
+    console.log("🚀 Sending ENHANCED email via Gmail API");
+    console.log("📧 Email recipient:", to);
+    console.log("📝 Email subject:", subject);
+    console.log("🔑 Using Gmail token (first 10 chars):", accessToken.substring(0, 10) + "...");
     
     let emailId;
+    let appliedLabels = [];
     try {
       const response = await fetch(
         'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
@@ -245,7 +362,11 @@ serve(async (req) => {
       const emailData = await response.json();
       emailId = emailData.id;
       
-      console.log(`Email sent successfully with ID: ${emailId}`);
+      console.log(`✅ Email sent successfully with ID: ${emailId}`);
+      
+      // ENHANCED: Auto-label the sent email for organization
+      appliedLabels = await labelSentEmail(emailId, accessToken, campaign_id);
+      
     } catch (apiError) {
       console.error("Gmail API call failed:", apiError);
       throw apiError; // Re-throw to be caught by the outer try/catch
@@ -262,19 +383,24 @@ serve(async (req) => {
         sent_at: new Date().toISOString(),
         provider: 'gmail',
         tracking_pixel_id: trackingPixelId,
-        updated_at: new Date().toISOString(),
-        open_count: 0,
-        click_count: 0,
         campaign_id: campaign_id,
-        contact_id: contact_id
+        updated_at: new Date().toISOString()
       })
       .select();
       
     if (trackingError) {
       console.error("Error recording email tracking:", trackingError);
-      // Don't fail the entire operation for tracking errors
+      console.error("Tracking data that failed:", {
+        email_id: emailId,
+        user_id: userIdToUse,
+        recipient: to,
+        subject: subject,
+        tracking_pixel_id: trackingPixelId,
+        tracking_pixel_id_type: typeof trackingPixelId
+      });
+      // Don't fail the entire operation for tracking errors, but log extensively
     } else {
-      console.log("Successfully recorded email tracking");
+      console.log("📊 Successfully recorded email tracking with pixel ID:", trackingPixelId);
     }
     
     // 8. Store tracked links if any
@@ -286,8 +412,6 @@ serve(async (req) => {
             ...link,
             email_id: emailId,
             email_tracking_id: trackingData ? trackingData[0].id : null,
-            campaign_id: campaign_id,
-            contact_id: contact_id,
             created_at: new Date().toISOString()
           });
       }
@@ -332,7 +456,7 @@ serve(async (req) => {
     
     // Update campaign_analytics if campaign_id is provided
     if (campaign_id) {
-      console.log(`Updating campaign analytics for campaign ${campaign_id}`);
+      console.log(`📈 Updating campaign analytics for campaign ${campaign_id}`);
       
       // 1. Check if campaign_analytics record exists
       const { data: existingAnalytics, error: analyticsCheckError } = await supabase
@@ -387,7 +511,7 @@ serve(async (req) => {
       
       // Add an entry in recipient_analytics if contact_id is provided
       if (contact_id) {
-        console.log(`Updating recipient analytics for contact ${contact_id}`);
+        console.log(`📊 Updating recipient analytics for contact ${contact_id}`);
         
         // Check if recipient_analytics entry exists
         const { data: existingRecipient, error: recipientCheckError } = await supabase
@@ -441,7 +565,7 @@ serve(async (req) => {
       }
       
       // Log send event
-      console.log("Logging email send event");
+      console.log("📝 Logging email send event");
       const { error: eventError } = await supabase
         .from('email_events')
         .insert({
@@ -471,7 +595,12 @@ serve(async (req) => {
         tracking_pixel_id: trackingPixelId,
         links_tracked: trackedLinks.length,
         campaign_id: campaign_id,
-        contact_id: contact_id
+        contact_id: contact_id,
+        enhanced_features: {
+          labels_applied: appliedLabels.length,
+          stealth_tracking: true,
+          personal_headers: true
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

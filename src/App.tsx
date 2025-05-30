@@ -43,24 +43,16 @@ const App: React.FC = () => {
   
   // Debug event listener to capture postMessages
   useEffect(() => {
-    const handleDebugMessage = (event: MessageEvent) => {
-      console.log('DEBUG - Message received:', event);
-      
-      // Only show toast for Gmail auth messages
-      if (event.data && event.data.type === 'GMAIL_AUTH_CODE') {
-        toast({
-          title: "Auth message received",
-          description: `Code received at ${new Date().toLocaleTimeString()}`,
-        });
+    const handleMessage = (event: MessageEvent) => {
+      // Only log in development mode
+      if (import.meta.env.DEV) {
+        console.log('App: Message received from:', event.origin);
       }
     };
-    
-    window.addEventListener('message', handleDebugMessage);
-    
-    return () => {
-      window.removeEventListener('message', handleDebugMessage);
-    };
-  }, [toast]);
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
   
   return (
     <QueryClientProvider client={queryClient}>

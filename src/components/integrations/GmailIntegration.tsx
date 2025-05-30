@@ -59,10 +59,8 @@ const GmailIntegration = () => {
     let timeoutId: number | null = null;
     
     if (isConnecting) {
-      console.log('GmailIntegration: Connection started, setting timeout');
       // If connecting takes more than 2 minutes, reset the state
       timeoutId = window.setTimeout(() => {
-        console.log('GmailIntegration: Connection timeout - resetting state');
         resetConnectionState();
         toast({
           title: "Connection timeout",
@@ -74,7 +72,6 @@ const GmailIntegration = () => {
     
     return () => {
       if (timeoutId) {
-        console.log('GmailIntegration: Clearing timeout');
         window.clearTimeout(timeoutId);
       }
     };
@@ -148,10 +145,8 @@ const GmailIntegration = () => {
   });
   
   const handleConnect = async () => {
-    console.log('GmailIntegration: initiating connection');
     try {
       const success = await connectGmail();
-      console.log('GmailIntegration: connection result:', success);
       if (success) {
         setIsDialogOpen(false);
         await refetch();
@@ -162,13 +157,12 @@ const GmailIntegration = () => {
         }
       }
     } catch (error) {
-      console.error('GmailIntegration: connection error:', error);
+      console.error('Gmail: Connection error:', error);
     }
   };
   
   const handleDisconnect = async () => {
     if (!integration) return;
-    console.log('GmailIntegration: disconnecting');
     try {
       // If we have a DB integration, disconnect it
       if (dbIntegration?.id) {
@@ -183,7 +177,7 @@ const GmailIntegration = () => {
       
       await refetch();
     } catch (error) {
-      console.error('GmailIntegration: disconnection error:', error);
+      console.error('Gmail: Disconnection error:', error);
     }
   };
   

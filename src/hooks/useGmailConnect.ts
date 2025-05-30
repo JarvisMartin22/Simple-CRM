@@ -22,28 +22,26 @@ export function useGmailConnect() {
   
   // Define message handler function
   const handleAuthMessage = async (event: MessageEvent) => {
-    console.log('Received message event:', event);
-    
     // Process message from auth popup
     const data = event.data;
     if (data && data.type === 'GMAIL_AUTH_CODE' && data.code) {
-      console.log('Auth code received from popup');
+      console.log('📧 Gmail: Processing auth code...');
       
       // Make sure we have an active promise resolver
       if (!authPromiseResolve) {
-        console.error('No active promise resolver found');
+        console.warn('Gmail: No active auth session found');
         return;
       }
       
       // Check if we're already processing a code or if this is a duplicate
       if (isProcessingCode) {
-        console.log('Already processing an auth code, ignoring duplicate');
+        console.log('Gmail: Auth already in progress, ignoring duplicate');
         return;
       }
       
       // Check if this is the same code we just processed
       if (lastProcessedCode === data.code) {
-        console.log('Ignoring duplicate auth code');
+        console.log('Gmail: Ignoring duplicate auth code');
         return;
       }
       
@@ -56,20 +54,15 @@ export function useGmailConnect() {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error('Session verification error:', sessionError);
-          // Continue with the process but log the error
+          console.warn('Gmail: Session verification warning:', sessionError.message);
         }
         
         if (!sessionData?.session) {
-          console.warn('No active session found, attempting to refresh');
-          // Try to refresh the session
+          console.log('Gmail: Refreshing session...');
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           
           if (refreshError || !refreshData.session) {
-            console.error('Could not refresh session:', refreshError);
-            // Continue with the process but log the error
-          } else {
-            console.log('Session refreshed successfully');
+            console.warn('Gmail: Could not refresh session');
           }
         }
         
@@ -78,30 +71,50 @@ export function useGmailConnect() {
         const currentUser = latestUserData?.user || user;
         
         if (!currentUser?.id) {
-          console.error('No authenticated user found after token acquisition');
           throw new Error('Authentication required to save integration');
         }
         
         // Call Gmail auth endpoint with the code
-        console.log('Calling Gmail auth endpoint with code');
         const tokenResponse = await supabase.functions.invoke('gmail-auth', {
           body: { code: data.code }
         });
         
         if (tokenResponse.error) {
-          console.error('Gmail auth endpoint error:', tokenResponse.error);
-          
-          // Check for specific error types
+          // Only log and throw errors for genuinely failed attempts
+          // Don't throw for 400 errors that might be followed by success
           if (tokenResponse.error.message && tokenResponse.error.message.includes('non-2xx status code')) {
-            // Check if it's specifically a 500 error (Internal Server Error)
-            if (tokenResponse.error.message.includes('500')) {
-              console.log('Received 500 error from Edge Function, will wait for secondary response...');
+            if (tokenResponse.error.message.includes('400')) {
+              console.log('Gmail: Received 400 error, waiting for potential retry...');
               
-              // Set a timeout to wait for the secondary response
+              // Set a shorter timeout for 400 errors since they often resolve quickly
               setTimeout(() => {
-                // If we're still processing the same code after 5 seconds, assume failure
                 if (isProcessingCode && lastProcessedCode === data.code) {
-                  console.error('Timeout waiting for secondary response');
+                  console.warn('Gmail: 400 error timeout, connection may have failed');
+                  setIsProcessingCode(false);
+                  setIsConnecting(false);
+                  
+                  if (authPromiseResolve) {
+                    authPromiseResolve(false);
+                    authPromiseResolve = null;
+                  }
+                  
+                  toast({
+                    title: "Connection failed",
+                    description: "OAuth authentication failed. Please try again.",
+                    variant: "destructive"
+                  });
+                }
+              }, 3000); // Shorter timeout for 400 errors
+              
+              return; // Don't throw immediately
+            }
+            
+            if (tokenResponse.error.message.includes('500')) {
+              console.log('Gmail: Server error, waiting for retry...');
+              
+              setTimeout(() => {
+                if (isProcessingCode && lastProcessedCode === data.code) {
+                  console.error('Gmail: Timeout waiting for server response');
                   setIsProcessingCode(false);
                   setIsConnecting(false);
                   
@@ -118,66 +131,40 @@ export function useGmailConnect() {
                 }
               }, 5000);
               
-              // Return early without throwing - this allows the secondary successful response to be processed if it arrives
-              return;
+              return; // Don't throw - this allows success to be processed if it comes later
             }
             
+            // Only throw OAuth service error for non-400/500 errors
             throw new Error('Gmail connection failed: OAuth service returned an error. Please check your Supabase project logs and verify the OAuth credentials are correctly configured.');
           }
           
           throw new Error(tokenResponse.error.message || 'Unknown error from Gmail auth endpoint');
         }
-        
-        console.log('Token response received:', tokenResponse);
-        console.log('Token response data:', JSON.stringify(tokenResponse.data));
-        console.log('Token response structure check:', {
-          hasProvider: 'provider' in tokenResponse.data,
-          hasAccessToken: 'access_token' in tokenResponse.data,
-          dataType: typeof tokenResponse.data,
-          hasUrl: 'url' in tokenResponse.data // Check if we're getting an auth URL instead of tokens
-        });
-        
+
         // Extract only the fields that exist in the user_integrations table
-        // Use default values for required fields to prevent null constraint errors
         const integrationData = {
-          user_id: currentUser.id, // Use the most current user ID
-          provider: tokenResponse.data.provider || "gmail", // Default to "gmail" if not provided
+          user_id: currentUser.id,
+          provider: tokenResponse.data.provider || "gmail",
           provider_user_id: tokenResponse.data.provider_user_id || null,
           email: tokenResponse.data.email || null,
           access_token: tokenResponse.data.access_token || "",
           refresh_token: tokenResponse.data.refresh_token || null,
-          // Convert timestamp to ISO string if it's a number
           expires_at: typeof tokenResponse.data.expires_at === 'number' 
             ? new Date(tokenResponse.data.expires_at).toISOString() 
             : tokenResponse.data.expires_at,
           scope: tokenResponse.data.scope || null
         };
         
-        console.log('Integration data constructed:', {
-          provider: integrationData.provider,
-          access_token_exists: !!integrationData.access_token,
-          email: integrationData.email,
-          user_id: integrationData.user_id, // Log the user_id to verify it matches the authenticated user
-          expires_at: integrationData.expires_at // Log to verify format
-        });
-        
         // Validate required fields are present
         if (!integrationData.provider || !integrationData.access_token) {
-          console.error('Missing required fields for integration', integrationData);
           throw new Error('Missing required fields for integration');
         }
         
         // Make sure all required fields are present
         if (!integrationData.email) {
-          console.error('Missing required email field in integration data');
-          
-          // Try to get email from userInfo if available
           if (tokenResponse.data && tokenResponse.data.email) {
-            console.log('Using email from token response:', tokenResponse.data.email);
             integrationData.email = tokenResponse.data.email;
           } else {
-            console.error('Cannot save integration: email is required');
-            // Set a fallback email based on user if available
             integrationData.email = currentUser.email || 'unknown@example.com';
           }
         }
@@ -192,11 +179,8 @@ export function useGmailConnect() {
             .maybeSingle();
             
           if (checkError) {
-            console.error('Error checking existing integration:', checkError);
-            
             // Special handling for auth errors
             if (checkError.code === '42501') {
-              console.error('Row-level security violation. User authentication issue.');
               throw new Error('Authentication error: Please log in again to connect Gmail');
             }
             
@@ -206,7 +190,6 @@ export function useGmailConnect() {
           let result;
           
           if (existingIntegration) {
-            console.log('Updating existing integration');
             // Update the existing integration
             result = await supabase
               .from('user_integrations')
@@ -217,7 +200,6 @@ export function useGmailConnect() {
               .eq('id', existingIntegration.id)
               .select();
           } else {
-            console.log('Creating new integration');
             // Insert a new integration
             result = await supabase
               .from('user_integrations')
@@ -233,12 +215,9 @@ export function useGmailConnect() {
           let savedData = result.data;
             
           if (integrationError) {
-            console.error('Error saving integration:', integrationError);
-            console.error('Error details:', JSON.stringify(integrationError));
-            
             // Special handling for unique constraint violations
             if (integrationError.code === '23505') {
-              console.log('Duplicate record detected, integration already exists');
+              console.log('Gmail: Integration already exists, fetching current record');
               
               // Instead of throwing an error, just fetch the current record
               const { data: existingData, error: fetchError } = await supabase
@@ -249,25 +228,18 @@ export function useGmailConnect() {
                 .maybeSingle();
                 
               if (fetchError) {
-                console.error('Error fetching existing integration:', fetchError);
                 throw new Error(`Database error fetching existing integration: ${fetchError.message}`);
               }
               
-              // Use the existing data instead
-              console.log('Using existing integration data');
               savedData = existingData;
-              
-              // Continue with success flow
             } else if (integrationError.code === '42501') {
-              // Special handling for RLS violations
-              console.error('Row-level security violation. User authentication issue.');
               throw new Error('Authentication error: Please log in again to connect Gmail');
             } else {
               throw new Error(`Database error saving integration: ${integrationError.message}`);
             }
           } 
           
-          console.log('Integration data saved/retrieved successfully:', savedData);
+          console.log('✅ Gmail connected successfully:', integrationData.email);
           
           toast({
             title: "Gmail connected successfully",
@@ -275,15 +247,20 @@ export function useGmailConnect() {
           });
           
           // Invalidate all queries that might depend on email connection
-          console.log('Invalidating queries');
           queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
           queryClient.invalidateQueries({ queryKey: ['email-integration'] });
           queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
           queryClient.invalidateQueries({ queryKey: ['email-stats'] });
           
           // Close the popup if it's still open
-          if (activeAuthPopup && !activeAuthPopup.closed) {
-            activeAuthPopup.close();
+          if (activeAuthPopup) {
+            try {
+              if (!activeAuthPopup.closed) {
+                activeAuthPopup.close();
+              }
+            } catch (e) {
+              // Silently handle COOP policy restrictions
+            }
           }
           
           // Reset state and resolve promise
@@ -295,34 +272,40 @@ export function useGmailConnect() {
             authPromiseResolve = null;
           }
         } catch (error) {
-          console.error('Unexpected error saving integration:', error);
+          console.error('Gmail: Failed to save integration:', error.message);
           toast({
             title: "Failed to save integration",
             description: `Error: ${error.message}`,
             variant: "destructive"
           });
-          throw error; // Propagate the error
+          throw error;
         }
       } catch (error) {
-        console.error('Error processing auth code:', error);
+        console.error('Gmail: Auth processing failed:', error.message);
         
         // Close the popup if it's still open
-        if (activeAuthPopup && !activeAuthPopup.closed) {
+        if (activeAuthPopup) {
           try {
-            activeAuthPopup.close();
-          } catch (closeError) {
-            console.log('Error closing popup (likely COOP policy restriction):', closeError);
+            if (!activeAuthPopup.closed) {
+              activeAuthPopup.close();
+            }
+          } catch (e) {
+            // Silently handle COOP policy restrictions
           }
         }
         
         setIsConnecting(false);
         setIsProcessingCode(false);
         
-        toast({
-          title: "Connection failed",
-          description: error.message || "Failed to connect to Gmail.",
-          variant: "destructive"
-        });
+        // Only show error toast for non-timeout errors
+        // (timeout errors are handled by their respective timeouts)
+        if (!error.message.includes('Server error') && !error.message.includes('OAuth authentication failed')) {
+          toast({
+            title: "Connection failed",
+            description: error.message || "Failed to connect to Gmail.",
+            variant: "destructive"
+          });
+        }
         
         if (authPromiseResolve) {
           authPromiseResolve(false);
@@ -335,13 +318,11 @@ export function useGmailConnect() {
   // Set up global message listener when the hook is first used
   useEffect(() => {
     if (!isMessageListenerAttached) {
-      console.log('Attaching global message event listener');
       window.addEventListener('message', handleAuthMessage);
       isMessageListenerAttached = true;
       
       // Cleanup function
       return () => {
-        console.log('Removing global message event listener');
         window.removeEventListener('message', handleAuthMessage);
         isMessageListenerAttached = false;
       };
@@ -509,25 +490,15 @@ export function useGmailConnect() {
         return false;
       }
       
-      console.log('Starting Gmail connection process with user:', currentUser.id);
+      console.log('Gmail: Starting connection process...');
       setIsConnecting(true);
       
       // Call the Gmail auth Edge Function to get OAuth URL
-      // This uses the deployed Supabase function with your project's environment variables
-      console.log('Requesting OAuth URL from deployed Edge Function');
       const response = await supabase.functions.invoke('gmail-auth', {
         body: { test: true }
       });
       
-      // Log the full response to help with debugging
-      console.log('OAuth URL response:', {
-        data: response.data,
-        error: response.error
-      });
-      
       if (response.error) {
-        console.error('Edge Function error:', response.error);
-        
         // Check for specific error patterns
         if (response.error.message && response.error.message.includes('non-2xx status code')) {
           throw new Error(
@@ -540,11 +511,8 @@ export function useGmailConnect() {
       }
       
       if (!response.data || !response.data.url) {
-        console.error('Invalid response from Edge Function:', response.data);
         throw new Error('Invalid response from server: Missing authorization URL');
       }
-      
-      console.log('Received OAuth URL:', response.data.url);
       
       // Store the state parameter for CSRF verification if provided
       if (response.data.state) {
@@ -584,7 +552,7 @@ export function useGmailConnect() {
       // Monitor the popup window
       const popupCheckInterval = setInterval(() => {
         try {
-          // Check if the popup is closed
+          // Check if the popup is closed (this may throw COOP errors)
           if (!activeAuthPopup || activeAuthPopup.closed) {
             clearInterval(popupCheckInterval);
             
@@ -597,9 +565,8 @@ export function useGmailConnect() {
           }
         } catch (e) {
           // COOP policy might block access to window.closed
-          // Just log the error but don't take any action, as the auth code handler
-          // or timeout will eventually resolve the authentication flow
-          console.log('Error checking popup state (COOP policy restriction):', e.message);
+          // This is expected behavior and not an error - just silently continue
+          // The auth code handler or timeout will eventually resolve the authentication flow
         }
       }, 1000);
       
@@ -609,8 +576,14 @@ export function useGmailConnect() {
           console.log('Auth timeout reached, canceling...');
           clearInterval(popupCheckInterval);
           
-          if (activeAuthPopup && !activeAuthPopup.closed) {
-            activeAuthPopup.close();
+          if (activeAuthPopup) {
+            try {
+              if (!activeAuthPopup.closed) {
+                activeAuthPopup.close();
+              }
+            } catch (e) {
+              // Silently handle COOP policy restrictions
+            }
           }
           
           setIsConnecting(false);
