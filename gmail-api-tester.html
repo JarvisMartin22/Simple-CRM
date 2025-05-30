@@ -342,6 +342,7 @@
             
             if (event.data && event.data.type === 'GMAIL_AUTH_CODE') {
                 const code = event.data.code;
+                const state = event.data.state;
                 
                 // Check if we've already processed this code
                 if (processedCodes.has(code)) {
@@ -352,6 +353,25 @@
                 
                 console.log('Processing auth code from callback, length:', code?.length);
                 showStatus('Processing authorization...', 'info');
+                
+                // Verify state parameter to prevent CSRF attacks
+                const savedState = localStorage.getItem('gmail_auth_state');
+                if (state && savedState && state !== savedState) {
+                    console.error('State parameter mismatch - possible CSRF attack');
+                    showStatus('Authorization failed: Invalid state parameter', 'error');
+                    showResult('connectionResult', {
+                        status: 'Error',
+                        message: 'Invalid state parameter - possible CSRF attack',
+                        timestamp: new Date().toISOString()
+                    }, 'error');
+                    localStorage.removeItem('gmail_auth_state');
+                    localStorage.removeItem('gmail_auth_timestamp');
+                    return;
+                }
+                
+                // Clear state after verification
+                localStorage.removeItem('gmail_auth_state');
+                localStorage.removeItem('gmail_auth_timestamp');
                 
                 try {
                     showResult('connectionResult', {
@@ -712,21 +732,71 @@
                         'Authorization': `Bearer ${userToken}`,
                         'apikey': supabaseKey
                     },
-                    body: JSON.stringify({ test: true })
+                    body: JSON.stringify({ 
+                        test: true,
+                        // Use the authorized redirect URI for the tester
+                        redirectUri: "http://localhost:8080/auth-callback.html"
+                    })
                 });
 
                 const data = await response.json();
                 console.log('Auth test response:', data);
                 
                 if (response.ok && data.url) {
-                    // Open the auth URL in a new window
-                    window.open(data.url, 'gmail_auth', 'width=600,height=600');
+                    // Store state parameter for CSRF protection if provided
+                    if (data.state) {
+                        localStorage.setItem('gmail_auth_state', data.state);
+                        localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
+                    }
+                    
+                    // Calculate popup position for center of screen
+                    const width = 600;
+                    const height = 700;
+                    const left = window.screenX + (window.outerWidth - width) / 2;
+                    const top = window.screenY + (window.outerHeight - height) / 2;
+                    
+                    // Open the auth URL in a popup window
+                    const authPopup = window.open(
+                        data.url, 
+                        'gmail_auth', 
+                        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                    );
+                    
+                    // Check if popup was blocked
+                    if (!authPopup || authPopup.closed) {
+                        showStatus('Popup was blocked. Please allow popups for this site.', 'error');
+                        showResult('connectionResult', {
+                            status: 'Error',
+                            message: 'Popup was blocked. Please allow popups for this site.',
+                            timestamp: new Date().toISOString()
+                        }, 'error');
+                        document.getElementById('connectionLoader').style.display = 'none';
+                        return;
+                    }
                     
                     showResult('connectionResult', {
                         status: 'Authorizing',
                         message: 'Please complete the authorization in the popup window',
+                        redirectUri: data.redirectUri,
                         timestamp: new Date().toISOString()
                     }, 'info');
+                    
+                    // Monitor the popup window
+                    const popupCheckInterval = setInterval(() => {
+                        try {
+                            if (!authPopup || authPopup.closed) {
+                                clearInterval(popupCheckInterval);
+                                document.getElementById('connectionLoader').style.display = 'none';
+                                
+                                // Check if the connection was successful by checking for updated data
+                                setTimeout(checkGmailConnection, 1000);
+                            }
+                        } catch (e) {
+                            // COOP policy might block access to window.closed
+                            console.log('Error checking popup state:', e.message);
+                            // We'll continue monitoring, and the timeout from checkGmailConnection will eventually check the status
+                        }
+                    }, 1000);
                 } else {
                     showResult('connectionResult', {
                         status: 'Error',
@@ -734,6 +804,7 @@
                         response: data,
                         timestamp: new Date().toISOString()
                     }, 'error');
+                    document.getElementById('connectionLoader').style.display = 'none';
                 }
             } catch (error) {
                 console.error('Connection test error:', error);
@@ -742,9 +813,8 @@
                     error: error.message,
                     timestamp: new Date().toISOString()
                 }, 'error');
+                document.getElementById('connectionLoader').style.display = 'none';
             }
-            
-            document.getElementById('connectionLoader').style.display = 'none';
         }
 
         async function refreshGmailToken() {

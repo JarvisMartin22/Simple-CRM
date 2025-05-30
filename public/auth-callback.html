@@ -123,6 +123,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const error = urlParams.get('error');
+      const state = urlParams.get('state');
 
       if (error) {
         updateStatus(`Authorization failed: ${error}`, 'error');
@@ -136,24 +137,53 @@
         return;
       }
 
-      addLog('Authorization code received', { codeLength: code.length });
-
-      // Store the code in localStorage
-      localStorage.setItem('gmail_auth_code', code);
-      localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
-      console.log('Code saved to localStorage');
+      addLog('Authorization code received', { 
+        codeLength: code.length,
+        hasState: !!state
+      });
 
       // Send message to main window
       try {
-        // Try sending to specific origin first
-        window.opener.postMessage({ type: 'GMAIL_AUTH_CODE', code }, window.location.origin);
-        console.log('Sent message with specific origin');
-        
-        // Also try with wildcard origin as fallback
-        window.opener.postMessage({ type: 'GMAIL_AUTH_CODE', code }, '*');
-        console.log('Sent message with wildcard origin');
+        // First check if we have an opener window
+        if (window.opener) {
+          console.log('Found opener window, sending message');
+          
+          // Try sending to specific origin first
+          window.opener.postMessage({ 
+            type: 'GMAIL_AUTH_CODE', 
+            code,
+            state
+          }, window.location.origin);
+          console.log('Sent message with specific origin');
+          
+          // Also try with wildcard origin as fallback
+          window.opener.postMessage({ 
+            type: 'GMAIL_AUTH_CODE', 
+            code,
+            state
+          }, '*');
+          console.log('Sent message with wildcard origin');
+          
+          updateStatus('Authorization successful! You can close this window.', 'success');
+        } else {
+          console.log('No opener window found, storing code for main window');
+          // Store the code for the main window to pick up
+          localStorage.setItem('gmail_auth_code', code);
+          localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
+          if (state) {
+            localStorage.setItem('gmail_auth_state', state);
+          }
+          
+          updateStatus('Authorization successful! Redirecting...', 'success');
+          
+          // Redirect to the integrations page if we're not in a popup
+          setTimeout(() => {
+            window.location.href = '/app/integrations';
+          }, 1500);
+        }
       } catch (error) {
         console.error('Error sending message:', error);
+        updateStatus('Error processing authorization. Please try again.', 'error');
       }
 
       // Start the close timer

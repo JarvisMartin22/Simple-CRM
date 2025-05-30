@@ -62,9 +62,13 @@ export const useCampaigns = () => {
       setLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      // Get the current user's ID
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
 
+      // Calculate status based on schedule
       const status = campaign.schedule_config?.enabled ? 'scheduled' : 'draft';
       
       // Convert schedule config to start_date
@@ -108,6 +112,20 @@ export const useCampaigns = () => {
         } : null
       }) : null;
 
+      // First, verify that the template exists if template_id is provided
+      if (campaign.template_id) {
+        const { data: template, error: templateError } = await supabase
+          .from('campaign_templates')
+          .select('id')
+          .eq('id', campaign.template_id)
+          .single();
+
+        if (templateError || !template) {
+          throw new Error('Invalid template_id or template not found');
+        }
+      }
+
+      // Create the campaign
       const { data, error: createError } = await supabase
         .from('campaigns')
         .insert([{
@@ -115,15 +133,19 @@ export const useCampaigns = () => {
           name: campaign.name,
           description: campaign.description,
           type: campaign.type,
-          template_id: campaign.template_id,
+          template_id: campaign.template_id || null,
           status,
           scheduled_at: start_date,
-          schedule_config
+          schedule_config,
+          audience_filter: campaign.audience_filter
         }])
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error('Campaign creation error:', createError);
+        throw createError;
+      }
 
       // If it's a sequence campaign with scheduling enabled, create the sequence entries
       if (campaign.type === 'sequence' && campaign.schedule_config?.enabled && campaign.schedule_config.recurringSchedule) {
@@ -183,6 +205,7 @@ export const useCampaigns = () => {
 
       return data;
     } catch (err: any) {
+      console.error('Campaign creation error:', err);
       setError(err.message);
       toast({
         title: 'Error creating campaign',
@@ -325,6 +348,39 @@ export const useCampaigns = () => {
     }
   }, [toast]);
 
+  const deleteCampaign = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error: deleteError } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      setCampaigns(prev => prev.filter(campaign => campaign.id !== id));
+
+      toast({
+        title: 'Campaign deleted',
+        description: 'Successfully deleted campaign.',
+      });
+
+      return true;
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: 'Error deleting campaign',
+        description: err.message,
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   return {
     campaigns,
     loading,
@@ -334,5 +390,6 @@ export const useCampaigns = () => {
     updateCampaign,
     pauseCampaign,
     resumeCampaign,
+    deleteCampaign,
   };
 }; 

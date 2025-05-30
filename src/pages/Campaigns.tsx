@@ -22,13 +22,15 @@ const Campaigns: React.FC = () => {
   const navigate = useNavigate();
   const { isEmailConnected, emailStats, recentEmails } = useEmail();
   const { connectGmail, isConnecting, resetConnectionState } = useGmailConnect();
-  const { loading: campaignsLoading, error: campaignsError, fetchCampaigns } = useCampaigns();
+  const { loading: campaignsLoading, error: campaignsError, fetchCampaigns, deleteCampaign } = useCampaigns();
   const { loading: templatesLoading, error: templatesError, fetchTemplates } = useCampaignTemplates();
   
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   
   // Handle connection timeout
   useEffect(() => {
@@ -85,6 +87,22 @@ const Campaigns: React.FC = () => {
   const totalSent = campaigns.reduce((sum, c) => sum + (c.stats?.sent || 0), 0);
   const totalOpened = campaigns.reduce((sum, c) => sum + (c.stats?.opened || 0), 0);
   const averageOpenRate = totalSent ? Math.round((totalOpened / totalSent) * 100) : 0;
+  
+  const handleDeleteClick = (campaignId: string) => {
+    setCampaignToDelete(campaignId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (campaignToDelete) {
+      const success = await deleteCampaign(campaignToDelete);
+      if (success) {
+        setCampaigns(prev => prev.filter(c => c.id !== campaignToDelete));
+      }
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
+    }
+  };
   
   if (!isEmailConnected) {
     return (
@@ -298,7 +316,10 @@ const Campaigns: React.FC = () => {
                             Resume
                           </DropdownMenuItem>
                         ) : null}
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={() => handleDeleteClick(campaign.id)}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
@@ -338,6 +359,25 @@ const Campaigns: React.FC = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Campaign</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this campaign? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

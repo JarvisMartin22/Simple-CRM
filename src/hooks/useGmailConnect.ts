@@ -10,12 +10,14 @@ let activeAuthPopup: Window | null = null;
 let authPromiseResolve: ((value: boolean) => void) | null = null;
 
 // Configure this based on your app's needs
-const POPUP_TIMEOUT_MS = 120000; // 2 minutes
+const REDIRECT_TIMEOUT_MS = 120000; // 2 minutes
 
 export function useGmailConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isProcessingCode, setIsProcessingCode] = useState(false);
+  const [lastProcessedCode, setLastProcessedCode] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   
   // Define message handler function
@@ -32,6 +34,22 @@ export function useGmailConnect() {
         console.error('No active promise resolver found');
         return;
       }
+      
+      // Check if we're already processing a code or if this is a duplicate
+      if (isProcessingCode) {
+        console.log('Already processing an auth code, ignoring duplicate');
+        return;
+      }
+      
+      // Check if this is the same code we just processed
+      if (lastProcessedCode === data.code) {
+        console.log('Ignoring duplicate auth code');
+        return;
+      }
+      
+      // Set processing state and save code for deduplication
+      setIsProcessingCode(true);
+      setLastProcessedCode(data.code);
       
       try {
         // Verify authentication is still active but don't fail immediately
@@ -71,7 +89,43 @@ export function useGmailConnect() {
         });
         
         if (tokenResponse.error) {
-          throw new Error(tokenResponse.error);
+          console.error('Gmail auth endpoint error:', tokenResponse.error);
+          
+          // Check for specific error types
+          if (tokenResponse.error.message && tokenResponse.error.message.includes('non-2xx status code')) {
+            // Check if it's specifically a 500 error (Internal Server Error)
+            if (tokenResponse.error.message.includes('500')) {
+              console.log('Received 500 error from Edge Function, will wait for secondary response...');
+              
+              // Set a timeout to wait for the secondary response
+              setTimeout(() => {
+                // If we're still processing the same code after 5 seconds, assume failure
+                if (isProcessingCode && lastProcessedCode === data.code) {
+                  console.error('Timeout waiting for secondary response');
+                  setIsProcessingCode(false);
+                  setIsConnecting(false);
+                  
+                  if (authPromiseResolve) {
+                    authPromiseResolve(false);
+                    authPromiseResolve = null;
+                  }
+                  
+                  toast({
+                    title: "Connection failed",
+                    description: "Server error: The authentication service is experiencing issues. Please try again later.",
+                    variant: "destructive"
+                  });
+                }
+              }, 5000);
+              
+              // Return early without throwing - this allows the secondary successful response to be processed if it arrives
+              return;
+            }
+            
+            throw new Error('Gmail connection failed: OAuth service returned an error. Please check your Supabase project logs and verify the OAuth credentials are correctly configured.');
+          }
+          
+          throw new Error(tokenResponse.error.message || 'Unknown error from Gmail auth endpoint');
         }
         
         console.log('Token response received:', tokenResponse);
@@ -92,7 +146,10 @@ export function useGmailConnect() {
           email: tokenResponse.data.email || null,
           access_token: tokenResponse.data.access_token || "",
           refresh_token: tokenResponse.data.refresh_token || null,
-          expires_at: tokenResponse.data.expires_at || null,
+          // Convert timestamp to ISO string if it's a number
+          expires_at: typeof tokenResponse.data.expires_at === 'number' 
+            ? new Date(tokenResponse.data.expires_at).toISOString() 
+            : tokenResponse.data.expires_at,
           scope: tokenResponse.data.scope || null
         };
         
@@ -100,7 +157,8 @@ export function useGmailConnect() {
           provider: integrationData.provider,
           access_token_exists: !!integrationData.access_token,
           email: integrationData.email,
-          user_id: integrationData.user_id // Log the user_id to verify it matches the authenticated user
+          user_id: integrationData.user_id, // Log the user_id to verify it matches the authenticated user
+          expires_at: integrationData.expires_at // Log to verify format
         });
         
         // Validate required fields are present
@@ -230,6 +288,7 @@ export function useGmailConnect() {
           
           // Reset state and resolve promise
           setIsConnecting(false);
+          setIsProcessingCode(false);
           
           if (authPromiseResolve) {
             authPromiseResolve(true);
@@ -249,10 +308,15 @@ export function useGmailConnect() {
         
         // Close the popup if it's still open
         if (activeAuthPopup && !activeAuthPopup.closed) {
-          activeAuthPopup.close();
+          try {
+            activeAuthPopup.close();
+          } catch (closeError) {
+            console.log('Error closing popup (likely COOP policy restriction):', closeError);
+          }
         }
         
         setIsConnecting(false);
+        setIsProcessingCode(false);
         
         toast({
           title: "Connection failed",
@@ -283,6 +347,124 @@ export function useGmailConnect() {
       };
     }
   }, []);
+
+  // Check for auth code in URL (for redirect URI http://localhost:8080/integrations)
+  useEffect(() => {
+    // Only run this if we're on the Integrations page and not already connecting
+    if (window.location.pathname.includes('/integrations') && !isConnecting) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code) {
+        console.log('Auth code found in URL, processing...');
+        
+        // Check if this is a duplicate code
+        if (lastProcessedCode === code) {
+          console.log('Ignoring duplicate auth code from URL');
+          
+          // Clean up the URL
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+          
+          return;
+        }
+        
+        // Check if already processing a code
+        if (isProcessingCode) {
+          console.log('Already processing an auth code, ignoring URL code');
+          
+          // Clean up the URL
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+          
+          return;
+        }
+        
+        // Process the authorization code
+        (async () => {
+          setIsConnecting(true);
+          setIsProcessingCode(true);
+          setLastProcessedCode(code);
+          
+          try {
+            // Call Gmail auth endpoint with the code
+            const tokenResponse = await supabase.functions.invoke('gmail-auth', {
+              body: { code }
+            });
+            
+            if (tokenResponse.error) {
+              console.error('Error processing auth code from URL:', tokenResponse.error);
+              
+              // Check for specific error types
+              if (tokenResponse.error.message && tokenResponse.error.message.includes('non-2xx status code')) {
+                // Check if it's specifically a 500 error (Internal Server Error)
+                if (tokenResponse.error.message.includes('500')) {
+                  console.log('Received 500 error from Edge Function, will wait for secondary response...');
+                  
+                  // Set a timeout to wait for the secondary response
+                  setTimeout(() => {
+                    // If we're still processing the same code after 5 seconds, assume failure
+                    if (isProcessingCode && lastProcessedCode === code) {
+                      console.error('Timeout waiting for secondary response in URL flow');
+                      setIsProcessingCode(false);
+                      setIsConnecting(false);
+                      
+                      toast({
+                        title: "Connection failed",
+                        description: "Server error: The authentication service is experiencing issues. Please try again later.",
+                        variant: "destructive"
+                      });
+                      
+                      // Clean up the URL
+                      const cleanUrl = window.location.pathname;
+                      window.history.replaceState({}, document.title, cleanUrl);
+                    }
+                  }, 5000);
+                  
+                  // Return early without throwing - this allows the secondary successful response to be processed if it arrives
+                  return;
+                }
+                
+                throw new Error('Gmail connection failed: OAuth service returned an error. Please check your Supabase project logs and verify the OAuth credentials are correctly configured.');
+              }
+              
+              throw new Error(tokenResponse.error.message || 'Failed to exchange authorization code');
+            }
+            
+            console.log('Token response received from URL code');
+            
+            // Show success message
+            toast({
+              title: "Gmail connected successfully",
+              description: `Connected as ${tokenResponse.data.email}`,
+            });
+            
+            // Invalidate queries
+            queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
+            queryClient.invalidateQueries({ queryKey: ['email-integration'] });
+            queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
+            queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+            
+          } catch (error) {
+            console.error('Error processing auth code from URL:', error);
+            toast({
+              title: "Failed to connect Gmail",
+              description: `Error: ${error.message}`,
+              variant: "destructive"
+            });
+          } finally {
+            setIsConnecting(false);
+            setIsProcessingCode(false);
+            
+            // Clean up the URL to remove the code parameter
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+          }
+        })();
+      }
+    }
+  }, []);  // Only run this effect once on component mount
 
   const connectGmail = async () => {
     try {
@@ -331,91 +513,146 @@ export function useGmailConnect() {
       setIsConnecting(true);
       
       // Call the Gmail auth Edge Function to get OAuth URL
-      console.log('Requesting OAuth URL from Edge Function');
-      const response = await supabase.functions.invoke('gmail-auth');
+      // This uses the deployed Supabase function with your project's environment variables
+      console.log('Requesting OAuth URL from deployed Edge Function');
+      const response = await supabase.functions.invoke('gmail-auth', {
+        body: { test: true }
+      });
+      
+      // Log the full response to help with debugging
+      console.log('OAuth URL response:', {
+        data: response.data,
+        error: response.error
+      });
       
       if (response.error) {
-        throw new Error(response.error);
+        console.error('Edge Function error:', response.error);
+        
+        // Check for specific error patterns
+        if (response.error.message && response.error.message.includes('non-2xx status code')) {
+          throw new Error(
+            'Edge Function configuration error: Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET ' +
+            'environment variables are properly set in your Supabase Edge Function.'
+          );
+        }
+        
+        throw new Error(response.error.message || 'Failed to get authorization URL');
+      }
+      
+      if (!response.data || !response.data.url) {
+        console.error('Invalid response from Edge Function:', response.data);
+        throw new Error('Invalid response from server: Missing authorization URL');
       }
       
       console.log('Received OAuth URL:', response.data.url);
       
-      // Open OAuth URL in a popup window
-      const authUrl = response.data.url;
+      // Store the state parameter for CSRF verification if provided
+      if (response.data.state) {
+        localStorage.setItem('gmail_auth_state', response.data.state);
+        localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
+      }
+      
+      // Create a promise that will be resolved when the auth flow completes
+      const authPromise = new Promise<boolean>((resolve) => {
+        authPromiseResolve = resolve;
+      });
+      
+      // Calculate popup position for center of screen
       const width = 600;
       const height = 700;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       
-      console.log('Opening OAuth popup window');
-      const popup = window.open(
-        authUrl,
-        'Gmail Authorization',
-        `width=${width},height=${height},left=${left},top=${top}`
+      // Open authorization URL in a popup window
+      activeAuthPopup = window.open(
+        response.data.url,
+        'gmail_auth',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
       );
       
-      if (!popup) {
-        throw new Error('Popup blocked. Please enable popups for this site.');
+      // Check if popup was blocked
+      if (!activeAuthPopup || activeAuthPopup.closed) {
+        setIsConnecting(false);
+        toast({
+          title: "Popup blocked",
+          description: "Please allow popups for this site and try again.",
+          variant: "destructive"
+        });
+        return false;
       }
       
-      // Store reference to active popup
-      activeAuthPopup = popup;
-      
-      // Return a promise that will be resolved when auth is complete
-      return new Promise<boolean>((resolve) => {
-        // Store the resolve function to be called when message is received
-        authPromiseResolve = resolve;
-        
-        // Also handle popup closure without authentication
-        const checkClosed = setInterval(() => {
-          // Safe check to see if popup exists and is closed
-          try {
-            if (!popup || popup.closed) {
-              console.log('Popup closed by user without completing auth');
-              clearInterval(checkClosed);
-              
-              if (authPromiseResolve) {
-                setIsConnecting(false);
-                authPromiseResolve(false);
-                authPromiseResolve = null;
-              }
-            }
-          } catch (err) {
-            // Handle any errors accessing the popup (like cross-origin issues)
-            console.error('Error checking popup state:', err);
-            clearInterval(checkClosed);
+      // Monitor the popup window
+      const popupCheckInterval = setInterval(() => {
+        try {
+          // Check if the popup is closed
+          if (!activeAuthPopup || activeAuthPopup.closed) {
+            clearInterval(popupCheckInterval);
             
+            // If the auth promise hasn't been resolved yet, assume the user canceled
             if (authPromiseResolve) {
               setIsConnecting(false);
               authPromiseResolve(false);
               authPromiseResolve = null;
             }
           }
-        }, 1000);
-        
-        // Add a timeout to prevent waiting indefinitely
-        setTimeout(() => {
-          if (authPromiseResolve) {
-            console.log('Connection timeout reached, cleaning up');
-            
-            toast({
-              title: "Connection timeout",
-              description: "Gmail connection process took too long. Please try again.",
-              variant: "destructive"
-            });
-            setIsConnecting(false);
-            authPromiseResolve(false);
-            authPromiseResolve = null;
+        } catch (e) {
+          // COOP policy might block access to window.closed
+          // Just log the error but don't take any action, as the auth code handler
+          // or timeout will eventually resolve the authentication flow
+          console.log('Error checking popup state (COOP policy restriction):', e.message);
+        }
+      }, 1000);
+      
+      // Set timeout to prevent hanging if auth takes too long
+      const timeoutId = setTimeout(() => {
+        if (authPromiseResolve) {
+          console.log('Auth timeout reached, canceling...');
+          clearInterval(popupCheckInterval);
+          
+          if (activeAuthPopup && !activeAuthPopup.closed) {
+            activeAuthPopup.close();
           }
-        }, POPUP_TIMEOUT_MS);
-      });
+          
+          setIsConnecting(false);
+          authPromiseResolve(false);
+          authPromiseResolve = null;
+          
+          toast({
+            title: "Authentication timeout",
+            description: "The authentication process took too long. Please try again.",
+            variant: "destructive"
+          });
+        }
+      }, REDIRECT_TIMEOUT_MS);
+      
+      // Wait for the authentication to complete
+      const result = await authPromise;
+      
+      // Clean up
+      clearTimeout(timeoutId);
+      clearInterval(popupCheckInterval);
+      
+      return result;
     } catch (error) {
       console.error('Error initiating OAuth flow:', error);
       setIsConnecting(false);
       
+      // Provide more user-friendly error messages
+      let errorMessage = "There was an error connecting to Gmail.";
+      
+      if (error.message.includes('Invalid response')) {
+        errorMessage = "Server configuration issue. Please contact support.";
+      } else if (error.message.includes('Network Error') || error.message.includes('Failed to fetch')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.message.includes('Authentication')) {
+        errorMessage = "Authentication error. Please try logging out and back in.";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "Connection timed out. Please try again later.";
+      }
+      
       toast({
         title: "Connection failed",
-        description: error.message || "There was an error connecting to Gmail.",
+        description: errorMessage,
         variant: "destructive"
       });
       
@@ -423,12 +660,9 @@ export function useGmailConnect() {
     }
   };
   
-  // Helper function to force reset connection state 
-  // (useful if the UI gets stuck in connecting state)
+  // Helper function to reset connection state if needed
   const resetConnectionState = () => {
     setIsConnecting(false);
-    authPromiseResolve = null;
-    activeAuthPopup = null;
   };
   
   return { connectGmail, isConnecting, resetConnectionState };
