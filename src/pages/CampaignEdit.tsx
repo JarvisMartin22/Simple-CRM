@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().optional(),
-  type: z.enum(['one-time', 'sequence']),
+  type: z.enum(['one_time', 'automated', 'sequence']),
   template_id: z.string().optional(),
   audience_filter: z.any().optional(),
   schedule_config: z.any().optional(),
@@ -178,7 +178,8 @@ const CampaignEdit: React.FC = () => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="one-time">One-time Campaign</SelectItem>
+                        <SelectItem value="one_time">One-time Campaign</SelectItem>
+                        <SelectItem value="automated">Automated Campaign</SelectItem>
                         <SelectItem value="sequence">Email Sequence</SelectItem>
                       </SelectContent>
                     </Select>

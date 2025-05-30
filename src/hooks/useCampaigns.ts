@@ -381,6 +381,249 @@ export const useCampaigns = () => {
     }
   }, [toast]);
 
+  const resetCampaignStatus = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: updateError } = await supabase
+        .from('campaigns')
+        .update({
+          status: 'draft',
+          started_at: null,
+          completed_at: null,
+          paused_at: null
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      setCampaigns(prev => prev.map(campaign => 
+        campaign.id === id ? { ...campaign, ...data } : campaign
+      ));
+
+      toast({
+        title: 'Campaign reset',
+        description: 'Campaign has been reset to draft status.',
+      });
+
+      return data;
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: 'Error resetting campaign',
+        description: err.message,
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  const startCampaign = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 1. Fetch the campaign
+      const { data: campaign, error: campaignError } = await supabase
+        .from('campaigns')
+        .select(`
+          *,
+          campaign_templates(
+            id, 
+            subject, 
+            content
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (campaignError) throw campaignError;
+      if (!campaign) throw new Error('Campaign not found');
+
+      // 2. Fetch the audience contacts
+      let contacts = [];
+      if (campaign.audience_filter && campaign.audience_filter.contacts) {
+        contacts = campaign.audience_filter.contacts;
+      } else {
+        const { data: contactsData, error: contactsError } = await supabase
+          .from('contacts')
+          .select('id, email, first_name, last_name')
+          .limit(100); // Safety limit
+
+        if (contactsError) throw contactsError;
+        contacts = contactsData || [];
+      }
+
+      if (!contacts.length) {
+        throw new Error('No recipients found for this campaign');
+      }
+
+      // 3. Get email template content
+      const template = campaign.campaign_templates;
+      if (!template) {
+        throw new Error('No template found for this campaign');
+      }
+
+      // 4. Check Gmail integration
+      const { data: integrations, error: integrationsError } = await supabase
+        .from('user_integrations')
+        .select('*')
+        .eq('provider', 'gmail')
+        .single();
+
+      if (integrationsError) {
+        throw new Error('Gmail integration not found or not active. Please connect Gmail in the Integrations section.');
+      }
+
+      // 5. Update campaign status to running
+      const { error: updateError } = await supabase
+        .from('campaigns')
+        .update({
+          status: 'running',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // 6. Process emails by calling the send-email edge function for each recipient
+      const emailPromises = contacts.map(async (contact, index) => {
+        try {
+          // Add a small delay between each email to avoid rate limiting
+          if (index > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
+          // Process variables in subject and body
+          const personalizedSubject = template.subject
+            .replace(/{{first_name}}/g, contact.first_name || '')
+            .replace(/{{last_name}}/g, contact.last_name || '')
+            .replace(/{{email}}/g, contact.email || '');
+
+          const personalizedBody = template.content
+            .replace(/{{first_name}}/g, contact.first_name || '')
+            .replace(/{{last_name}}/g, contact.last_name || '')
+            .replace(/{{email}}/g, contact.email || '');
+
+          // Call the send-email edge function
+          const response = await supabase.functions.invoke('send-email', {
+            body: {
+              userId: campaign.user_id,
+              to: contact.email,
+              subject: personalizedSubject,
+              html: personalizedBody,
+              campaign_id: id,
+              contact_id: contact.id,
+            }
+          });
+
+          if (response.error) {
+            console.error(`Error sending email to ${contact.email}:`, response.error);
+            return { contact, success: false, error: response.error };
+          }
+
+          return { contact, success: true };
+        } catch (error) {
+          console.error(`Error processing email for ${contact.email}:`, error);
+          return { contact, success: false, error };
+        }
+      });
+
+      const results = await Promise.all(emailPromises);
+      
+      // 7. Calculate success rate and update analytics
+      const successCount = results.filter(r => r.success).length;
+      const totalCount = results.length;
+      const successRate = totalCount > 0 ? (successCount / totalCount) * 100 : 0;
+
+      await supabase
+        .from('campaign_analytics')
+        .update({
+          total_recipients: totalCount,
+          sent_count: successCount,
+          delivered_count: successCount, // Assume all sent are delivered for now
+          last_updated: new Date().toISOString()
+        })
+        .eq('campaign_id', id);
+
+      // 8. Update campaign status based on results
+      let finalStatus: Campaign['status'] = 'completed';
+      if (successCount === 0) {
+        finalStatus = 'failed';
+      }
+      // For partial success, we still mark as completed but will show a warning toast
+
+      const { error: finalUpdateError } = await supabase
+        .from('campaigns')
+        .update({
+          status: finalStatus,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (finalUpdateError) {
+        console.error('Error updating campaign final status:', finalUpdateError);
+      }
+
+      // 9. Update the local state
+      setCampaigns(prev => prev.map(c => 
+        c.id === id ? { ...c, status: finalStatus, completed_at: new Date().toISOString() } : c
+      ));
+
+      // 10. Show success toast
+      toast({
+        title: 'Campaign processed',
+        description: `Successfully sent ${successCount} out of ${totalCount} emails.`,
+        ...(successCount < totalCount ? { variant: 'destructive' } : {})
+      });
+
+      return {
+        success: true,
+        sent: successCount,
+        total: totalCount,
+        successRate
+      };
+    } catch (err: any) {
+      console.error('Campaign execution error:', err);
+      setError(err.message);
+      
+      // Update campaign status to failed
+      try {
+        await supabase
+          .from('campaigns')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        setCampaigns(prev => prev.map(c => 
+          c.id === id ? { ...c, status: 'failed', completed_at: new Date().toISOString() } : c
+        ));
+      } catch (updateErr) {
+        console.error('Error updating campaign status to failed:', updateErr);
+      }
+
+      toast({
+        title: 'Error running campaign',
+        description: err.message,
+        variant: 'destructive',
+      });
+      
+      return {
+        success: false,
+        error: err.message
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   return {
     campaigns,
     loading,
@@ -391,5 +634,7 @@ export const useCampaigns = () => {
     pauseCampaign,
     resumeCampaign,
     deleteCampaign,
+    resetCampaignStatus,
+    startCampaign
   };
 }; 

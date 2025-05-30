@@ -14,11 +14,62 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, to, subject, body, trackOpens = true, trackClicks = true } = await req.json();
+    const { 
+      userId, 
+      to, 
+      subject, 
+      html, 
+      body,  // Support both 'html' and 'body' parameters
+      trackOpens = true, 
+      trackClicks = true,
+      campaign_id = null,
+      contact_id = null
+    } = await req.json();
     
-    if (!userId || !to || !subject || !body) {
+    // Use either html or body parameter
+    const emailContent = html || body;
+    
+    // Check if we have direct user ID or need to get it from campaign
+    let userIdToUse = userId;
+    
+    if (!userIdToUse && campaign_id) {
+      // Get user ID from the campaign
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('user_id')
+        .eq('id', campaign_id)
+        .single();
+        
+      if (campaignError) {
+        return new Response(
+          JSON.stringify({ error: "Campaign not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
+      
+      userIdToUse = campaignData.user_id;
+    }
+    
+    if (!userIdToUse || !to || !subject || !emailContent) {
+      console.error("Missing required fields:", {
+        hasUserId: !!userIdToUse,
+        hasTo: !!to,
+        hasSubject: !!subject,
+        hasContent: !!emailContent
+      });
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ 
+          error: "Missing required fields",
+          details: {
+            hasUserId: !!userIdToUse,
+            hasTo: !!to,
+            hasSubject: !!subject,
+            hasContent: !!emailContent
+          }
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -26,20 +77,23 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Preparing to send email from user ${userId} to ${to}`);
+    console.log(`Preparing to send email from user ${userIdToUse} to ${to}`);
+    if (campaign_id) {
+      console.log(`As part of campaign ${campaign_id}`);
+    }
     
     // 1. Get the user's Gmail integration
     const { data: integration, error: integrationError } = await supabase
       .from('user_integrations')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userIdToUse)
       .eq('provider', 'gmail')
       .single();
       
     if (integrationError) {
       console.error("Error fetching integration:", integrationError);
       return new Response(
-        JSON.stringify({ error: "Gmail integration not found" }),
+        JSON.stringify({ error: "Gmail integration not found or not active" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -96,7 +150,7 @@ serve(async (req) => {
     
     // 3. Generate tracking pixel ID if needed
     let trackingPixelId = null;
-    let modifiedBody = body;
+    let modifiedBody = emailContent;
     
     if (trackOpens) {
       // Generate a unique ID for tracking
@@ -124,7 +178,7 @@ serve(async (req) => {
         trackedLinks.push({
           tracking_id: linkTrackingId,
           original_url: url,
-          user_id: userId
+          user_id: userIdToUse
         });
         
         // Replace the link in the email
@@ -146,43 +200,63 @@ serve(async (req) => {
     const emailString = emailLines.join('\r\n');
     
     // Encode to base64url format as required by Gmail API
-    const encodedEmail = btoa(emailString)
+    // Handle UTF-8 encoding properly by using TextEncoder first
+    const encoder = new TextEncoder();
+    const emailBytes = encoder.encode(emailString);
+    
+    // Convert to base64 - in Deno, use a different approach than btoa which can have issues with binary data
+    const base64Email = btoa(String.fromCharCode(...new Uint8Array(emailBytes)))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
     
     // 6. Send the email via Gmail API
     console.log("Sending email via Gmail API");
-    const response = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          raw: encodedEmail
-        })
+    console.log("Email recipient:", to);
+    console.log("Email subject:", subject);
+    console.log("Using Gmail token (first 10 chars):", accessToken.substring(0, 10) + "...");
+    
+    let emailId;
+    try {
+      const response = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            raw: base64Email
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Gmail API error response:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        throw new Error(`Failed to send email: ${errorData.error?.message || response.statusText}`);
       }
-    );
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Failed to send email: ${error.error?.message || response.statusText}`);
+      
+      const emailData = await response.json();
+      emailId = emailData.id;
+      
+      console.log(`Email sent successfully with ID: ${emailId}`);
+    } catch (apiError) {
+      console.error("Gmail API call failed:", apiError);
+      throw apiError; // Re-throw to be caught by the outer try/catch
     }
-    
-    const emailData = await response.json();
-    const emailId = emailData.id;
-    
-    console.log(`Email sent successfully with ID: ${emailId}`);
     
     // 7. Record the email in our tracking system
     const { data: trackingData, error: trackingError } = await supabase
       .from('email_tracking')
       .insert({
         email_id: emailId,
-        user_id: userId,
+        user_id: userIdToUse,
         recipient: to,
         subject: subject,
         sent_at: new Date().toISOString(),
@@ -190,7 +264,9 @@ serve(async (req) => {
         tracking_pixel_id: trackingPixelId,
         updated_at: new Date().toISOString(),
         open_count: 0,
-        click_count: 0
+        click_count: 0,
+        campaign_id: campaign_id,
+        contact_id: contact_id
       })
       .select();
       
@@ -207,7 +283,45 @@ serve(async (req) => {
             ...link,
             email_id: emailId,
             email_tracking_id: trackingData ? trackingData[0].id : null,
+            campaign_id: campaign_id,
             created_at: new Date().toISOString()
+          });
+      }
+    }
+    
+    // 9. Update recipient analytics if this is a campaign email
+    if (campaign_id && contact_id) {
+      // Check if recipient analytics already exists
+      const { data: existingRecipient } = await supabase
+        .from('recipient_analytics')
+        .select('id')
+        .eq('campaign_id', campaign_id)
+        .eq('recipient_id', contact_id)
+        .single();
+        
+      if (existingRecipient) {
+        // Update existing record
+        await supabase
+          .from('recipient_analytics')
+          .update({
+            email_id: emailId,
+            sent_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRecipient.id);
+      } else {
+        // Create new record
+        await supabase
+          .from('recipient_analytics')
+          .insert({
+            campaign_id: campaign_id,
+            recipient_id: contact_id,
+            email_id: emailId,
+            sent_at: new Date().toISOString(),
+            open_count: 0,
+            click_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
       }
     }
@@ -218,7 +332,9 @@ serve(async (req) => {
         email_id: emailId,
         tracking_id: trackingData ? trackingData[0].id : null,
         tracking_pixel_id: trackingPixelId,
-        links_tracked: trackedLinks.length
+        links_tracked: trackedLinks.length,
+        campaign_id: campaign_id,
+        contact_id: contact_id
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
