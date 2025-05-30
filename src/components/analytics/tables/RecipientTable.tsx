@@ -26,8 +26,10 @@ export const RecipientTable: React.FC<RecipientTableProps> = ({ recipients }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  const filteredRecipients = recipients.filter((recipient) => {
-    const matchesSearch = recipient.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const safeRecipients = recipients && Array.isArray(recipients) ? recipients : [];
+
+  const filteredRecipients = safeRecipients.filter((recipient) => {
+    const matchesSearch = recipient.recipient_id.toLowerCase().includes(searchTerm.toLowerCase());
     if (filterStatus === 'all') return matchesSearch;
     
     switch (filterStatus) {
@@ -46,7 +48,7 @@ export const RecipientTable: React.FC<RecipientTableProps> = ({ recipients }) =>
     <div className="space-y-4">
       <div className="flex items-center gap-4">
         <Input
-          placeholder="Search by email..."
+          placeholder="Search by recipient ID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
@@ -68,7 +70,7 @@ export const RecipientTable: React.FC<RecipientTableProps> = ({ recipients }) =>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Email</TableHead>
+              <TableHead>Recipient ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Opens</TableHead>
               <TableHead>Clicks</TableHead>
@@ -77,32 +79,40 @@ export const RecipientTable: React.FC<RecipientTableProps> = ({ recipients }) =>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRecipients.map((recipient) => (
-              <TableRow key={recipient.id}>
-                <TableCell>{recipient.email}</TableCell>
-                <TableCell>
-                  {recipient.bounced_at
-                    ? 'Bounced'
-                    : recipient.click_count > 0
-                    ? 'Clicked'
-                    : recipient.open_count > 0
-                    ? 'Opened'
-                    : 'Sent'}
-                </TableCell>
-                <TableCell>{recipient.open_count}</TableCell>
-                <TableCell>{recipient.click_count}</TableCell>
-                <TableCell>
-                  {recipient.first_opened_at
-                    ? format(new Date(recipient.first_opened_at), 'PPp')
-                    : '-'}
-                </TableCell>
-                <TableCell>
-                  {recipient.last_clicked_at
-                    ? format(new Date(recipient.last_clicked_at), 'PPp')
-                    : '-'}
+            {filteredRecipients.length > 0 ? (
+              filteredRecipients.map((recipient) => (
+                <TableRow key={recipient.id}>
+                  <TableCell>{recipient.recipient_id}</TableCell>
+                  <TableCell>
+                    {recipient.bounced_at
+                      ? 'Bounced'
+                      : recipient.click_count > 0
+                      ? 'Clicked'
+                      : recipient.open_count > 0
+                      ? 'Opened'
+                      : 'Sent'}
+                  </TableCell>
+                  <TableCell>{recipient.open_count}</TableCell>
+                  <TableCell>{recipient.click_count}</TableCell>
+                  <TableCell>
+                    {recipient.first_opened_at
+                      ? format(new Date(recipient.first_opened_at), 'PPp')
+                      : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {recipient.last_clicked_at
+                      ? format(new Date(recipient.last_clicked_at), 'PPp')
+                      : '-'}
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  {safeRecipients.length === 0 ? 'No recipient data available yet' : 'No recipients match your search criteria'}
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>

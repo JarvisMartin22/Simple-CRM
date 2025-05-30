@@ -272,6 +272,9 @@ serve(async (req) => {
       
     if (trackingError) {
       console.error("Error recording email tracking:", trackingError);
+      // Don't fail the entire operation for tracking errors
+    } else {
+      console.log("Successfully recorded email tracking");
     }
     
     // 8. Store tracked links if any
@@ -284,6 +287,7 @@ serve(async (req) => {
             email_id: emailId,
             email_tracking_id: trackingData ? trackingData[0].id : null,
             campaign_id: campaign_id,
+            contact_id: contact_id,
             created_at: new Date().toISOString()
           });
       }
@@ -326,6 +330,139 @@ serve(async (req) => {
       }
     }
     
+    // Update campaign_analytics if campaign_id is provided
+    if (campaign_id) {
+      console.log(`Updating campaign analytics for campaign ${campaign_id}`);
+      
+      // 1. Check if campaign_analytics record exists
+      const { data: existingAnalytics, error: analyticsCheckError } = await supabase
+        .from('campaign_analytics')
+        .select('id, total_recipients, sent_count, delivered_count')
+        .eq('campaign_id', campaign_id)
+        .single();
+        
+      if (analyticsCheckError && analyticsCheckError.code !== 'PGRST116') {
+        console.error("Error checking campaign analytics:", analyticsCheckError);
+      }
+      
+      if (!existingAnalytics) {
+        // Create a new entry if one doesn't exist
+        console.log("Campaign analytics record not found, creating new record");
+        const { error: createAnalyticsError } = await supabase
+          .from('campaign_analytics')
+          .insert({
+            campaign_id: campaign_id,
+            total_recipients: 1,
+            sent_count: 1,
+            delivered_count: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            last_event_at: new Date().toISOString()
+          });
+          
+        if (createAnalyticsError) {
+          console.error("Error creating campaign analytics:", createAnalyticsError);
+        } else {
+          console.log("Created new campaign analytics record");
+        }
+      } else {
+        // Update existing record
+        console.log("Found campaign analytics record:", existingAnalytics);
+        const { error: updateAnalyticsError } = await supabase
+          .from('campaign_analytics')
+          .update({
+            sent_count: (existingAnalytics.sent_count || 0) + 1,
+            delivered_count: (existingAnalytics.delivered_count || 0) + 1,
+            updated_at: new Date().toISOString(),
+            last_event_at: new Date().toISOString()
+          })
+          .eq('id', existingAnalytics.id);
+          
+        if (updateAnalyticsError) {
+          console.error("Error updating campaign analytics:", updateAnalyticsError);
+        } else {
+          console.log("Successfully updated campaign analytics");
+        }
+      }
+      
+      // Add an entry in recipient_analytics if contact_id is provided
+      if (contact_id) {
+        console.log(`Updating recipient analytics for contact ${contact_id}`);
+        
+        // Check if recipient_analytics entry exists
+        const { data: existingRecipient, error: recipientCheckError } = await supabase
+          .from('recipient_analytics')
+          .select('id')
+          .eq('campaign_id', campaign_id)
+          .eq('recipient_id', contact_id)
+          .single();
+          
+        if (recipientCheckError && recipientCheckError.code !== 'PGRST116') {
+          console.error("Error checking recipient analytics:", recipientCheckError);
+        }
+          
+        if (!existingRecipient) {
+          // Create a new entry
+          console.log("Recipient analytics record not found, creating new record");
+          const { error: createRecipientError } = await supabase
+            .from('recipient_analytics')
+            .insert({
+              campaign_id: campaign_id,
+              recipient_id: contact_id,
+              sent_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              open_count: 0,
+              click_count: 0
+            });
+            
+          if (createRecipientError) {
+            console.error("Error creating recipient analytics:", createRecipientError);
+          } else {
+            console.log("Created new recipient analytics record");
+          }
+        } else {
+          // Update existing entry
+          console.log("Found recipient analytics record:", existingRecipient);
+          const { error: updateRecipientError } = await supabase
+            .from('recipient_analytics')
+            .update({
+              sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingRecipient.id);
+            
+          if (updateRecipientError) {
+            console.error("Error updating recipient analytics:", updateRecipientError);
+          } else {
+            console.log("Successfully updated recipient analytics");
+          }
+        }
+      }
+      
+      // Log send event
+      console.log("Logging email send event");
+      const { error: eventError } = await supabase
+        .from('email_events')
+        .insert({
+          campaign_id: campaign_id,
+          recipient_id: contact_id,
+          event_type: 'sent',
+          event_data: {
+            recipient: to,
+            subject: subject
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        
+      if (eventError) {
+        console.error("Error logging send event:", eventError);
+      } else {
+        console.log("Successfully logged send event");
+      }
+    }
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -343,10 +480,28 @@ serve(async (req) => {
   } catch (error) {
     console.error("Send email error:", error);
     
+    // Determine appropriate status code based on error type
+    let statusCode = 500;
+    let errorMessage = error.message || 'Unknown error occurred';
+    
+    if (errorMessage.includes('Gmail integration not found')) {
+      statusCode = 404;
+    } else if (errorMessage.includes('Failed to refresh')) {
+      statusCode = 401;
+    } else if (errorMessage.includes('Failed to send email')) {
+      statusCode = 502; // Bad Gateway - external service error
+    } else if (errorMessage.includes('Missing required fields')) {
+      statusCode = 400;
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error.stack,
+        timestamp: new Date().toISOString()
+      }),
       {
-        status: 500,
+        status: statusCode,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );

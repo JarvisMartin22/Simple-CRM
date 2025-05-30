@@ -7,35 +7,41 @@ interface PerformanceMetricsProps {
 }
 
 export const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ analytics }) => {
+  // Safe division function to handle division by zero
+  const safePercentage = (numerator: number, denominator: number): string => {
+    if (denominator === 0) return '0.0';
+    return ((numerator / denominator) * 100).toFixed(1);
+  };
+
   const metrics = [
     {
       title: 'Delivery Rate',
-      value: `${((analytics.delivered_count / analytics.sent_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.delivered_count, analytics.sent_count)}%`,
       description: `${analytics.delivered_count} of ${analytics.sent_count} delivered`,
     },
     {
       title: 'Open Rate',
-      value: `${((analytics.opened_count / analytics.delivered_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.opened_count, analytics.delivered_count)}%`,
       description: `${analytics.opened_count} of ${analytics.delivered_count} opened`,
     },
     {
       title: 'Click Rate',
-      value: `${((analytics.clicked_count / analytics.delivered_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.clicked_count, analytics.delivered_count)}%`,
       description: `${analytics.clicked_count} of ${analytics.delivered_count} clicked`,
     },
     {
       title: 'Bounce Rate',
-      value: `${((analytics.bounced_count / analytics.sent_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.bounced_count, analytics.sent_count)}%`,
       description: `${analytics.bounced_count} of ${analytics.sent_count} bounced`,
     },
     {
       title: 'Complaint Rate',
-      value: `${((analytics.complained_count / analytics.delivered_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.complained_count, analytics.delivered_count)}%`,
       description: `${analytics.complained_count} complaints received`,
     },
     {
       title: 'Unsubscribe Rate',
-      value: `${((analytics.unsubscribed_count / analytics.delivered_count) * 100).toFixed(1)}%`,
+      value: `${safePercentage(analytics.unsubscribed_count, analytics.delivered_count)}%`,
       description: `${analytics.unsubscribed_count} unsubscribed`,
     },
   ];

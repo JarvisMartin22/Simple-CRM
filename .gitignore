@@ -22,3 +22,31 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Development and testing files
+temp/
+*.test.html
+*-test.html
+test-*.html
+test-*.js
+oauth-*.js
+*-debug.*
+fix-*.sql
+*-migration.sql
+run_*.html
+database_setup_guide.html
+fix-instructions.html
+
+# Package manager files (keep only one)
+bun.lockb
+yarn.lock
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.temp
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db

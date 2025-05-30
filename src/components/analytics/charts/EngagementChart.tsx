@@ -24,10 +24,22 @@ interface EngagementChartProps {
 }
 
 export const EngagementChart: React.FC<EngagementChartProps> = ({ data }) => {
-  const formattedData = data.map(point => ({
+  // Add null/undefined checking for data
+  const chartData = data && Array.isArray(data) ? data : [];
+  
+  const formattedData = chartData.map(point => ({
     ...point,
     timestamp: format(new Date(point.timestamp), 'MMM d, h:mm a'),
   }));
+
+  // Show a message if no data is available
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <p>No engagement data available yet</p>
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height="100%">

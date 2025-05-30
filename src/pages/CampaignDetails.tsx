@@ -6,6 +6,7 @@ import { ArrowLeft, Pause, Play, Send, Loader2, RefreshCw } from 'lucide-react';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import CampaignAnalyticsDashboard from '@/components/analytics/CampaignAnalyticsDashboard';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const CampaignDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -92,6 +93,80 @@ const CampaignDetails: React.FC = () => {
     }
   };
 
+  const handleTestSendEmail = async () => {
+    if (!campaign?.template_id) {
+      toast({
+        title: 'Error',
+        description: 'This campaign does not have a template assigned',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsStarting(true);
+      
+      // First, fetch the template data
+      const { data: template, error: templateError } = await supabase
+        .from('campaign_templates')
+        .select('*')
+        .eq('id', campaign.template_id)
+        .single();
+
+      if (templateError || !template) {
+        toast({
+          title: 'Error',
+          description: 'Campaign template not found in database',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Test with a sample email
+      const testEmail = 'test@example.com';
+      
+      console.log('Testing send-email function with template:', template.name);
+      
+      const response = await supabase.functions.invoke('send-email', {
+        body: {
+          userId: campaign.user_id,
+          to: testEmail,
+          subject: `Test: ${template.subject}`,
+          html: template.content,
+          campaign_id: campaign.id,
+          contact_id: 'test-contact-id',
+          trackOpens: true,
+          trackClicks: true
+        }
+      });
+
+      console.log('Send-email test response:', response);
+
+      if (response.error) {
+        console.error('Send-email test error:', response.error);
+        toast({
+          title: 'Email Function Test Failed',
+          description: response.error.message || 'Unknown error',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Email Function Test Successful',
+          description: 'The email sending function is working correctly',
+        });
+      }
+    } catch (error) {
+      console.error('Test send email error:', error);
+      toast({
+        title: 'Test Failed',
+        description: error.message || 'Unknown error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -106,24 +181,44 @@ const CampaignDetails: React.FC = () => {
               Back
             </Button>
             {campaign.status === 'draft' && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleStartCampaign}
-                disabled={isStarting}
-              >
-                {isStarting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Start Campaign
-                  </>
-                )}
-              </Button>
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleStartCampaign}
+                  disabled={isStarting}
+                >
+                  {isStarting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Start Campaign
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestSendEmail}
+                  disabled={isStarting}
+                >
+                  {isStarting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Test Email Function
+                    </>
+                  )}
+                </Button>
+              </>
             )}
             {(campaign.status === 'failed' || campaign.status === 'completed') && (
               <Button

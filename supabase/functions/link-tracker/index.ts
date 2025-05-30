@@ -73,7 +73,7 @@ serve(async (req) => {
     // Get the tracking record first
     const { data: trackingData, error: fetchError } = await supabase
       .from("tracked_links")
-      .select("id, email_tracking_id")
+      .select("id, email_tracking_id, campaign_id, contact_id")
       .eq("tracking_id", trackingId)
       .single();
 
@@ -85,7 +85,7 @@ serve(async (req) => {
     // Get the email tracking record for user_id
     const { data: emailData, error: emailError } = await supabase
       .from("email_tracking")
-      .select("id, user_id, email_id, recipient, subject")
+      .select("id, user_id, email_id, recipient, subject, campaign_id, contact_id")
       .eq("id", trackingData.email_tracking_id)
       .single();
 
@@ -125,6 +125,162 @@ serve(async (req) => {
 
       if (eventError) {
         console.error("Error recording event:", eventError);
+      }
+      
+      // Get campaign_id from either the tracked link or the email data
+      const campaignId = trackingData.campaign_id || emailData.campaign_id;
+      const contactId = trackingData.contact_id || emailData.contact_id;
+      
+      // Update campaign analytics if this is part of a campaign
+      if (campaignId) {
+        console.log(`Updating campaign analytics for campaign ${campaignId}`);
+        
+        try {
+          // 1. First, update the campaign_analytics table
+          const { data: campaignAnalytics, error: fetchAnalyticsError } = await supabase
+            .from("campaign_analytics")
+            .select("id, clicked_count")
+            .eq("campaign_id", campaignId)
+            .single();
+            
+          if (fetchAnalyticsError) {
+            console.error("Error fetching campaign analytics:", fetchAnalyticsError);
+            
+            // If the record doesn't exist, try to create it
+            if (fetchAnalyticsError.code === "PGRST116") {
+              console.log("Campaign analytics record not found, creating new record");
+              const { error: insertError } = await supabase
+                .from("campaign_analytics")
+                .insert({
+                  campaign_id: campaignId,
+                  clicked_count: 1,
+                  last_event_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+                
+              if (insertError) {
+                console.error("Error creating campaign analytics:", insertError);
+              } else {
+                console.log("Created new campaign analytics record");
+              }
+            }
+          } else {
+            console.log("Found campaign analytics record:", campaignAnalytics);
+            const { error: campaignAnalyticsError } = await supabase
+              .from("campaign_analytics")
+              .update({
+                clicked_count: (campaignAnalytics?.clicked_count || 0) + 1,
+                last_event_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq("id", campaignAnalytics.id);
+              
+            if (campaignAnalyticsError) {
+              console.error("Error updating campaign analytics:", campaignAnalyticsError);
+            } else {
+              console.log("Successfully updated campaign analytics");
+            }
+          }
+        } catch (error) {
+          console.error("Unexpected error updating campaign analytics:", error);
+        }
+        
+        // 2. Next, update the recipient_analytics table if we have a contact_id
+        if (contactId) {
+          const { data: recipientAnalytics, error: fetchRecipientError } = await supabase
+            .from("recipient_analytics")
+            .select("click_count, first_clicked_at")
+            .eq("campaign_id", campaignId)
+            .eq("recipient_id", contactId)
+            .single();
+            
+          if (fetchRecipientError) {
+            console.error("Error fetching recipient analytics:", fetchRecipientError);
+          } else {
+            const { error: recipientAnalyticsError } = await supabase
+              .from("recipient_analytics")
+              .update({
+                last_clicked_at: new Date().toISOString(),
+                click_count: (recipientAnalytics?.click_count || 0) + 1,
+                updated_at: new Date().toISOString(),
+                first_clicked_at: recipientAnalytics?.first_clicked_at || new Date().toISOString()
+              })
+              .eq("campaign_id", campaignId)
+              .eq("recipient_id", contactId);
+              
+            if (recipientAnalyticsError) {
+              console.error("Error updating recipient analytics:", recipientAnalyticsError);
+            }
+          }
+        }
+        
+        // 3. Update or insert into link_clicks table
+        const linkClicksData = {
+          campaign_id: campaignId,
+          recipient_id: contactId,
+          link_url: originalUrl,
+          click_count: 1,
+          last_clicked_at: new Date().toISOString(),
+          first_clicked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Try to update existing record first
+        const { data: existingClick, error: existingClickError } = await supabase
+          .from("link_clicks")
+          .select("id, click_count")
+          .eq("campaign_id", campaignId)
+          .eq("link_url", originalUrl)
+          .maybeSingle();
+          
+        if (existingClick) {
+          // Update existing record
+          const { error: updateClickError } = await supabase
+            .from("link_clicks")
+            .update({
+              click_count: existingClick.click_count + 1,
+              last_clicked_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingClick.id);
+            
+          if (updateClickError) {
+            console.error("Error updating link click:", updateClickError);
+          }
+        } else {
+          // Insert new record
+          const { error: insertClickError } = await supabase
+            .from("link_clicks")
+            .insert([linkClicksData]);
+            
+          if (insertClickError) {
+            console.error("Error inserting link click:", insertClickError);
+          }
+        }
+        
+        // 4. Record in the newer email_events table for campaign analytics
+        const { error: campaignEventError } = await supabase
+          .from("email_events")
+          .insert({
+            campaign_id: campaignId,
+            recipient_id: contactId,
+            event_type: "clicked",
+            event_data: {
+              user_agent: userAgent,
+              ip_address: ipAddress,
+              tracking_id: trackingId,
+              url: originalUrl
+            },
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            link_url: originalUrl,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+          
+        if (campaignEventError) {
+          console.error("Error recording campaign event:", campaignEventError);
+        }
       }
     }
 

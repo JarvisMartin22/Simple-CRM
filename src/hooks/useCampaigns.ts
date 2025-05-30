@@ -510,7 +510,9 @@ export const useCampaigns = () => {
             .replace(/{{last_name}}/g, contact.last_name || '')
             .replace(/{{email}}/g, contact.email || '');
 
-          // Call the send-email edge function
+          console.log(`Sending email to ${contact.email}...`);
+
+          // Call the send-email edge function with better error handling
           const response = await supabase.functions.invoke('send-email', {
             body: {
               userId: campaign.user_id,
@@ -519,18 +521,43 @@ export const useCampaigns = () => {
               html: personalizedBody,
               campaign_id: id,
               contact_id: contact.id,
+              trackOpens: true,
+              trackClicks: true
             }
           });
 
+          // Check for Edge Function errors
           if (response.error) {
-            console.error(`Error sending email to ${contact.email}:`, response.error);
-            return { contact, success: false, error: response.error };
+            console.error(`Edge Function error for ${contact.email}:`, response.error);
+            
+            // Handle specific error types
+            if (response.error.message?.includes('Gmail integration not found')) {
+              throw new Error('Gmail integration not found or not active. Please reconnect Gmail in the Integrations section.');
+            } else if (response.error.message?.includes('Failed to refresh')) {
+              throw new Error('Failed to refresh Gmail token. Please reconnect Gmail in the Integrations section.');
+            } else if (response.error.message?.includes('Failed to send email')) {
+              throw new Error(`Failed to send email to ${contact.email}: ${response.error.message}`);
+            } else {
+              throw new Error(`Email service error: ${response.error.message}`);
+            }
           }
 
-          return { contact, success: true };
+          // Check the response data for success
+          if (!response.data || !response.data.success) {
+            console.error(`Send email failed for ${contact.email}:`, response.data);
+            throw new Error(`Failed to send email to ${contact.email}: ${response.data?.error || 'Unknown error'}`);
+          }
+
+          console.log(`Successfully sent email to ${contact.email}`);
+          return { contact, success: true, emailId: response.data.email_id };
+
         } catch (error) {
           console.error(`Error processing email for ${contact.email}:`, error);
-          return { contact, success: false, error };
+          return { 
+            contact, 
+            success: false, 
+            error: error.message || 'Unknown error occurred'
+          };
         }
       });
 
@@ -538,8 +565,28 @@ export const useCampaigns = () => {
       
       // 7. Calculate success rate and update analytics
       const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
       const totalCount = results.length;
       const successRate = totalCount > 0 ? (successCount / totalCount) * 100 : 0;
+
+      // Collect error details for failed emails
+      const failedEmails = results.filter(r => !r.success);
+      const errorSummary = failedEmails.reduce((acc, result) => {
+        const errorType = result.error?.includes('Gmail integration') ? 'gmail_integration' :
+                         result.error?.includes('Failed to refresh') ? 'token_expired' :
+                         result.error?.includes('Failed to send') ? 'send_failed' :
+                         'unknown';
+        acc[errorType] = (acc[errorType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      console.log('Campaign execution results:', {
+        total: totalCount,
+        successful: successCount,
+        failed: failedCount,
+        successRate,
+        errorSummary
+      });
 
       await supabase
         .from('campaign_analytics')
@@ -575,12 +622,45 @@ export const useCampaigns = () => {
         c.id === id ? { ...c, status: finalStatus, completed_at: new Date().toISOString() } : c
       ));
 
-      // 10. Show success toast
-      toast({
-        title: 'Campaign processed',
-        description: `Successfully sent ${successCount} out of ${totalCount} emails.`,
-        ...(successCount < totalCount ? { variant: 'destructive' } : {})
-      });
+      // 10. Show detailed success/error messages
+      if (successCount === totalCount) {
+        toast({
+          title: 'Campaign completed successfully',
+          description: `Successfully sent ${successCount} emails.`,
+        });
+      } else if (successCount > 0) {
+        // Partial success - provide details about failures
+        let errorMessage = `Sent ${successCount} out of ${totalCount} emails.`;
+        if (errorSummary.gmail_integration > 0) {
+          errorMessage += ` ${errorSummary.gmail_integration} failed due to Gmail integration issues.`;
+        }
+        if (errorSummary.token_expired > 0) {
+          errorMessage += ` ${errorSummary.token_expired} failed due to expired tokens.`;
+        }
+        if (errorSummary.send_failed > 0) {
+          errorMessage += ` ${errorSummary.send_failed} failed during sending.`;
+        }
+        
+        toast({
+          title: 'Campaign partially completed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      } else {
+        // Complete failure
+        let errorMessage = 'Failed to send any emails.';
+        if (errorSummary.gmail_integration > 0) {
+          errorMessage += ' Please check your Gmail integration in Settings.';
+        } else if (errorSummary.token_expired > 0) {
+          errorMessage += ' Please reconnect your Gmail account in Settings.';
+        }
+        
+        toast({
+          title: 'Campaign failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
 
       return {
         success: true,

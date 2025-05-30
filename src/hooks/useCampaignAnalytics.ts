@@ -88,8 +88,14 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         .eq('campaign_id', campaignId)
         .single();
 
-      if (analyticsError && analyticsError.code !== 'PGRST116') { // Not found error
-        throw analyticsError;
+      if (analyticsError) {
+        // Handle 406 Not Acceptable error (likely RLS issue)
+        if (analyticsError.code === '406' || analyticsError.code === 'PGRST109') {
+          console.warn('RLS policy preventing access to campaign_analytics, using default data');
+          // Use default analytics data
+        } else if (analyticsError.code !== 'PGRST116') { // Not found error
+          throw analyticsError;
+        }
       }
 
       // Initialize default analytics if none exist
@@ -133,7 +139,14 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         .select('*')
         .eq('campaign_id', campaignId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '406' || error.code === 'PGRST109') {
+          console.warn('RLS policy preventing access to recipient_analytics, using empty data');
+          setRecipientAnalytics([]);
+          return;
+        }
+        throw error;
+      }
       setRecipientAnalytics(data || []);
     } catch (err: any) {
       console.error('Error fetching recipient analytics:', err);
@@ -157,7 +170,14 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         .select('*')
         .eq('campaign_id', campaignId);
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '406' || error.code === 'PGRST109') {
+          console.warn('RLS policy preventing access to link_clicks, using empty data');
+          setLinkClicks([]);
+          return;
+        }
+        throw error;
+      }
       setLinkClicks(data || []);
     } catch (err: any) {
       console.error('Error fetching link clicks:', err);
@@ -189,7 +209,14 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
 
       const { data, error } = await query.order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '406' || error.code === 'PGRST109') {
+          console.warn('RLS policy preventing access to email_events, using empty data');
+          setEvents([]);
+          return;
+        }
+        throw error;
+      }
       setEvents(data || []);
     } catch (err: any) {
       console.error('Error fetching events:', err);
