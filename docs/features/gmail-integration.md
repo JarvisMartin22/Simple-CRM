@@ -2,11 +2,16 @@
 
 ## Overview
 
-Golly CRM's Gmail integration allows you to:
+Simple CRM's Gmail integration allows you to:
 - Import and sync contacts from Gmail
 - Track email opens and clicks
 - Send tracked emails directly from CRM
 - View email history for contacts
+
+> **Quick Links**:
+> - [Setup Guide](../setup/gmail-integration-setup.md) - Complete setup instructions
+> - [Troubleshooting](../troubleshooting/gmail-integration.md) - Common issues and solutions
+> - [Contact Import](./gmail-contact-import.md) - Detailed import documentation
 
 ## ⚠️ Important Development Note
 
@@ -70,6 +75,10 @@ Gmail: Starting connection process...
 Gmail: Processing auth code...
 ✅ Gmail connected successfully: your-email@gmail.com
 ```
+
+### 🆕 OAuth Flow Improvements (May 2025)
+
+**Automatic Window Closing**: The OAuth callback window now automatically closes after successful authentication, providing a seamless user experience. The integration handles both popup and redirect flows gracefully.
 
 ### ❌ Common Issues (Resolved)
 

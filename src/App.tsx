@@ -13,6 +13,7 @@ import { EmailProvider } from './contexts/EmailContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Callback from './pages/auth/Callback';
+import GmailCallback from './pages/auth/GmailCallback';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { useToast } from './components/ui/use-toast';
 import TestSupabase from "./pages/auth/TestSupabase";
@@ -68,6 +69,7 @@ const App: React.FC = () => {
                       <Route path="/auth/login" element={<Login />} />
                       <Route path="/auth/register" element={<Register />} />
                       <Route path="/auth/callback" element={<Callback />} />
+                      <Route path="/auth/callback/gmail" element={<GmailCallback />} />
                       <Route path="/auth/test-supabase" element={<TestSupabase />} />
                       <Route path="/" element={<LandingPage />} />
                       

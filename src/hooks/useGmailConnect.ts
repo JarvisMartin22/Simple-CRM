@@ -24,6 +24,50 @@ export function useGmailConnect() {
   const handleAuthMessage = async (event: MessageEvent) => {
     // Process message from auth popup
     const data = event.data;
+    
+    // Handle success message from callback page
+    if (data && data.type === 'GMAIL_AUTH_SUCCESS') {
+      console.log('📧 Gmail: Connection successful!');
+      setIsConnecting(false);
+      setIsProcessingCode(false);
+      
+      toast({
+        title: "Gmail connected successfully",
+        description: `Connected as ${data.email}`,
+      });
+      
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
+      queryClient.invalidateQueries({ queryKey: ['email-integration'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
+      queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+      
+      if (authPromiseResolve) {
+        authPromiseResolve(true);
+        authPromiseResolve = null;
+      }
+      return;
+    }
+    
+    // Handle error message from callback page
+    if (data && data.type === 'GMAIL_AUTH_ERROR') {
+      console.error('📧 Gmail: Connection failed:', data.error);
+      setIsConnecting(false);
+      setIsProcessingCode(false);
+      
+      toast({
+        title: "Connection failed",
+        description: data.error || "Failed to connect Gmail",
+        variant: "destructive"
+      });
+      
+      if (authPromiseResolve) {
+        authPromiseResolve(false);
+        authPromiseResolve = null;
+      }
+      return;
+    }
+    
     if (data && data.type === 'GMAIL_AUTH_CODE' && data.code) {
       console.log('📧 Gmail: Processing auth code...');
       

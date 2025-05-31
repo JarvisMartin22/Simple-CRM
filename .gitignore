@@ -50,3 +50,8 @@ yarn.lock
 # OS generated files
 Thumbs.db
 ehthumbs.db
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

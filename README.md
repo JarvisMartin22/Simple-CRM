@@ -28,9 +28,15 @@ Golly is a modern, lightweight CRM system built for growing businesses. It provi
 
 ## Documentation
 
+### Core Documentation
 - [Deployment Guide](DEPLOYMENT.md) - Production deployment instructions
 - [Database Setup](supabase/README.md) - Supabase configuration and schema
 - [Function Documentation](supabase/functions/README.md) - Edge Functions documentation
+
+### Gmail Integration
+- [Gmail Integration Index](docs/GMAIL_INTEGRATION_INDEX.md) - Complete guide to Gmail integration docs
+- [Setup Guide](docs/setup/gmail-integration-setup.md) - Step-by-step setup instructions
+- [Troubleshooting](docs/troubleshooting/gmail-integration.md) - Common issues and solutions
 
 ## Local Development
 
