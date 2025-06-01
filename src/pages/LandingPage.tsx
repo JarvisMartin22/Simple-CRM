@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, ChevronDown } from 'lucide-react';
+import { ArrowRight, CheckCircle, ChevronDown, Zap, ArrowDownToDot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
+import { PricingSection } from '@/components/pricing/PricingSection';
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -31,6 +32,134 @@ const LandingPage: React.FC = () => {
     description: 'Schedule and manage your appointments.',
     icon: <CheckCircle className="h-5 w-5 text-green-500" />
   }];
+
+  const pricingTiers = [
+    {
+      name: "Essential",
+      price: {
+        monthly: 4.99,
+        yearly: 3.99,
+      },
+      description: "Perfect for individuals and small businesses",
+      icon: (
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-blue-500/30 blur-2xl rounded-full" />
+          <Zap className="w-7 h-7 relative z-10 text-blue-600 dark:text-blue-400" />
+        </div>
+      ),
+      features: [
+        {
+          name: "One user",
+          description: "Single user account",
+          included: true,
+        },
+        {
+          name: "Up to 500 contacts",
+          description: "Manage up to 500 customer contacts",
+          included: true,
+        },
+        {
+          name: "Pipeline management",
+          description: "Track deals through your sales pipeline",
+          included: true,
+        },
+        {
+          name: "Notes & Task management",
+          description: "Organize notes and manage tasks efficiently",
+          included: true,
+        },
+        {
+          name: "Email integration",
+          description: "Connect your email for seamless communication",
+          included: true,
+        },
+      ],
+    },
+    {
+      name: "Advanced",
+      price: {
+        monthly: 14.99,
+        yearly: 11.99,
+      },
+      description: "Ideal for growing teams and businesses",
+      highlight: true,
+      badge: "Most Popular",
+      icon: (
+        <div className="relative">
+          <ArrowDownToDot className="w-7 h-7 relative z-10" />
+        </div>
+      ),
+      features: [
+        {
+          name: "Everything in Essential",
+          description: "All Essential features included",
+          included: true,
+        },
+        {
+          name: "Email campaigns",
+          description: "Create and send targeted email campaigns",
+          included: true,
+        },
+        {
+          name: "Campaign analytics",
+          description: "Track performance of your email campaigns",
+          included: true,
+        },
+        {
+          name: "Up to 2,500 contacts",
+          description: "Manage up to 2,500 customer contacts",
+          included: true,
+        },
+        {
+          name: "1,200 emails per month",
+          description: "Send up to 1,200 marketing emails monthly",
+          included: true,
+        },
+      ],
+    },
+    {
+      name: "Expert",
+      price: {
+        monthly: 24.99,
+        yearly: 19.99,
+      },
+      description: "For large teams with advanced needs",
+      priceUnit: "user per month",
+      icon: (
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/30 to-purple-500/30 blur-2xl rounded-full" />
+          <CheckCircle className="w-7 h-7 relative z-10 text-purple-600 dark:text-purple-400" />
+        </div>
+      ),
+      features: [
+        {
+          name: "Multiple users",
+          description: "Add team members with user management",
+          included: true,
+        },
+        {
+          name: "Unlimited contacts",
+          description: "No limits on the number of contacts",
+          included: true,
+        },
+        {
+          name: "API access",
+          description: "Full API access for custom integrations",
+          included: true,
+        },
+        {
+          name: "5,000 emails per month",
+          description: "Send up to 5,000 marketing emails monthly",
+          included: true,
+        },
+        {
+          name: "Everything in Advanced",
+          description: "All Advanced features included",
+          included: true,
+        },
+      ],
+    },
+  ];
   return <div className="min-h-screen flex flex-col">
       {/* Navigation */}
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
@@ -167,147 +296,14 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-gray-50 relative z-10">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Simple Pricing</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Affordable plans for businesses of all sizes.
-            </p>
-          </div>
-          
-          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <motion.div initial={{
-            opacity: 0,
-            y: 20
-          }} whileInView={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.5
-          }} viewport={{
-            once: true
-          }}>
-              <Card className="h-full backdrop-blur-sm bg-white/80">
-                <CardHeader>
-                  <CardTitle>Starter</CardTitle>
-                  <div className="mt-3 text-3xl font-bold">$9<span className="text-sm font-normal text-gray-500">/month</span></div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Up to 100 contacts</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Basic pipeline management</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Email integration</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Choose Plan</Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-            
-            <motion.div initial={{
-            opacity: 0,
-            y: 20
-          }} whileInView={{
-            opacity: 1,
-            y: 0,
-            scale: 1.05
-          }} transition={{
-            duration: 0.5,
-            delay: 0.1
-          }} viewport={{
-            once: true
-          }} className="md:transform md:-translate-y-4">
-              <Card className="h-full border-primary bg-primary bg-opacity-5 backdrop-blur-sm">
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Professional</CardTitle>
-                    <span className="bg-primary text-white text-xs py-1 px-2 rounded-full">Popular</span>
-                  </div>
-                  <div className="mt-3 text-3xl font-bold">$29<span className="text-sm font-normal text-gray-500">/month</span></div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Unlimited contacts</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Advanced pipeline management</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Email campaigns</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Calendar integration</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Choose Plan</Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-            
-            <motion.div initial={{
-            opacity: 0,
-            y: 20
-          }} whileInView={{
-            opacity: 1,
-            y: 0
-          }} transition={{
-            duration: 0.5,
-            delay: 0.2
-          }} viewport={{
-            once: true
-          }}>
-              <Card className="h-full backdrop-blur-sm bg-white/80">
-                <CardHeader>
-                  <CardTitle>Enterprise</CardTitle>
-                  <div className="mt-3 text-3xl font-bold">$99<span className="text-sm font-normal text-gray-500">/month</span></div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Everything in Professional</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>
-                    </span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Dedicated support</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>Custom integrations</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full">Contact Sales</Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+      <div id="pricing">
+        <PricingSection 
+          tiers={pricingTiers} 
+          className="bg-gray-50"
+          title="Simple, Transparent Pricing"
+          description="Choose the plan that works for you. We can't wait for what's next."
+        />
+      </div>
 
       {/* FAQ Section */}
       <section id="faq" className="py-20 bg-white relative z-10">

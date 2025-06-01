@@ -57,6 +57,13 @@ serve(async (req) => {
   console.log("Request method:", req.method);
   console.log("Request URL:", req.url);
   
+  // Log environment variable lengths for debugging (but don't fail)
+  console.log("Environment check:", {
+    clientIdLength: GOOGLE_CLIENT_ID.length,
+    clientSecretLength: GOOGLE_CLIENT_SECRET.length,
+    anonKeyLength: SUPABASE_ANON_KEY.length
+  });
+  
   // Log headers for debugging
   const headersObj = Object.fromEntries(req.headers.entries());
   console.log("Request headers:", {

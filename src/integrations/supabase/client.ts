@@ -2,14 +2,29 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 
-// Use Supabase production instance only
-const supabaseUrl = 'https://bujaaqjxrvntcneoarkj.supabase.co';
+// Use environment variables for Supabase configuration
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bujaaqjxrvntcneoarkj.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1amFhcWp4cnZudGNuZW9hcmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQwNzQsImV4cCI6MjA2MjEzMDA3NH0.cX-07WwAXeutGV1_lahlsloiu_KIPIy8SQXmHfrGKXw';
 
-// Use the most recent anon key - using anon key is the correct approach for client-side auth
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1amFhcWp4cnZudGNuZW9hcmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQwNzQsImV4cCI6MjA2MjEzMDA3NH0.cX-07WwAXeutGV1_lahlsloiu_KIPIy8SQXmHfrGKXw';
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
 
-// Create Supabase client with minimal configuration 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Create a singleton instance to prevent multiple clients
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
 
-// Log initialization but avoid excessive console logs
-console.log('Supabase client initialized with URL:', supabaseUrl);
+// Create Supabase client with minimal configuration
+if (!supabaseInstance) {
+  supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+  
+  // Log initialization but avoid excessive console logs
+  console.log('Supabase client initialized with URL:', supabaseUrl);
+}
+
+export const supabase = supabaseInstance;

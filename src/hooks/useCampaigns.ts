@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { supabaseWithAuth } from '@/lib/supabaseWithAuth';
 import { useToast } from '@/components/ui/use-toast';
 import type { ScheduleConfig } from '@/components/campaign/CampaignScheduler';
 
@@ -539,7 +540,7 @@ export const useCampaigns = () => {
           console.log(`Sending email to ${contact.email}...`);
 
           // Call the send-email edge function with better error handling
-          const response = await supabase.functions.invoke('send-email', {
+          const response = await supabaseWithAuth.functions.invoke('send-email-simple', {
             body: {
               userId: campaign.user_id,
               to: contact.email,

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { supabaseWithAuth } from '@/lib/supabaseWithAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -122,85 +121,70 @@ export function useGmailConnect() {
         // Get session for auth
         const { data: { session } } = await supabase.auth.getSession();
         
-        // Call Gmail auth endpoint with the code
-        const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-          body: { code: data.code }
+        if (!session) {
+          throw new Error('No active session found');
+        }
+        
+        // Call Gmail auth endpoint with the code using direct fetch
+        // This bypasses any potential issues with supabase.functions.invoke
+        const tokenResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/gmail-auth`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': supabase.anonKey // Add the anon key header
+          },
+          body: JSON.stringify({ code: data.code })
         });
         
-        if (tokenResponse.error) {
-          // Only log and throw errors for genuinely failed attempts
-          // Don't throw for 400 errors that might be followed by success
-          if (tokenResponse.error.message && tokenResponse.error.message.includes('non-2xx status code')) {
-            if (tokenResponse.error.message.includes('400')) {
-              console.log('Gmail: Received 400 error, waiting for potential retry...');
-              
-              // Set a shorter timeout for 400 errors since they often resolve quickly
-              setTimeout(() => {
-                if (isProcessingCode && lastProcessedCode === data.code) {
-                  console.warn('Gmail: 400 error timeout, connection may have failed');
-                  setIsProcessingCode(false);
-                  setIsConnecting(false);
-                  
-                  if (authPromiseResolve) {
-                    authPromiseResolve(false);
-                    authPromiseResolve = null;
-                  }
-                  
-                  toast({
-                    title: "Connection failed",
-                    description: "OAuth authentication failed. Please try again.",
-                    variant: "destructive"
-                  });
-                }
-              }, 3000); // Shorter timeout for 400 errors
-              
-              return; // Don't throw immediately
-            }
+        const responseData = await tokenResponse.json();
+        
+        if (!tokenResponse.ok) {
+          console.error('Gmail auth failed:', responseData);
+          
+          // Handle specific error codes
+          if (tokenResponse.status === 401) {
+            throw new Error('Authentication failed. Please try logging out and back in.');
+          } else if (tokenResponse.status === 400 && responseData.error?.includes('redirect_uri_mismatch')) {
+            console.log('Gmail: Received redirect_uri_mismatch error, waiting for potential retry...');
             
-            if (tokenResponse.error.message.includes('500')) {
-              console.log('Gmail: Server error, waiting for retry...');
-              
-              setTimeout(() => {
-                if (isProcessingCode && lastProcessedCode === data.code) {
-                  console.error('Gmail: Timeout waiting for server response');
-                  setIsProcessingCode(false);
-                  setIsConnecting(false);
-                  
-                  if (authPromiseResolve) {
-                    authPromiseResolve(false);
-                    authPromiseResolve = null;
-                  }
-                  
-                  toast({
-                    title: "Connection failed",
-                    description: "Server error: The authentication service is experiencing issues. Please try again later.",
-                    variant: "destructive"
-                  });
+            setTimeout(() => {
+              if (isProcessingCode && lastProcessedCode === data.code) {
+                console.warn('Gmail: redirect_uri_mismatch timeout');
+                setIsProcessingCode(false);
+                setIsConnecting(false);
+                
+                if (authPromiseResolve) {
+                  authPromiseResolve(false);
+                  authPromiseResolve = null;
                 }
-              }, 5000);
-              
-              return; // Don't throw - this allows success to be processed if it comes later
-            }
+                
+                toast({
+                  title: "Connection failed",
+                  description: "OAuth configuration mismatch. Please check your redirect URI settings.",
+                  variant: "destructive"
+                });
+              }
+            }, 3000);
             
-            // Only throw OAuth service error for non-400/500 errors
-            throw new Error('Gmail connection failed: OAuth service returned an error. Please check your Supabase project logs and verify the OAuth credentials are correctly configured.');
+            return;
           }
           
-          throw new Error(tokenResponse.error.message || 'Unknown error from Gmail auth endpoint');
+          throw new Error(responseData.error || 'Failed to exchange authorization code');
         }
 
         // Extract only the fields that exist in the user_integrations table
         const integrationData = {
           user_id: currentUser.id,
-          provider: tokenResponse.data.provider || "gmail",
-          provider_user_id: tokenResponse.data.provider_user_id || null,
-          email: tokenResponse.data.email || null,
-          access_token: tokenResponse.data.access_token || "",
-          refresh_token: tokenResponse.data.refresh_token || null,
-          expires_at: typeof tokenResponse.data.expires_at === 'number' 
-            ? new Date(tokenResponse.data.expires_at).toISOString() 
-            : tokenResponse.data.expires_at,
-          scope: tokenResponse.data.scope || null
+          provider: responseData.provider || "gmail",
+          provider_user_id: responseData.provider_user_id || null,
+          email: responseData.email || null,
+          access_token: responseData.access_token || "",
+          refresh_token: responseData.refresh_token || null,
+          expires_at: typeof responseData.expires_at === 'number' 
+            ? new Date(responseData.expires_at).toISOString() 
+            : responseData.expires_at,
+          scope: responseData.scope || null
         };
         
         // Validate required fields are present
@@ -210,8 +194,8 @@ export function useGmailConnect() {
         
         // Make sure all required fields are present
         if (!integrationData.email) {
-          if (tokenResponse.data && tokenResponse.data.email) {
-            integrationData.email = tokenResponse.data.email;
+          if (responseData && responseData.email) {
+            integrationData.email = responseData.email;
           } else {
             integrationData.email = currentUser.email || 'unknown@example.com';
           }
@@ -420,48 +404,51 @@ export function useGmailConnect() {
             // Get session for auth
             const { data: { session } } = await supabase.auth.getSession();
             
-            // Call Gmail auth endpoint with the code
-            const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-              body: { code }
+            if (!session) {
+              throw new Error('No active session found');
+            }
+            
+            // Call Gmail auth endpoint with the code using direct fetch
+            const tokenResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/gmail-auth`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': supabase.anonKey
+              },
+              body: JSON.stringify({ code })
             });
             
-            if (tokenResponse.error) {
-              console.error('Error processing auth code from URL:', tokenResponse.error);
+            const responseData = await tokenResponse.json();
+            
+            if (!tokenResponse.ok) {
+              console.error('Error processing auth code from URL:', responseData);
               
-              // Check for specific error types
-              if (tokenResponse.error.message && tokenResponse.error.message.includes('non-2xx status code')) {
-                // Check if it's specifically a 500 error (Internal Server Error)
-                if (tokenResponse.error.message.includes('500')) {
-                  console.log('Received 500 error from Edge Function, will wait for secondary response...');
-                  
-                  // Set a timeout to wait for the secondary response
-                  setTimeout(() => {
-                    // If we're still processing the same code after 5 seconds, assume failure
-                    if (isProcessingCode && lastProcessedCode === code) {
-                      console.error('Timeout waiting for secondary response in URL flow');
-                      setIsProcessingCode(false);
-                      setIsConnecting(false);
-                      
-                      toast({
-                        title: "Connection failed",
-                        description: "Server error: The authentication service is experiencing issues. Please try again later.",
-                        variant: "destructive"
-                      });
-                      
-                      // Clean up the URL
-                      const cleanUrl = window.location.pathname;
-                      window.history.replaceState({}, document.title, cleanUrl);
-                    }
-                  }, 5000);
-                  
-                  // Return early without throwing - this allows the secondary successful response to be processed if it arrives
-                  return;
-                }
+              if (tokenResponse.status === 500) {
+                console.log('Received 500 error from Edge Function, will wait for secondary response...');
                 
-                throw new Error('Gmail connection failed: OAuth service returned an error. Please check your Supabase project logs and verify the OAuth credentials are correctly configured.');
+                setTimeout(() => {
+                  if (isProcessingCode && lastProcessedCode === code) {
+                    console.error('Timeout waiting for secondary response in URL flow');
+                    setIsProcessingCode(false);
+                    setIsConnecting(false);
+                    
+                    toast({
+                      title: "Connection failed",
+                      description: "Server error: The authentication service is experiencing issues. Please try again later.",
+                      variant: "destructive"
+                    });
+                    
+                    // Clean up the URL
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                  }
+                }, 5000);
+                
+                return;
               }
               
-              throw new Error(tokenResponse.error.message || 'Failed to exchange authorization code');
+              throw new Error(responseData.error || 'Failed to exchange authorization code');
             }
             
             console.log('Token response received from URL code');
@@ -469,7 +456,7 @@ export function useGmailConnect() {
             // Show success message
             toast({
               title: "Gmail connected successfully",
-              description: `Connected as ${tokenResponse.data.email}`,
+              description: `Connected as ${responseData.email}`,
             });
             
             // Invalidate queries
@@ -551,30 +538,36 @@ export function useGmailConnect() {
         throw new Error('No active session found');
       }
       
-      // Call the Gmail auth Edge Function to get OAuth URL
-      const response = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-        body: { test: true }
+      // Call the Gmail auth Edge Function to get OAuth URL using direct fetch
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/gmail-auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabase.anonKey // Add the anon key header
+        },
+        body: JSON.stringify({ test: true })
       });
       
-      if (response.error) {
-        // Check for specific error patterns
-        if (response.error.message && response.error.message.includes('non-2xx status code')) {
-          throw new Error(
-            'Edge Function configuration error: Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET ' +
-            'environment variables are properly set in your Supabase Edge Function.'
-          );
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error('Gmail auth function error:', responseData);
+        
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please try logging out and back in.');
         }
         
-        throw new Error(response.error.message || 'Failed to get authorization URL');
+        throw new Error(responseData.error || 'Failed to get authorization URL');
       }
       
-      if (!response.data || !response.data.url) {
+      if (!responseData.url) {
         throw new Error('Invalid response from server: Missing authorization URL');
       }
       
       // Store the state parameter for CSRF verification if provided
-      if (response.data.state) {
-        localStorage.setItem('gmail_auth_state', response.data.state);
+      if (responseData.state) {
+        localStorage.setItem('gmail_auth_state', responseData.state);
         localStorage.setItem('gmail_auth_timestamp', Date.now().toString());
       }
       
@@ -591,7 +584,7 @@ export function useGmailConnect() {
       
       // Open authorization URL in a popup window
       activeAuthPopup = window.open(
-        response.data.url,
+        responseData.url,
         'gmail_auth',
         `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
       );
@@ -676,7 +669,7 @@ export function useGmailConnect() {
       } else if (error.message.includes('Network Error') || error.message.includes('Failed to fetch')) {
         errorMessage = "Network error. Please check your connection and try again.";
       } else if (error.message.includes('Authentication')) {
-        errorMessage = "Authentication error. Please try logging out and back in.";
+        errorMessage = error.message; // Use the specific auth error message
       } else if (error.message.includes('timeout')) {
         errorMessage = "Connection timed out. Please try again later.";
       }
@@ -696,5 +689,18 @@ export function useGmailConnect() {
     setIsConnecting(false);
   };
   
+  // Helper to get Supabase URL and anon key from the client
+  const getSupabaseConfig = () => {
+    // Access the internal properties of the Supabase client
+    // These are available on the client instance
+    const url = (supabase as any).supabaseUrl || (supabase as any).restUrl || 'https://bujaaqjxrvntcneoarkj.supabase.co';
+    const anonKey = (supabase as any).supabaseKey || (supabase as any).anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1amFhcWp4cnZudGNuZW9hcmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQwNzQsImV4cCI6MjA2MjEzMDA3NH0.cX-07WwAXeutGV1_lahlsloiu_KIPIy8SQXmHfrGKXw';
+    
+    return { supabaseUrl: url, anonKey };
+  };
+  
+  // Add supabase config to the client for easy access
+  Object.assign(supabase, getSupabaseConfig());
+  
   return { connectGmail, isConnecting, resetConnectionState };
-} 
+}
