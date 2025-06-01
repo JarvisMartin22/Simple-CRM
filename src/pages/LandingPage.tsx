@@ -191,6 +191,8 @@ const LandingPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <Waves lineColor="rgba(249, 115, 22, 0.25)" backgroundColor="transparent" waveSpeedX={0.015} waveSpeedY={0.01} waveAmpX={35} waveAmpY={20} xGap={12} yGap={36} friction={0.9} tension={0.01} maxCursorMove={120} />
         </div>
+        {/* Orange gradient overlay starting at bottom of hero */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-orange-25 to-transparent z-5"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
@@ -259,7 +261,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-white relative z-10">
+      <section id="features" className="py-20 bg-gradient-to-b from-white via-orange-25 to-orange-50 relative z-10">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Features</h2>
@@ -299,7 +301,7 @@ const LandingPage: React.FC = () => {
       <div id="pricing">
         <PricingSection 
           tiers={pricingTiers} 
-          className="bg-gray-50"
+          className="bg-gradient-to-b from-orange-50 via-orange-25 to-white"
           title="Simple, Transparent Pricing"
           description="Choose the plan that works for you. We can't wait for what's next."
         />

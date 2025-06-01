@@ -52,6 +52,16 @@ const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({
     fetchRecipientAnalytics();
     fetchLinkClicks();
     fetchEvents();
+
+    // Set up automatic refresh every 30 seconds for real-time updates
+    const interval = setInterval(() => {
+      fetchAnalytics();
+      fetchRecipientAnalytics();
+      fetchLinkClicks();
+      fetchEvents();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [fetchAnalytics, fetchRecipientAnalytics, fetchLinkClicks, fetchEvents]);
 
   const refreshData = () => {
@@ -104,7 +114,7 @@ const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProps> = ({
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4" data-testid="campaign-analytics">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Campaign Analytics</h2>
         <div className="flex gap-2">

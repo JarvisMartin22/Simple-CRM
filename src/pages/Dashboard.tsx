@@ -16,6 +16,7 @@ import ContactDetail from '@/components/dashboard/ContactDetail';
 import MetricDetail from '@/components/dashboard/MetricDetail';
 import TaskDetail from '@/components/dashboard/TaskDetail';
 import { EmailTracker } from '@/components/email/EmailTracker';
+import { PlatformAnalyticsDashboard } from '@/components/analytics/PlatformAnalyticsDashboard';
 import { useEmail } from '@/contexts/EmailContext';
 
 // Import sample data
@@ -101,6 +102,9 @@ const Dashboard: React.FC = () => {
       
       {/* Key Metrics */}
       <KeyMetrics onMetricClick={handleMetricClick} />
+
+      {/* Platform Analytics */}
+      <PlatformAnalyticsDashboard />
 
       {/* Main Dashboard Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -30,10 +30,24 @@ interface UseCampaignAnalyticsResult {
 }
 
 function processEventsData(events: any[]): EngagementDataPoint[] {
+  if (!events || events.length === 0) {
+    return [];
+  }
+
+  // Group events by hour to create more meaningful data points
   const timePoints = new Map<string, EngagementDataPoint>();
 
   events.forEach(event => {
-    const timestamp = new Date(event.created_at).toISOString();
+    if (!event.created_at || !event.event_type) {
+      console.warn('Invalid event data:', event);
+      return;
+    }
+
+    // Round to nearest hour for grouping
+    const eventDate = new Date(event.created_at);
+    eventDate.setMinutes(0, 0, 0); // Round to the hour
+    const timestamp = eventDate.toISOString();
+    
     const existing = timePoints.get(timestamp) || {
       timestamp,
       opens: 0,
@@ -42,7 +56,7 @@ function processEventsData(events: any[]): EngagementDataPoint[] {
       complaints: 0,
     };
 
-    switch (event.event_type) {
+    switch (event.event_type.toLowerCase()) {
       case 'opened':
         existing.opens++;
         break;
@@ -55,14 +69,19 @@ function processEventsData(events: any[]): EngagementDataPoint[] {
       case 'complained':
         existing.complaints++;
         break;
+      default:
+        console.warn('Unknown event type:', event.event_type);
     }
 
     timePoints.set(timestamp, existing);
   });
 
-  return Array.from(timePoints.values()).sort((a, b) => 
+  const result = Array.from(timePoints.values()).sort((a, b) => 
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
+
+  console.log('Processed engagement data points:', result);
+  return result;
 }
 
 export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsResult {
@@ -74,12 +93,43 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const refreshCampaignAnalytics = useCallback(async (skipLoading = false) => {
+    if (!campaignId) return;
+
+    try {
+      // Get the anon key from environment
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1amFhcWp4cnZudGNuZW9hcmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NTQwNzQsImV4cCI6MjA2MjEzMDA3NH0.cX-07WwAXeutGV1_lahlsloiu_KIPIy8SQXmHfrGKXw';
+      
+      // Call the refresh function to update analytics from events
+      const response = await fetch(`https://bujaaqjxrvntcneoarkj.supabase.co/functions/v1/refresh-campaign-analytics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+          'apikey': anonKey
+        },
+        body: JSON.stringify({ campaign_id: campaignId })
+      });
+
+      if (response.ok) {
+        console.log('Campaign analytics refreshed successfully');
+      } else {
+        console.warn('Failed to refresh campaign analytics:', response.status);
+      }
+    } catch (error) {
+      console.warn('Error refreshing campaign analytics:', error);
+    }
+  }, [campaignId]);
+
   const fetchAnalytics = useCallback(async () => {
     if (!campaignId) return;
 
     try {
       setLoading(true);
       setError(null);
+
+      // First try to refresh analytics from events
+      await refreshCampaignAnalytics(true);
 
       // Fetch campaign analytics
       const { data: analyticsData, error: analyticsError } = await supabase
@@ -115,6 +165,26 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         engagementData: [],
         recipientData: []
       };
+
+      // Also fetch events to populate engagementData
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('email_events')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .order('created_at', { ascending: true });
+
+      if (eventsError) {
+        console.warn('Failed to fetch events for engagement data:', eventsError);
+      }
+
+      if (eventsData && eventsData.length > 0) {
+        console.log(`Processing ${eventsData.length} events for engagement chart`);
+        baseAnalytics.engagementData = processEventsData(eventsData);
+        console.log('Engagement data points:', baseAnalytics.engagementData.length);
+      } else {
+        console.log('No events found for campaign, using empty engagement data');
+        baseAnalytics.engagementData = [];
+      }
 
       setAnalytics(baseAnalytics);
     } catch (err: any) {

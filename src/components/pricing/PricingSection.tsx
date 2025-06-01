@@ -86,6 +86,8 @@ function PricingSection({
         className,
       )}
     >
+      {/* Gradient overlay for smooth transition to next section */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent z-5"></div>
       <div className="container py-20">
         <div className="text-center space-y-4 mb-12">
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
