@@ -111,6 +111,39 @@ serve(async (req) => {
   }
 
   try {
+    // Verify JWT authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Create client with the user's JWT for authentication
+    const userSupabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") as string, {
+      global: {
+        headers: {
+          authorization: authHeader
+        }
+      }
+    });
+
+    // Verify the user's authentication
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Authentication failed" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
     const { 
       userId, 
       to, 
@@ -127,10 +160,10 @@ serve(async (req) => {
     const emailContent = html || body;
     
     // Check if we have direct user ID or need to get it from campaign
-    let userIdToUse = userId;
+    let userIdToUse = userId || user.id;
     
-    if (!userIdToUse && campaign_id) {
-      // Get user ID from the campaign
+    // Verify campaign ownership if campaign_id is provided
+    if (campaign_id) {
       const { data: campaignData, error: campaignError } = await supabase
         .from('campaigns')
         .select('user_id')
@@ -147,7 +180,29 @@ serve(async (req) => {
         );
       }
       
+      // Ensure the authenticated user owns this campaign
+      if (campaignData.user_id !== user.id) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized: You don't own this campaign" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
+      
       userIdToUse = campaignData.user_id;
+    }
+    
+    // Ensure the userIdToUse matches the authenticated user
+    if (userIdToUse && userIdToUse !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: User ID mismatch" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
     
     if (!userIdToUse || !to || !subject || !emailContent) {
@@ -252,8 +307,8 @@ serve(async (req) => {
     if (trackOpens) {
       // Generate a unique ID for tracking
       trackingPixelId = crypto.randomUUID();
-      // Use direct REST API endpoint instead of edge function
-      const trackingUrl = `${supabaseUrl}/rest/v1/rpc/track_email_open?tracking_id=${trackingPixelId}`;
+      // Use the edge function for tracking
+      const trackingUrl = `${supabaseUrl}/functions/v1/email-tracker?id=${trackingPixelId}`;
       
       // ENHANCED: Use more natural tracking pixel placement for better stealth
       const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;opacity:0;border:0;outline:0;" loading="lazy" />`;
@@ -269,6 +324,38 @@ serve(async (req) => {
       }
       
       console.log(`🎯 Enhanced tracking pixel added with ID: ${trackingPixelId}`);
+    }
+
+    // ENHANCED: 3.5. Add unsubscribe link for campaign emails
+    if (campaign_id) {
+      // Generate unsubscribe token
+      const unsubscribeData = {
+        email: to,
+        campaign_id: campaign_id,
+        contact_id: contact_id,
+        timestamp: Date.now()
+      };
+      const unsubscribeToken = btoa(JSON.stringify(unsubscribeData));
+      const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&email=${encodeURIComponent(to)}&campaign=${campaign_id}`;
+      
+      // Create unsubscribe footer
+      const unsubscribeFooter = `
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #9ca3af;">
+          <p>You received this email because you are subscribed to our updates.</p>
+          <p><a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe from this campaign</a> | <a href="mailto:support@example.com" style="color: #6b7280; text-decoration: underline;">Contact Support</a></p>
+        </div>
+      `;
+      
+      // Add unsubscribe footer to email
+      if (modifiedBody.includes('</body>')) {
+        modifiedBody = modifiedBody.replace('</body>', `${unsubscribeFooter}</body>`);
+      } else if (modifiedBody.includes('</html>')) {
+        modifiedBody = modifiedBody.replace('</html>', `${unsubscribeFooter}</html>`);
+      } else {
+        modifiedBody += unsubscribeFooter;
+      }
+      
+      console.log(`📧 Unsubscribe link added for campaign: ${campaign_id}`);
     }
     
     // 4. Process links for click tracking if needed

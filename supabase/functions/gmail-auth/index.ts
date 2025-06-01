@@ -16,11 +16,14 @@ const REDIRECT_URI = configuredRedirectUri || defaultRedirectUri;
 
 const API_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 // Debug: Log configuration (but not secrets)
 console.log("Gmail Auth Configuration:");
 console.log("- Client ID length:", GOOGLE_CLIENT_ID.length);
 console.log("- Client Secret length:", GOOGLE_CLIENT_SECRET.length);
+console.log("- Anon Key length:", SUPABASE_ANON_KEY.length);
+console.log("- Service Key length:", SERVICE_ROLE_KEY.length);
 console.log("- Configured Redirect URI from env:", configuredRedirectUri);
 console.log("- Default Redirect URI:", defaultRedirectUri);
 console.log("- Legacy Redirect URI:", legacyRedirectUri);
@@ -94,8 +97,17 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     console.log("Token length:", token.length);
 
+    // Create a client with anon key for JWT verification
+    const userSupabase = createClient(API_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          authorization: authHeader
+        }
+      }
+    });
+
     // Verify the token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     console.log("Auth verification result:", {
       hasUser: !!user,
       error: userError?.message,

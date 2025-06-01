@@ -35,6 +35,9 @@ import Integrations from './pages/Integrations';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import LandingPage from './pages/LandingPage';
+import TestCampaignCreation from './pages/TestCampaignCreation';
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import TermsOfService from './pages/legal/TermsOfService';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -72,6 +75,10 @@ const App: React.FC = () => {
                       <Route path="/auth/callback/gmail" element={<GmailCallback />} />
                       <Route path="/auth/test-supabase" element={<TestSupabase />} />
                       <Route path="/" element={<LandingPage />} />
+                      
+                      {/* Legal pages (public) */}
+                      <Route path="/legal/privacy-policy" element={<PrivacyPolicy />} />
+                      <Route path="/legal/terms-of-service" element={<TermsOfService />} />
                       
                       {/* Protected routes */}
                       <Route 
@@ -175,6 +182,16 @@ const App: React.FC = () => {
                         } 
                       />
                       <Route 
+                        path="/app/test-campaign" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <TestCampaignCreation />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
                         path="/app/templates" 
                         element={
                           <ProtectedRoute>
@@ -210,6 +227,18 @@ const App: React.FC = () => {
                           <ProtectedRoute>
                             <Layout>
                               <Settings />
+                            </Layout>
+                          </ProtectedRoute>
+                        } 
+                      />
+                      
+                      {/* Test route */}
+                      <Route 
+                        path="/app/test-campaign" 
+                        element={
+                          <ProtectedRoute>
+                            <Layout>
+                              <TestCampaignCreation />
                             </Layout>
                           </ProtectedRoute>
                         } 

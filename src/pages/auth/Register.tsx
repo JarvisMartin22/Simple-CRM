@@ -1,35 +1,31 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Waves } from '@/components/ui/waves-background';
+import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PrivacyPolicyDialog } from '@/components/legal/PrivacyPolicyDialog';
-import { TermsOfServiceDialog } from '@/components/legal/TermsOfServiceDialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Waves } from '@/components/ui/waves-background';
 
+// Form validation schema
 const registerSchema = z.object({
-  firstName: z.string().min(1, {
-    message: 'First name is required'
-  }),
-  lastName: z.string().min(1, {
-    message: 'Last name is required'
-  }),
-  email: z.string().email({
-    message: 'Please enter a valid email address'
-  }),
-  password: z.string().min(6, {
-    message: 'Password must be at least 6 characters'
-  }),
-  confirmPassword: z.string().min(6, {
-    message: 'Password must be at least 6 characters'
-  }),
+  firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
+  lastName: z.string().min(2, { message: 'Last name must be at least 2 characters' }),
+  email: z.string().email({ message: 'Please enter a valid email address' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+  confirmPassword: z.string(),
   termsAccepted: z.boolean().refine(val => val === true, {
     message: 'You must accept the terms of service',
   }),
@@ -37,8 +33,8 @@ const registerSchema = z.object({
     message: 'You must accept the privacy policy',
   }),
 }).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"]
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -48,8 +44,6 @@ const Register = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
-  const [termsOfServiceOpen, setTermsOfServiceOpen] = useState(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -205,13 +199,13 @@ const Register = () => {
                     <div className="space-y-1 leading-none">
                       <FormLabel className="text-sm font-normal">
                         I agree to the{' '}
-                        <button
-                          type="button"
-                          onClick={() => setTermsOfServiceOpen(true)}
+                        <Link
+                          to="/legal/terms-of-service"
+                          target="_blank"
                           className="text-primary hover:underline"
                         >
                           Terms of Service
-                        </button>
+                        </Link>
                       </FormLabel>
                       <FormMessage />
                     </div>
@@ -234,13 +228,13 @@ const Register = () => {
                     <div className="space-y-1 leading-none">
                       <FormLabel className="text-sm font-normal">
                         I agree to the{' '}
-                        <button
-                          type="button"
-                          onClick={() => setPrivacyPolicyOpen(true)}
+                        <Link
+                          to="/legal/privacy-policy"
+                          target="_blank"
                           className="text-primary hover:underline"
                         >
                           Privacy Policy
-                        </button>
+                        </Link>
                       </FormLabel>
                       <FormMessage />
                     </div>
@@ -266,16 +260,6 @@ const Register = () => {
           </p>
         </div>
       </div>
-
-      {/* Legal Dialogs */}
-      <PrivacyPolicyDialog 
-        open={privacyPolicyOpen} 
-        onOpenChange={setPrivacyPolicyOpen} 
-      />
-      <TermsOfServiceDialog 
-        open={termsOfServiceOpen} 
-        onOpenChange={setTermsOfServiceOpen} 
-      />
     </div>
   );
 }

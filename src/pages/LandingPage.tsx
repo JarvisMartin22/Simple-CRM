@@ -5,12 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { Waves } from '@/components/ui/waves-background';
-import PrivacyPolicyDialog from '@/components/legal/PrivacyPolicyDialog';
-import TermsOfServiceDialog from '@/components/legal/TermsOfServiceDialog';
 const LandingPage: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
-  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false);
-  const [termsOfServiceOpen, setTermsOfServiceOpen] = useState(false);
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -408,8 +404,8 @@ const LandingPage: React.FC = () => {
             <div>
               <h4 className="text-white font-medium mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li><button onClick={() => setPrivacyPolicyOpen(true)} className="hover:text-white transition-colors">Privacy Policy</button></li>
-                <li><button onClick={() => setTermsOfServiceOpen(true)} className="hover:text-white transition-colors">Terms of Service</button></li>
+                <li><Link to="/legal/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/legal/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
@@ -419,10 +415,6 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
-
-      {/* Legal Dialogs */}
-      <PrivacyPolicyDialog open={privacyPolicyOpen} onOpenChange={setPrivacyPolicyOpen} />
-      <TermsOfServiceDialog open={termsOfServiceOpen} onOpenChange={setTermsOfServiceOpen} />
     </div>;
 };
 export default LandingPage;

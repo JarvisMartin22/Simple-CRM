@@ -100,17 +100,10 @@ export const useCampaigns = () => {
         }
       }
 
-      // Combine schedule config and audience filter into one JSONB object
-      const schedule_config = campaign.schedule_config?.enabled ? JSON.stringify({
-        ...campaign.schedule_config,
-        audience: campaign.audience_filter ? {
-          contacts: campaign.audience_filter.contacts.map(contact => ({
-            id: contact.id,
-            email: contact.email || null
-          })),
-          size: campaign.audience_filter.size
-        } : null
-      }) : null;
+      // Keep schedule config separate from audience filter
+      const schedule_config = campaign.schedule_config?.enabled ? {
+        ...campaign.schedule_config
+      } : null;
 
       // First, verify that the template exists if template_id is provided
       if (campaign.template_id) {
@@ -125,25 +118,51 @@ export const useCampaigns = () => {
         }
       }
 
-      // Create the campaign
+      // Create the campaign with proper audience_filter structure
+      const campaignData = {
+        user_id: user.id,
+        name: campaign.name,
+        description: campaign.description || null,
+        type: campaign.type,
+        template_id: campaign.template_id || null,
+        status,
+        scheduled_at: start_date,
+        schedule_config: schedule_config,
+        audience_filter: campaign.audience_filter ? {
+          contacts: campaign.audience_filter.contacts.map(contact => ({
+            id: contact.id,
+            email: contact.email || null
+          })),
+          size: campaign.audience_filter.size
+        } : null
+      };
+
+      console.log('Creating campaign with data:', campaignData);
+
       const { data, error: createError } = await supabase
         .from('campaigns')
-        .insert([{
-          user_id: user.id,
-          name: campaign.name,
-          description: campaign.description,
-          type: campaign.type,
-          template_id: campaign.template_id || null,
-          status,
-          scheduled_at: start_date,
-          schedule_config,
-          audience_filter: campaign.audience_filter
-        }])
+        .insert([campaignData])
         .select()
         .single();
 
       if (createError) {
         console.error('Campaign creation error:', createError);
+        console.error('Error details:', {
+          message: createError.message,
+          details: createError.details,
+          hint: createError.hint,
+          code: createError.code
+        });
+        
+        // Check for specific error types
+        if (createError.code === '42501') {
+          throw new Error('Permission denied. Please check your authentication.');
+        } else if (createError.code === '23503') {
+          throw new Error('Invalid template selected. Please choose a valid template.');
+        } else if (createError.code === '23502') {
+          throw new Error('Required field is missing. Please check all required fields.');
+        }
+        
         throw createError;
       }
 
@@ -197,6 +216,13 @@ export const useCampaigns = () => {
         if (sequenceError) throw sequenceError;
       }
 
+      if (!data) {
+        console.error('No data returned from campaign creation');
+        throw new Error('Campaign was created but no data was returned');
+      }
+
+      console.log('Campaign created successfully:', data);
+      
       setCampaigns(prev => [data, ...prev]);
       toast({
         title: 'Campaign created',
@@ -594,7 +620,7 @@ export const useCampaigns = () => {
           total_recipients: totalCount,
           sent_count: successCount,
           delivered_count: successCount, // Assume all sent are delivered for now
-          last_updated: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('campaign_id', id);
 
