@@ -14,18 +14,22 @@ const trackingHeaders = {
 };
 
 serve(async (req) => {
-  // Always return tracking pixel for GET requests, regardless of auth
+  // Always return tracking pixel for GET requests
   if (req.method === "GET") {
     try {
       const url = new URL(req.url);
       const trackingId = url.searchParams.get("id");
+      const eventType = url.searchParams.get("type") || "open";
+      const section = url.searchParams.get("section");
+      const campaignId = url.searchParams.get("campaign");
+      const contactId = url.searchParams.get("contact");
       const userAgent = req.headers.get("user-agent") || "Unknown";
       const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "Unknown";
 
-      console.log(`🔍 Tracking pixel accessed: ${trackingId}`);
+      console.log(`🔍 Tracking pixel accessed - ID: ${trackingId}, Type: ${eventType}, Section: ${section}`);
 
       if (trackingId && SERVICE_ROLE_KEY) {
-        // Initialize Supabase client with service role key (bypasses RLS)
+        // Initialize Supabase client with service role key
         const supabase = createClient(API_URL, SERVICE_ROLE_KEY, {
           auth: {
             autoRefreshToken: false,
@@ -33,79 +37,47 @@ serve(async (req) => {
           }
         });
 
-        // Get the tracking record
-        const { data: trackingData, error: fetchError } = await supabase
-          .from("email_tracking")
-          .select("id, user_id, email_id, recipient, subject, campaign_id, open_count")
-          .eq("tracking_pixel_id", trackingId)
-          .single();
+        // Build event metadata
+        const eventMetadata: any = {
+          user_agent: userAgent,
+          ip_address: ipAddress,
+          timestamp: new Date().toISOString()
+        };
 
-        if (!fetchError && trackingData) {
-          console.log(`✅ Found tracking record for campaign: ${trackingData.campaign_id}`);
+        if (section) {
+          eventMetadata.section = section;
+        }
 
-          // Update open count and timestamp
-          const { error: updateError } = await supabase
-            .from("email_tracking")
-            .update({
-              open_count: (trackingData.open_count || 0) + 1,
-              opened_at: trackingData.open_count === 0 ? new Date().toISOString() : undefined,
-              last_opened_at: new Date().toISOString(),
-              last_user_agent: userAgent.substring(0, 255),
-              last_ip: ipAddress.substring(0, 45),
-              updated_at: new Date().toISOString()
-            })
-            .eq("tracking_pixel_id", trackingId);
+        // Hash IP for privacy
+        if (ipAddress !== "Unknown") {
+          const encoder = new TextEncoder();
+          const data = encoder.encode(ipAddress);
+          const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          eventMetadata.ip_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+        }
 
-          if (!updateError) {
-            console.log(`✅ Updated tracking record`);
+        // Call the enhanced tracking function
+        const { data, error } = await supabase
+          .rpc('track_email_event', { 
+            p_tracking_id: trackingId,
+            p_event_type: eventType,
+            p_event_metadata: eventMetadata
+          });
 
-            // Record in email_events if it's a campaign email
-            if (trackingData.campaign_id) {
-              // For campaign emails, find recipient from contacts
-              const { data: contact } = await supabase
-                .from("contacts")
-                .select("id")
-                .eq("email", trackingData.recipient)
-                .eq("user_id", trackingData.user_id)
-                .single();
-
-              await supabase
-                .from("email_events")
-                .insert({
-                  campaign_id: trackingData.campaign_id,
-                  recipient_id: contact?.id || null,
-                  event_type: "opened",
-                  event_data: {
-                    tracking_id: trackingId,
-                    email: trackingData.recipient,
-                    open_count: (trackingData.open_count || 0) + 1
-                  },
-                  user_agent: userAgent,
-                  ip_address: ipAddress
-                });
-
-              // Update campaign analytics
-              await supabase.rpc('increment_campaign_opens', {
-                p_campaign_id: trackingData.campaign_id
-              }).catch(async (rpcError) => {
-                // If RPC doesn't exist, update manually
-                console.log('RPC failed, updating manually');
-                await supabase
-                  .from("campaign_analytics")
-                  .update({
-                    opened_count: supabase.sql`opened_count + 1`,
-                    unique_opened_count: trackingData.open_count === 0 
-                      ? supabase.sql`unique_opened_count + 1` 
-                      : supabase.sql`unique_opened_count`,
-                    last_event_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                  .eq("campaign_id", trackingData.campaign_id);
-              });
-
-              console.log(`✅ Updated campaign analytics`);
+        if (error) {
+          console.error('Error tracking email event:', error);
+          // Fall back to simple tracking if enhanced function doesn't exist
+          if (error.message.includes('function') && error.message.includes('does not exist')) {
+            const { error: fallbackError } = await supabase
+              .rpc('track_email_open', { p_tracking_id: trackingId });
+            
+            if (!fallbackError) {
+              console.log(`✅ Email open tracked (fallback) for campaign: ${campaignId}`);
             }
           }
+        } else {
+          console.log(`✅ Email event tracked - Type: ${eventType}, Result:`, data);
         }
       }
     } catch (error) {
@@ -113,7 +85,7 @@ serve(async (req) => {
     }
   }
 
-  // Always return the tracking pixel
+  // Always return the tracking pixel (1x1 transparent GIF)
   return new Response(
     Uint8Array.from([
       0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00,

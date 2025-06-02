@@ -108,14 +108,14 @@ serve(async (req) => {
     } else {
       console.log(`Successfully recorded click for tracking ID: ${trackingId}`);
 
-      // Record the event in email_events
+      // Record the event in email_events (using consistent "clicked" event type)
       const { error: eventError } = await supabase
         .from("email_events")
         .insert({
           email_tracking_id: emailData.id,
           user_id: emailData.user_id,
           email_id: emailData.email_id,
-          event_type: "click",
+          event_type: "clicked",
           recipient: emailData.recipient,
           subject: emailData.subject,
           url: originalUrl,
@@ -258,29 +258,7 @@ serve(async (req) => {
           }
         }
         
-        // 4. Record in the newer email_events table for campaign analytics
-        const { error: campaignEventError } = await supabase
-          .from("email_events")
-          .insert({
-            campaign_id: campaignId,
-            recipient_id: contactId,
-            event_type: "clicked",
-            event_data: {
-              user_agent: userAgent,
-              ip_address: ipAddress,
-              tracking_id: trackingId,
-              url: originalUrl
-            },
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            link_url: originalUrl,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-          
-        if (campaignEventError) {
-          console.error("Error recording campaign event:", campaignEventError);
-        }
+        // Note: Email event already recorded above - avoiding duplicate entry
       }
     }
 

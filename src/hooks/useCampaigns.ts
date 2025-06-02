@@ -36,15 +36,45 @@ export const useCampaigns = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      // First fetch campaigns
+      const { data: campaignsData, error: fetchError } = await supabase
         .from('campaigns')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
 
-      setCampaigns(data || []);
-      return data;
+      // Then fetch analytics separately
+      const campaignIds = (campaignsData || []).map(c => c.id);
+      const { data: analyticsData } = await supabase
+        .from('campaign_analytics')
+        .select('*')
+        .in('campaign_id', campaignIds);
+
+      // Create a map for quick lookup
+      const analyticsMap = new Map((analyticsData || []).map(a => [a.campaign_id, a]));
+
+      // Transform data to include analytics as stats
+      const campaignsWithStats = (campaignsData || []).map(campaign => {
+        const analytics = analyticsMap.get(campaign.id);
+        return {
+          ...campaign,
+          stats: {
+            sent: analytics?.sent_count || 0,
+            delivered: analytics?.delivered_count || 0,
+            opened: analytics?.opened_count || 0,
+            unique_opened: analytics?.unique_opened_count || 0,
+            clicked: analytics?.clicked_count || 0,
+            unique_clicked: analytics?.unique_clicked_count || 0,
+            bounced: analytics?.bounced_count || 0,
+            complained: analytics?.complained_count || 0,
+            unsubscribed: analytics?.unsubscribed_count || 0
+          }
+        };
+      });
+
+      setCampaigns(campaignsWithStats);
+      return campaignsWithStats;
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -225,6 +255,34 @@ export const useCampaigns = () => {
       console.log('Campaign created successfully:', data);
       
       setCampaigns(prev => [data, ...prev]);
+      
+      // Initialize campaign analytics
+      try {
+        const { error: analyticsError } = await supabase
+          .from('campaign_analytics')
+          .insert({
+            campaign_id: data.id,
+            total_recipients: campaign.audience_filter?.size || 0,
+            sent_count: 0,
+            delivered_count: 0,
+            opened_count: 0,
+            unique_opened_count: 0,
+            clicked_count: 0,
+            unique_clicked_count: 0,
+            bounced_count: 0,
+            complained_count: 0,
+            unsubscribed_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+          
+        if (analyticsError) {
+          console.error('Error initializing campaign analytics:', analyticsError);
+        }
+      } catch (err) {
+        console.error('Failed to initialize campaign analytics:', err);
+      }
+      
       toast({
         title: 'Campaign created',
         description: 'Successfully created new campaign.',
@@ -539,8 +597,8 @@ export const useCampaigns = () => {
 
           console.log(`Sending email to ${contact.email}...`);
 
-          // Call the send-email edge function with better error handling
-          const response = await supabaseWithAuth.functions.invoke('send-email-simple', {
+          // Call the enhanced send-email edge function with better error handling
+          const response = await supabaseWithAuth.functions.invoke('send-email-enhanced', {
             body: {
               userId: campaign.user_id,
               to: contact.email,
@@ -549,7 +607,8 @@ export const useCampaigns = () => {
               campaign_id: id,
               contact_id: contact.id,
               trackOpens: true,
-              trackClicks: true
+              trackClicks: true,
+              trackSections: false // Can be enabled when using section-based templates
             }
           });
 

@@ -2,78 +2,122 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
 
-// Create a Supabase client with service role for database operations
 const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+interface EmailSection {
+  id: string;
+  type: string;
+  content: string;
+  tracking?: boolean;
+}
+
+interface EnhancedEmailRequest {
+  userId: string;
+  to: string;
+  subject: string;
+  html?: string;
+  template?: {
+    sections: EmailSection[];
+  };
+  trackOpens?: boolean;
+  trackClicks?: boolean;
+  trackSections?: boolean;
+  campaign_id?: string;
+  contact_id?: string;
+}
+
 serve(async (req) => {
-  // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    console.log("=== Send Email Simple Function ===");
+    console.log("=== Enhanced Email Send Function ===");
     
-    // Check for basic auth
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log("No valid Authorization header found");
       return new Response(JSON.stringify({
         error: "No valid Authorization header",
-        status: "Error"
       }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
     
-    const token = authHeader.replace('Bearer ', '');
-    console.log("Token received, length:", token.length);
-    
-    // Parse request body
+    const requestData: EnhancedEmailRequest = await req.json();
     const { 
       userId, 
       to, 
       subject, 
-      html, 
-      body,
+      html,
+      template,
       trackOpens = true, 
       trackClicks = true,
+      trackSections = false,
       campaign_id = null,
       contact_id = null
-    } = await req.json();
+    } = requestData;
     
-    const emailContent = html || body;
+    // Build email content from template or use provided HTML
+    let emailContent = html || '';
+    const trackingPixels: string[] = [];
+    const mainTrackingId = crypto.randomUUID();
     
-    console.log("Email request:", {
-      hasUserId: !!userId,
-      hasTo: !!to,
-      hasSubject: !!subject,
-      hasContent: !!emailContent,
-      hasCampaignId: !!campaign_id
-    });
-    
-    if (!userId || !to || !subject || !emailContent) {
-      console.error("Missing required fields");
-      return new Response(JSON.stringify({
-        error: "Missing required fields",
-        details: {
-          hasUserId: !!userId,
-          hasTo: !!to,
-          hasSubject: !!subject,
-          hasContent: !!emailContent
+    if (template?.sections) {
+      // Build email from sections
+      emailContent = '<div style="max-width: 600px; margin: 0 auto;">';
+      
+      for (const section of template.sections) {
+        emailContent += `<div id="${section.id}" class="email-section email-section-${section.type}">`;
+        emailContent += section.content;
+        
+        // Add section tracking pixel if enabled
+        if (trackSections && section.tracking !== false && campaign_id) {
+          const sectionPixelUrl = `${supabaseUrl}/functions/v1/email-tracker?id=${mainTrackingId}&type=section&section=${section.id}&campaign=${campaign_id}`;
+          emailContent += `<img src="${sectionPixelUrl}" width="1" height="1" alt="" style="display:block;height:0;width:0;border:0;" />`;
         }
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        
+        emailContent += '</div>';
+      }
+      
+      emailContent += '</div>';
+    }
+    
+    // Add main tracking pixel at the end
+    if (trackOpens && campaign_id) {
+      const mainPixelUrl = `${supabaseUrl}/functions/v1/email-tracker?id=${mainTrackingId}&type=open&campaign=${campaign_id}&contact=${contact_id || ''}`;
+      trackingPixels.push(`<img src="${mainPixelUrl}" width="1" height="1" alt="" />`);
+    }
+    
+    // Add re-open tracking pixel
+    if (trackOpens && campaign_id) {
+      const reopenPixelUrl = `${supabaseUrl}/functions/v1/email-tracker?id=${mainTrackingId}&type=reopen&campaign=${campaign_id}`;
+      trackingPixels.push(`<img src="${reopenPixelUrl}" width="1" height="1" alt="" style="display:none;" />`);
+    }
+    
+    // Process links for click tracking
+    if (trackClicks) {
+      const linkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1/gi;
+      emailContent = emailContent.replace(linkRegex, (match, quote, href) => {
+        if (href.startsWith('mailto:') || href.startsWith('#')) {
+          return match; // Don't track mailto or anchor links
+        }
+        
+        const linkId = crypto.randomUUID();
+        const trackingUrl = `${supabaseUrl}/functions/v1/link-tracker?id=${linkId}&url=${encodeURIComponent(href)}&campaign=${campaign_id}&tracking=${mainTrackingId}`;
+        
+        return match.replace(href, trackingUrl);
       });
     }
     
-    console.log(`📧 Sending email from user ${userId} to ${to}`);
+    // Append all tracking pixels at the end
+    const finalHtmlContent = emailContent + trackingPixels.join('');
     
-    // Get the user's Gmail integration
+    console.log(`📧 Sending enhanced email from user ${userId} to ${to}`);
+    
+    // Get Gmail integration
     const { data: integration, error: integrationError } = await supabase
       .from('user_integrations')
       .select('*')
@@ -82,7 +126,6 @@ serve(async (req) => {
       .single();
       
     if (integrationError || !integration) {
-      console.error("Gmail integration not found:", integrationError);
       return new Response(JSON.stringify({
         error: "Gmail integration not found or not active"
       }), {
@@ -91,16 +134,13 @@ serve(async (req) => {
       });
     }
     
-    console.log("Gmail integration found for user");
-    
-    // Check if access token is expired and refresh if needed
+    // Refresh token if needed (similar to original function)
+    let accessToken = integration.access_token;
     const now = new Date();
     const expiresAt = new Date(integration.expires_at);
     
-    let accessToken = integration.access_token;
-    
     if (now >= expiresAt && integration.refresh_token) {
-      console.log("Access token expired, refreshing...");
+      console.log("Refreshing access token...");
       
       const refreshResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -119,7 +159,6 @@ serve(async (req) => {
         const refreshData = await refreshResponse.json();
         accessToken = refreshData.access_token;
         
-        // Update the integration with new access token
         await supabase
           .from('user_integrations')
           .update({
@@ -128,10 +167,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString()
           })
           .eq('id', integration.id);
-          
-        console.log("Access token refreshed successfully");
       } else {
-        console.error("Failed to refresh access token");
         return new Response(JSON.stringify({
           error: "Failed to refresh Gmail access token"
         }), {
@@ -141,33 +177,35 @@ serve(async (req) => {
       }
     }
     
-    // Generate tracking pixel if requested
-    let finalHtmlContent = emailContent;
-    if (trackOpens && campaign_id) {
-      const trackingId = crypto.randomUUID();
-      const trackingPixel = `<img src="${supabaseUrl}/functions/v1/email-tracker?id=${trackingId}&campaign=${campaign_id}&contact=${contact_id || ''}" width="1" height="1" alt="" />`;
-      finalHtmlContent += trackingPixel;
-      
-      // Store tracking record
+    // Store initial tracking record
+    if (campaign_id) {
       const { error: eventError } = await supabase
         .from('email_events')
         .insert({
           event_type: 'sent',
           campaign_id: campaign_id,
           contact_id: contact_id,
-          tracking_id: trackingId,
+          tracking_id: mainTrackingId,
           recipient_email: to,
+          event_data: {
+            subject: subject,
+            has_sections: !!template?.sections,
+            section_count: template?.sections?.length || 0,
+            tracking_enabled: {
+              opens: trackOpens,
+              clicks: trackClicks,
+              sections: trackSections
+            }
+          },
           created_at: new Date().toISOString()
         });
         
       if (eventError) {
         console.error("Error storing email event:", eventError);
-      } else {
-        console.log("Email event stored successfully");
       }
     }
     
-    // Create email message in Gmail format
+    // Create and send email via Gmail
     const emailMessage = [
       `To: ${to}`,
       `Subject: ${subject}`,
@@ -176,10 +214,8 @@ serve(async (req) => {
       finalHtmlContent
     ].join('\r\n');
     
-    // Base64 encode the message
     const encodedMessage = btoa(unescape(encodeURIComponent(emailMessage)));
     
-    // Send via Gmail API
     const sendResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: {
@@ -204,14 +240,29 @@ serve(async (req) => {
     }
     
     const sendData = await sendResponse.json();
-    console.log("Email sent successfully:", sendData.id);
+    console.log("Enhanced email sent successfully:", sendData.id);
+    
+    // Track delivered event (Gmail usually delivers immediately)
+    if (campaign_id) {
+      setTimeout(async () => {
+        await supabase.rpc('track_email_delivered', {
+          p_campaign_id: campaign_id,
+          p_recipient_email: to,
+          p_message_id: sendData.id
+        });
+      }, 1000);
+    }
     
     return new Response(JSON.stringify({
       success: true,
       messageId: sendData.id,
+      trackingId: mainTrackingId,
       to: to,
       subject: subject,
-      status: "Success"
+      features: {
+        trackingEnabled: trackOpens || trackClicks || trackSections,
+        sectionsTracked: template?.sections?.filter(s => s.tracking !== false).length || 0
+      }
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -221,7 +272,6 @@ serve(async (req) => {
     console.error("Unhandled error:", error);
     return new Response(JSON.stringify({
       error: error.message || "An unexpected error occurred",
-      status: "Error",
       stack: error.stack
     }), {
       status: 500,

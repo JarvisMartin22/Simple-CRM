@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Email Tracking</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Email Tracking Debug Tool</h1>
+    <div id="output"></div>
+
+    <script>
+        async function debugTracking() {
+            const output = document.getElementById('output');
+            
+            // You'll need to replace these with your actual credentials
+            const supabaseUrl = 'https://bujaaqjxrvntcneoarkj.supabase.co';
+            const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ1amFhcWp4cnZudGNuZW9hcmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMxMDk0NjQsImV4cCI6MjA0ODY4NTQ2NH0.UHAZpRAKFAZvbfD4Cm8EvB_LJyK2A5HoSPYnZJbL-xg';
+            
+            const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+            
+            const campaignId = '94e1db42-6586-47dd-b827-18d1d05f4364';
+            
+            output.innerHTML = '<p>🔍 Analyzing tracking events...</p>';
+            
+            try {
+                // 1. Check campaign analytics
+                const { data: analytics, error: analyticsError } = await supabase
+                    .from('campaign_analytics')
+                    .select('*')
+                    .eq('campaign_id', campaignId)
+                    .single();
+                
+                output.innerHTML += '<h2>📊 Campaign Analytics:</h2>';
+                if (analyticsError) {
+                    output.innerHTML += `<p style="color: red;">Error: ${analyticsError.message}</p>`;
+                } else {
+                    output.innerHTML += `
+                        <ul>
+                            <li>Sent: ${analytics.sent_count}</li>
+                            <li>Opened: ${analytics.opened_count}</li>
+                            <li>Clicked: ${analytics.clicked_count}</li>
+                            <li>Unique Opened: ${analytics.unique_opened_count}</li>
+                            <li>Unique Clicked: ${analytics.unique_clicked_count}</li>
+                        </ul>
+                    `;
+                }
+                
+                // 2. Check email events
+                const { data: events, error: eventsError } = await supabase
+                    .from('email_events')
+                    .select('event_type, created_at, tracking_id, recipient_email')
+                    .eq('campaign_id', campaignId)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                output.innerHTML += '<h2>📧 Recent Email Events:</h2>';
+                if (eventsError) {
+                    output.innerHTML += `<p style="color: red;">Error: ${eventsError.message}</p>`;
+                } else {
+                    const eventCounts = events.reduce((acc, event) => {
+                        acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+                        return acc;
+                    }, {});
+                    
+                    output.innerHTML += '<h3>Event Type Counts:</h3>';
+                    output.innerHTML += '<ul>';
+                    Object.entries(eventCounts).forEach(([type, count]) => {
+                        output.innerHTML += `<li>${type}: ${count}</li>`;
+                    });
+                    output.innerHTML += '</ul>';
+                    
+                    output.innerHTML += '<h3>Recent Events:</h3>';
+                    output.innerHTML += '<table border="1" style="border-collapse: collapse;">';
+                    output.innerHTML += '<tr><th>Time</th><th>Type</th><th>Email</th><th>Tracking ID</th></tr>';
+                    events.forEach(event => {
+                        const time = new Date(event.created_at).toLocaleString();
+                        output.innerHTML += `
+                            <tr>
+                                <td>${time}</td>
+                                <td>${event.event_type}</td>
+                                <td>${event.recipient_email || 'N/A'}</td>
+                                <td>${event.tracking_id || 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                    output.innerHTML += '</table>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run the debug when page loads
+        debugTracking();
+    </script>
+</body>
+</html>

@@ -7,21 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-06-02 - Enhanced Email Tracking
+
 ### Added
-- Gmail contact import functionality
-- Email tracking system
-- Campaign management features
-- Documentation structure in `/docs` directory
+- **Multi-pixel email tracking system**
+  - Track email opens with re-open detection
+  - Section-level tracking to see which parts of emails are viewed
+  - Forward detection based on IP/location changes
+  - Privacy-compliant IP hashing and metadata collection
+- **New Edge Functions**
+  - `send-email-enhanced` - Advanced email sending with multi-pixel tracking
+  - Enhanced `email-tracker` - Supports multiple event types (open, reopen, section)
+- **Database Enhancements**
+  - `track_email_event` function for flexible event tracking
+  - `campaign_engagement_details` view for detailed analytics
+  - New columns: `tracking_type`, `section_id`, `interaction_sequence`
+- **Frontend Components**
+  - `EnhancedTemplateEditor` - Section-based email template builder
+  - Real-time campaign analytics from database
+- **Comprehensive Documentation**
+  - Email tracking feature guide
+  - Setup instructions for tracking system
+  - Updated API documentation
 
 ### Changed
-- Updated README with clearer project structure
-- Improved Edge Function documentation
-- Enhanced local development guide
+- Email sending now uses `send-email-enhanced` function
+- Campaign fetching properly joins analytics data
+- Tracking pixels no longer use `display:none` for better compatibility
+- Improved error handling in edge functions
+- Updated documentation structure
 
 ### Fixed
+- Campaign analytics now display correct sent, opened, and clicked counts
+- Email tracking pixel correctly records open events
+- Fixed type mismatch in tracking function (UUID to text conversion)
+- Fixed relationship error between campaigns and campaign_analytics tables
 - Gmail contacts preview function handling of different contact categories
 - OAuth2 flow for Gmail integration
-- Email tracking pixel issues
 
 ## [0.2.0] - 2024-03-20
 
