@@ -56,18 +56,28 @@ function processEventsData(events: any[]): EngagementDataPoint[] {
       complaints: 0,
     };
 
-    switch (event.event_type.toLowerCase()) {
+    // Fix the data mapping - ensure correct event types are processed
+    const eventType = event.event_type.toLowerCase();
+    switch (eventType) {
       case 'opened':
+      case 'open':
         existing.opens++;
         break;
       case 'clicked':
+      case 'click':
         existing.clicks++;
         break;
       case 'bounced':
+      case 'bounce':
         existing.bounces++;
         break;
       case 'complained':
+      case 'complaint':
         existing.complaints++;
+        break;
+      case 'sent':
+      case 'delivered':
+        // These are tracking events but not engagement metrics
         break;
       default:
         console.warn('Unknown event type:', event.event_type);
@@ -80,7 +90,7 @@ function processEventsData(events: any[]): EngagementDataPoint[] {
     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  console.log('Processed engagement data points:', result);
+  console.log('Processed engagement data points:', result.length, 'time points');
   return result;
 }
 
@@ -165,6 +175,19 @@ export function useCampaignAnalytics(campaignId?: string): UseCampaignAnalyticsR
         engagementData: [],
         recipientData: []
       };
+
+      // Debug logging to identify data mapping issues
+      if (analyticsData) {
+        console.log('📊 Raw analytics data:', {
+          total_recipients: analyticsData.total_recipients,
+          sent_count: analyticsData.sent_count,
+          delivered_count: analyticsData.delivered_count,
+          opened_count: analyticsData.opened_count,
+          unique_opened_count: analyticsData.unique_opened_count,
+          clicked_count: analyticsData.clicked_count,
+          unique_clicked_count: analyticsData.unique_clicked_count
+        });
+      }
 
       // Also fetch events to populate engagementData
       const { data: eventsData, error: eventsError } = await supabase

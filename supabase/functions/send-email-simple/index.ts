@@ -143,12 +143,38 @@ serve(async (req) => {
     
     // Generate tracking pixel if requested
     let finalHtmlContent = emailContent;
+    let trackingId = null;
+    
     if (trackOpens && campaign_id) {
-      const trackingId = crypto.randomUUID();
+      trackingId = crypto.randomUUID();
       const trackingPixel = `<img src="${supabaseUrl}/functions/v1/email-tracker?id=${trackingId}&campaign=${campaign_id}&contact=${contact_id || ''}" width="1" height="1" alt="" />`;
       finalHtmlContent += trackingPixel;
-      
-      // Store tracking record
+    }
+    
+    // Create or update campaign recipient record BEFORE sending
+    if (campaign_id && contact_id) {
+      const { error: recipientError } = await supabase
+        .from('campaign_recipients')
+        .upsert({
+          campaign_id: campaign_id,
+          contact_id: contact_id,
+          email: to,
+          status: 'pending',
+          metadata: trackingId ? { tracking_id: trackingId } : {},
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'campaign_id,contact_id'
+        });
+        
+      if (recipientError) {
+        console.error("Error creating campaign recipient:", recipientError);
+      } else {
+        console.log("Campaign recipient record created/updated");
+      }
+    }
+    
+    // Store initial tracking record
+    if (trackingId && campaign_id) {
       const { error: eventError } = await supabase
         .from('email_events')
         .insert({
@@ -206,12 +232,32 @@ serve(async (req) => {
     const sendData = await sendResponse.json();
     console.log("Email sent successfully:", sendData.id);
     
+    // Update campaign recipient status to 'sent' after successful send
+    if (campaign_id && contact_id) {
+      const { error: updateError } = await supabase
+        .from('campaign_recipients')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('campaign_id', campaign_id)
+        .eq('contact_id', contact_id);
+        
+      if (updateError) {
+        console.error("Error updating campaign recipient status:", updateError);
+      } else {
+        console.log("Campaign recipient marked as sent");
+      }
+    }
+    
     return new Response(JSON.stringify({
       success: true,
       messageId: sendData.id,
       to: to,
       subject: subject,
-      status: "Success"
+      status: "Success",
+      trackingId: trackingId
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

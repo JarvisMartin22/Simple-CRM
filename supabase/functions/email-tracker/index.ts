@@ -57,27 +57,72 @@ serve(async (req) => {
           eventMetadata.ip_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
         }
 
-        // Call the enhanced tracking function
-        const { data, error } = await supabase
-          .rpc('track_email_event', { 
-            p_tracking_id: trackingId,
-            p_event_type: eventType,
-            p_event_metadata: eventMetadata
+        // Find the original sent event to get campaign and contact details
+        const { data: sentEvent, error: sentError } = await supabase
+          .from('email_events')
+          .select('campaign_id, contact_id, recipient_email')
+          .eq('tracking_id', trackingId)
+          .eq('event_type', 'sent')
+          .single();
+
+        if (sentError || !sentEvent) {
+          console.error('No sent event found for tracking_id:', trackingId);
+          return new Response(
+            Uint8Array.from([
+              0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00,
+              0x80, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x21,
+              0xF9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2C, 0x00, 0x00,
+              0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44,
+              0x01, 0x00, 0x3B
+            ]),
+            { headers: trackingHeaders }
+          );
+        }
+
+        // Insert the tracking event
+        const { error: eventError } = await supabase
+          .from('email_events')
+          .insert({
+            campaign_id: sentEvent.campaign_id,
+            contact_id: sentEvent.contact_id,
+            recipient_email: sentEvent.recipient_email,
+            event_type: 'opened',
+            tracking_id: trackingId,
+            event_data: eventMetadata,
+            user_agent: userAgent,
+            ip_address: ipAddress,
+            created_at: new Date().toISOString()
           });
 
-        if (error) {
-          console.error('Error tracking email event:', error);
-          // Fall back to simple tracking if enhanced function doesn't exist
-          if (error.message.includes('function') && error.message.includes('does not exist')) {
-            const { error: fallbackError } = await supabase
-              .rpc('track_email_open', { p_tracking_id: trackingId });
-            
-            if (!fallbackError) {
-              console.log(`✅ Email open tracked (fallback) for campaign: ${campaignId}`);
+        if (eventError) {
+          console.error('Error storing email event:', eventError);
+        } else {
+          console.log(`✅ Email open tracked for campaign: ${sentEvent.campaign_id}`);
+          
+          // Update campaign recipient with first open time if not already set
+          if (sentEvent.contact_id) {
+            const { error: recipientError } = await supabase
+              .from('campaign_recipients')
+              .update({
+                opened_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('campaign_id', sentEvent.campaign_id)
+              .eq('contact_id', sentEvent.contact_id)
+              .is('opened_at', null); // Only update if not already opened
+              
+            if (!recipientError) {
+              console.log('Campaign recipient marked as opened');
             }
           }
-        } else {
-          console.log(`✅ Email event tracked - Type: ${eventType}, Result:`, data);
+          
+          // Refresh campaign analytics
+          const { error: refreshError } = await supabase
+            .rpc('refresh_campaign_analytics_simple', { p_campaign_id: sentEvent.campaign_id });
+            
+          if (refreshError) {
+            console.warn('Failed to refresh campaign analytics:', refreshError);
+          }
         }
       }
     } catch (error) {
