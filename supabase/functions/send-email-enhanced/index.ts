@@ -105,8 +105,8 @@ serve(async (req) => {
           return match; // Don't track mailto or anchor links
         }
         
-        const linkId = crypto.randomUUID();
-        const trackingUrl = `${supabaseUrl}/functions/v1/link-tracker?id=${linkId}&url=${encodeURIComponent(href)}&campaign=${campaign_id}&tracking=${mainTrackingId}`;
+        // Use the main tracking ID for link tracking
+        const trackingUrl = `${supabaseUrl}/functions/v1/link-tracker?id=${mainTrackingId}&url=${encodeURIComponent(href)}`;
         
         return match.replace(href, trackingUrl);
       });

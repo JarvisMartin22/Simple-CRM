@@ -1,29 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
 
-const API_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const API_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+// Log environment status
+console.log("Link Tracker Function Started");
+console.log("API_URL available:", !!API_URL);
+console.log("SERVICE_ROLE_KEY available:", !!SERVICE_ROLE_KEY);
+
+// CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+};
 
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { 
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
-      }
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   // Handle HEAD requests for testing
   if (req.method === "HEAD") {
-    return new Response(null, {
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
-      }
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -39,15 +40,14 @@ serve(async (req) => {
       userAgent: userAgent.substring(0, 50),
       ip: ipAddress,
       method: req.method,
-      origin: req.headers.get('Origin'),
-      headers: Object.fromEntries(req.headers.entries())
+      origin: req.headers.get('Origin')
     });
 
     if (!trackingId || !originalUrl) {
       console.warn("Missing tracking ID or URL in request");
       // If we have the URL but no tracking ID, still redirect
       if (originalUrl) {
-        return redirectToUrl(originalUrl, req.headers.get('Origin'));
+        return redirectToUrl(originalUrl);
       }
       return new Response(
         JSON.stringify({ error: "Missing tracking ID or URL" }),
@@ -55,220 +55,115 @@ serve(async (req) => {
           status: 400, 
           headers: { 
             ...corsHeaders, 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+            'Content-Type': 'application/json'
           } 
         }
       );
     }
 
-    // Initialize Supabase client with service role key
-    const supabase = createClient(API_URL, SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    // Track the click if we have environment variables
+    if (API_URL && SERVICE_ROLE_KEY) {
+      // Initialize Supabase client with service role key
+      const supabase = createClient(API_URL, SERVICE_ROLE_KEY, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
 
-    // Get the tracking record first
-    const { data: trackingData, error: fetchError } = await supabase
-      .from("tracked_links")
-      .select("id, email_tracking_id, campaign_id, contact_id")
-      .eq("tracking_id", trackingId)
-      .single();
+      // Find the original sent event to get campaign and contact details
+      const { data: sentEvent, error: sentError } = await supabase
+        .from('email_events')
+        .select('campaign_id, contact_id, recipient_email')
+        .eq('tracking_id', trackingId)
+        .eq('event_type', 'sent')
+        .single();
 
-    if (fetchError) {
-      console.error("Error fetching tracking data:", fetchError);
-      return redirectToUrl(originalUrl, req.headers.get('Origin'));
-    }
-
-    // Get the email tracking record for user_id
-    const { data: emailData, error: emailError } = await supabase
-      .from("email_tracking")
-      .select("id, user_id, email_id, recipient, subject, campaign_id, contact_id")
-      .eq("id", trackingData.email_tracking_id)
-      .single();
-
-    if (emailError) {
-      console.error("Error fetching email data:", emailError);
-      return redirectToUrl(originalUrl, req.headers.get('Origin'));
-    }
-
-    // Record the click event in tracked_links
-    const { error: updateError } = await supabase
-      .from("tracked_links")
-      .update({
-        click_count: supabase.sql`click_count + 1`,
-        last_clicked_at: new Date().toISOString()
-      })
-      .eq("tracking_id", trackingId);
-
-    if (updateError) {
-      console.error("Error updating tracking record:", updateError);
-    } else {
-      console.log(`Successfully recorded click for tracking ID: ${trackingId}`);
-
-      // Record the event in email_events (using consistent "clicked" event type)
-      const { error: eventError } = await supabase
-        .from("email_events")
-        .insert({
-          email_tracking_id: emailData.id,
-          user_id: emailData.user_id,
-          email_id: emailData.email_id,
-          event_type: "clicked",
-          recipient: emailData.recipient,
-          subject: emailData.subject,
-          url: originalUrl,
+      if (sentError || !sentEvent) {
+        console.error('No sent event found for tracking_id:', trackingId, sentError);
+      } else {
+        // Build event metadata
+        const eventMetadata = {
           user_agent: userAgent,
-          ip_address: ipAddress
-        });
+          ip_address: ipAddress,
+          timestamp: new Date().toISOString(),
+          url: originalUrl
+        };
 
-      if (eventError) {
-        console.error("Error recording event:", eventError);
-      }
-      
-      // Get campaign_id from either the tracked link or the email data
-      const campaignId = trackingData.campaign_id || emailData.campaign_id;
-      const contactId = trackingData.contact_id || emailData.contact_id;
-      
-      // Update campaign analytics if this is part of a campaign
-      if (campaignId) {
-        console.log(`Updating campaign analytics for campaign ${campaignId}`);
-        
-        try {
-          // 1. First, update the campaign_analytics table
-          const { data: campaignAnalytics, error: fetchAnalyticsError } = await supabase
-            .from("campaign_analytics")
-            .select("id, clicked_count")
-            .eq("campaign_id", campaignId)
-            .single();
-            
-          if (fetchAnalyticsError) {
-            console.error("Error fetching campaign analytics:", fetchAnalyticsError);
-            
-            // If the record doesn't exist, try to create it
-            if (fetchAnalyticsError.code === "PGRST116") {
-              console.log("Campaign analytics record not found, creating new record");
-              const { error: insertError } = await supabase
-                .from("campaign_analytics")
-                .insert({
-                  campaign_id: campaignId,
-                  clicked_count: 1,
-                  last_event_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-                
-              if (insertError) {
-                console.error("Error creating campaign analytics:", insertError);
-              } else {
-                console.log("Created new campaign analytics record");
-              }
-            }
-          } else {
-            console.log("Found campaign analytics record:", campaignAnalytics);
-            const { error: campaignAnalyticsError } = await supabase
-              .from("campaign_analytics")
+        // Hash IP for privacy
+        if (ipAddress !== "Unknown") {
+          try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(ipAddress);
+            const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            eventMetadata.ip_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+          } catch (e) {
+            console.error("Error hashing IP:", e);
+          }
+        }
+
+        // Insert the click event
+        const { error: eventError } = await supabase
+          .from('email_events')
+          .insert({
+            campaign_id: sentEvent.campaign_id,
+            contact_id: sentEvent.contact_id,
+            recipient_email: sentEvent.recipient_email,
+            event_type: 'clicked',
+            tracking_id: trackingId,
+            event_data: eventMetadata,
+            user_agent: userAgent,
+            ip_address: ipAddress,
+            link_url: originalUrl,
+            created_at: new Date().toISOString()
+          });
+
+        if (eventError) {
+          console.error('Error storing click event:', eventError);
+        } else {
+          console.log(`✅ Link click tracked for campaign: ${sentEvent.campaign_id}`);
+          
+          // Update campaign recipient clicked_at if not already set
+          if (sentEvent.contact_id) {
+            const { error: recipientError } = await supabase
+              .from('campaign_recipients')
               .update({
-                clicked_count: (campaignAnalytics?.clicked_count || 0) + 1,
-                last_event_at: new Date().toISOString(),
+                clicked_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               })
-              .eq("id", campaignAnalytics.id);
+              .eq('campaign_id', sentEvent.campaign_id)
+              .eq('contact_id', sentEvent.contact_id)
+              .is('clicked_at', null); // Only update if not already clicked
               
-            if (campaignAnalyticsError) {
-              console.error("Error updating campaign analytics:", campaignAnalyticsError);
-            } else {
-              console.log("Successfully updated campaign analytics");
+            if (!recipientError) {
+              console.log('Campaign recipient marked as clicked');
             }
           }
-        } catch (error) {
-          console.error("Unexpected error updating campaign analytics:", error);
-        }
-        
-        // 2. Next, update the recipient_analytics table if we have a contact_id
-        if (contactId) {
-          const { data: recipientAnalytics, error: fetchRecipientError } = await supabase
-            .from("recipient_analytics")
-            .select("click_count, first_clicked_at")
-            .eq("campaign_id", campaignId)
-            .eq("recipient_id", contactId)
-            .single();
-            
-          if (fetchRecipientError) {
-            console.error("Error fetching recipient analytics:", fetchRecipientError);
-          } else {
-            const { error: recipientAnalyticsError } = await supabase
-              .from("recipient_analytics")
-              .update({
-                last_clicked_at: new Date().toISOString(),
-                click_count: (recipientAnalytics?.click_count || 0) + 1,
-                updated_at: new Date().toISOString(),
-                first_clicked_at: recipientAnalytics?.first_clicked_at || new Date().toISOString()
-              })
-              .eq("campaign_id", campaignId)
-              .eq("recipient_id", contactId);
-              
-            if (recipientAnalyticsError) {
-              console.error("Error updating recipient analytics:", recipientAnalyticsError);
-            }
-          }
-        }
-        
-        // 3. Update or insert into link_clicks table
-        const linkClicksData = {
-          campaign_id: campaignId,
-          recipient_id: contactId,
-          link_url: originalUrl,
-          click_count: 1,
-          last_clicked_at: new Date().toISOString(),
-          first_clicked_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        // Try to update existing record first
-        const { data: existingClick, error: existingClickError } = await supabase
-          .from("link_clicks")
-          .select("id, click_count")
-          .eq("campaign_id", campaignId)
-          .eq("link_url", originalUrl)
-          .maybeSingle();
           
-        if (existingClick) {
-          // Update existing record
-          const { error: updateClickError } = await supabase
-            .from("link_clicks")
-            .update({
-              click_count: existingClick.click_count + 1,
-              last_clicked_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", existingClick.id);
+          // Refresh campaign analytics
+          const { error: refreshError } = await supabase
+            .rpc('refresh_campaign_analytics_simple', { p_campaign_id: sentEvent.campaign_id });
             
-          if (updateClickError) {
-            console.error("Error updating link click:", updateClickError);
-          }
-        } else {
-          // Insert new record
-          const { error: insertClickError } = await supabase
-            .from("link_clicks")
-            .insert([linkClicksData]);
-            
-          if (insertClickError) {
-            console.error("Error inserting link click:", insertClickError);
+          if (refreshError) {
+            console.warn('Failed to refresh campaign analytics:', refreshError);
+          } else {
+            console.log('Campaign analytics refreshed successfully');
           }
         }
-        
-        // Note: Email event already recorded above - avoiding duplicate entry
       }
+    } else {
+      console.error("Missing required environment variables for tracking");
     }
 
-    return redirectToUrl(originalUrl, req.headers.get('Origin'));
+    // Always redirect to the original URL
+    return redirectToUrl(originalUrl);
   } catch (error) {
     console.error("Error processing link tracking:", error);
     // If we have the URL, still redirect even if tracking fails
     const url = new URL(req.url).searchParams.get("url");
     if (url) {
-      return redirectToUrl(url, req.headers.get('Origin'));
+      return redirectToUrl(url);
     }
     return new Response(
       JSON.stringify({ error: error.message }),
@@ -276,8 +171,7 @@ serve(async (req) => {
         status: 500, 
         headers: { 
           ...corsHeaders, 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': req.headers.get('Origin') || '*'
+          'Content-Type': 'application/json'
         } 
       }
     );
@@ -285,16 +179,15 @@ serve(async (req) => {
 });
 
 // Helper function to handle redirects
-function redirectToUrl(url: string, origin: string | null) {
+function redirectToUrl(url: string) {
   return new Response(null, {
     status: 302,
     headers: {
       ...corsHeaders,
-      'Access-Control-Allow-Origin': origin || '*',
       'Location': url,
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0'
     }
   });
-} 
+}
