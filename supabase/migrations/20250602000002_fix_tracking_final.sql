@@ -9,8 +9,8 @@ DROP FUNCTION IF EXISTS refresh_campaign_analytics(UUID);
 
 -- 2. Remove problematic tables and views
 DROP VIEW IF EXISTS campaign_engagement_details CASCADE;
-DROP VIEW IF EXISTS recipient_analytics CASCADE;
-DROP VIEW IF EXISTS link_clicks CASCADE;
+DROP TABLE IF EXISTS recipient_analytics CASCADE;
+DROP TABLE IF EXISTS link_clicks CASCADE;
 DROP TABLE IF EXISTS tracked_links CASCADE;
 
 -- 3. Ensure email_events table has correct structure
