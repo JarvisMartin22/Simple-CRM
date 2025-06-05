@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Crown } from 'lucide-react';
 import { Waves } from '@/components/ui/waves-background';
 import GoogleOAuthButton from '@/components/auth/GoogleOAuthButton';
+import { STRIPE_CONFIG } from '@/config/stripe';
+import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -24,10 +26,18 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { signIn, loading: authLoading } = useAuth();
+  const { signIn, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const { createCheckoutSession, loading: stripeLoading } = useStripeCheckout();
+  
+  // Get plan and billing info from URL params
+  const selectedPlan = searchParams.get('plan') as keyof typeof STRIPE_CONFIG.plans | null;
+  const billingInterval = searchParams.get('billing') as 'monthly' | 'annual' || 'monthly';
+  const action = searchParams.get('action');
+  const selectedPlanConfig = selectedPlan ? STRIPE_CONFIG.plans[selectedPlan] : null;
   const [isLoading, setIsLoading] = useState(false);
   
   const from = location.state?.from?.pathname || '/app/dashboard';
@@ -64,6 +74,14 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  // Trigger checkout after user is authenticated (if plan was selected and action is checkout)
+  useEffect(() => {
+    if (user && selectedPlan && action === 'checkout' && !stripeLoading) {
+      const priceId = STRIPE_CONFIG.prices[selectedPlan][billingInterval];
+      createCheckoutSession(priceId);
+    }
+  }, [user, selectedPlan, billingInterval, action, stripeLoading]);
   
   if (authLoading) {
     return (
@@ -100,6 +118,24 @@ const Login = () => {
           <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
           <p className="text-gray-600">We've got customers to grow</p>
         </div>
+
+        {selectedPlanConfig && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Crown className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold text-blue-900">Selected Plan: {selectedPlanConfig.name}</h3>
+                <p className="text-sm text-blue-700">
+                  ${selectedPlanConfig.pricing[billingInterval].price}/{billingInterval === 'annual' ? 'year' : 'month'}
+                  {billingInterval === 'annual' && (
+                    <span className="ml-2 text-green-600 font-medium">{selectedPlanConfig.pricing.annual.savings}</span>
+                  )}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">Login to complete your subscription</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive" className="mb-6">

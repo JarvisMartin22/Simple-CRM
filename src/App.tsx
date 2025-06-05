@@ -10,6 +10,7 @@ import { TasksProvider } from './contexts/TasksContext';
 import { NotesProvider } from './contexts/NotesContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { EmailProvider } from './contexts/EmailContext';
+import { BillingProvider } from './contexts/BillingContext';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Callback from './pages/auth/Callback';
@@ -61,12 +62,13 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <EmailProvider>
-          <ContactsProvider>
-            <CompaniesProvider>
-              <PipelinesProvider>
-                <TasksProvider>
-                  <NotesProvider>
+        <BillingProvider>
+          <EmailProvider>
+            <ContactsProvider>
+              <CompaniesProvider>
+                <PipelinesProvider>
+                  <TasksProvider>
+                    <NotesProvider>
                     <Routes>
                       {/* Auth routes (public) */}
                       <Route path="/auth/login" element={<Login />} />
@@ -248,12 +250,13 @@ const App: React.FC = () => {
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                     <Toaster />
-                  </NotesProvider>
-                </TasksProvider>
-              </PipelinesProvider>
-            </CompaniesProvider>
-          </ContactsProvider>
-        </EmailProvider>
+                    </NotesProvider>
+                  </TasksProvider>
+                </PipelinesProvider>
+              </CompaniesProvider>
+            </ContactsProvider>
+          </EmailProvider>
+        </BillingProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

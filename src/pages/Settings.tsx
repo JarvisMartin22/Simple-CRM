@@ -9,10 +9,16 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Bell, Lock, User, KeyRound, Users, Shield, Building, Paintbrush, Globe, Mail, AlertCircle, Plus } from 'lucide-react';
+import { Bell, Lock, User, KeyRound, Users, Shield, Building, Paintbrush, Globe, Mail, AlertCircle, Plus, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import BillingTab from '@/components/settings/BillingTab';
+import TeamInvitations from '@/components/settings/TeamInvitations';
+import { useSearchParams } from 'react-router-dom';
 
 const Settings: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'profile';
+  
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +26,7 @@ const Settings: React.FC = () => {
         <p className="text-gray-500 mt-1">Manage your account preferences and workspace settings</p>
       </div>
       
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="mb-6 w-full justify-start border-b pb-0 rounded-none">
           <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
             <User className="w-4 h-4 mr-2" />
@@ -45,6 +51,10 @@ const Settings: React.FC = () => {
           <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
             <Paintbrush className="w-4 h-4 mr-2" />
             Appearance
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary">
+            <CreditCard className="w-4 h-4 mr-2" />
+            Billing
           </TabsTrigger>
         </TabsList>
         
@@ -225,144 +235,7 @@ const Settings: React.FC = () => {
         
         {/* Team Tab */}
         <TabsContent value="team">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex justify-between">
-                <div>
-                  <CardTitle>Team Members</CardTitle>
-                  <CardDescription>Manage your team members and their access levels.</CardDescription>
-                </div>
-                <Button className="bg-primary">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Invite Member
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="divide-y divide-gray-100">
-                {/* Team Member 1 */}
-                <div className="py-4 flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback>JD</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">John Doe</p>
-                      <p className="text-gray-500 text-sm">john@example.com</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <Badge className="mr-4">Admin</Badge>
-                    <Button variant="ghost" size="sm">Edit</Button>
-                  </div>
-                </div>
-                
-                {/* Team Member 2 */}
-                <div className="py-4 flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback>EP</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">Emily Parker</p>
-                      <p className="text-gray-500 text-sm">emily@example.com</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <Badge variant="outline" className="bg-gray-100 text-gray-800 mr-4">Member</Badge>
-                    <Button variant="ghost" size="sm">Edit</Button>
-                  </div>
-                </div>
-                
-                {/* Team Member 3 */}
-                <div className="py-4 flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback>ML</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">Marcus Lee</p>
-                      <p className="text-gray-500 text-sm">marcus@example.com</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <Badge variant="outline" className="bg-gray-100 text-gray-800 mr-4">Member</Badge>
-                    <Button variant="ghost" size="sm">Edit</Button>
-                  </div>
-                </div>
-                
-                {/* Team Member 4 */}
-                <div className="py-4 flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
-                    <Avatar>
-                      <AvatarFallback>JW</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">Jessica Wong</p>
-                      <p className="text-gray-500 text-sm">jessica@example.com</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <Badge className="bg-blue-50 text-blue-700 mr-4">Manager</Badge>
-                    <Button variant="ghost" size="sm">Edit</Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between border-t pt-6">
-              <div className="text-sm text-gray-500">4 team members</div>
-              <Button variant="outline">Manage Roles</Button>
-            </CardFooter>
-          </Card>
-          
-          <Card className="shadow-sm mt-6">
-            <CardHeader>
-              <CardTitle>Team Permissions</CardTitle>
-              <CardDescription>Set default permissions for team members.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <Checkbox id="contacts-access" />
-                  <div>
-                    <Label className="text-sm font-medium" htmlFor="contacts-access">Contacts Access</Label>
-                    <p className="text-sm text-gray-500">Allow team members to view and manage contacts.</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Checkbox id="deal-creation" />
-                  <div>
-                    <Label className="text-sm font-medium" htmlFor="deal-creation">Deal Creation</Label>
-                    <p className="text-sm text-gray-500">Allow team members to create new deals.</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Checkbox id="campaign-management" />
-                  <div>
-                    <Label className="text-sm font-medium" htmlFor="campaign-management">Campaign Management</Label>
-                    <p className="text-sm text-gray-500">Allow team members to create and manage campaigns.</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Checkbox id="reports-access" />
-                  <div>
-                    <Label className="text-sm font-medium" htmlFor="reports-access">Reports Access</Label>
-                    <p className="text-sm text-gray-500">Allow team members to access performance reports.</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t pt-6">
-              <Button className="ml-auto">Save Permissions</Button>
-            </CardFooter>
-          </Card>
+          <TeamInvitations />
         </TabsContent>
         
         {/* Notifications Tab */}
@@ -710,6 +583,11 @@ const Settings: React.FC = () => {
               <Button>Save Changes</Button>
             </CardFooter>
           </Card>
+        </TabsContent>
+        
+        {/* Billing Tab */}
+        <TabsContent value="billing">
+          <BillingTab />
         </TabsContent>
       </Tabs>
     </div>

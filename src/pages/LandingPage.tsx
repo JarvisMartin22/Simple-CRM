@@ -300,7 +300,6 @@ const LandingPage: React.FC = () => {
       {/* Pricing Section */}
       <div id="pricing">
         <PricingSection 
-          tiers={pricingTiers} 
           className="bg-gradient-to-b from-orange-50 via-orange-25 to-white"
           title="Simple, Transparent Pricing"
           description="Choose the plan that works for you. We can't wait for what's next."

@@ -1,10 +1,12 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Crown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { STRIPE_CONFIG } from '@/config/stripe';
+import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,10 +43,17 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
-  const { signUp, loading: authLoading } = useAuth();
+  const { signUp, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const { createCheckoutSession, loading: stripeLoading } = useStripeCheckout();
+  
+  // Get plan and billing info from URL params
+  const selectedPlan = searchParams.get('plan') as keyof typeof STRIPE_CONFIG.plans | null;
+  const billingInterval = searchParams.get('billing') as 'monthly' | 'annual' || 'monthly';
+  const selectedPlanConfig = selectedPlan ? STRIPE_CONFIG.plans[selectedPlan] : null;
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -66,13 +75,27 @@ const Register = () => {
     setError(null);
     try {
       await signUp(values.email, values.password, values.firstName, values.lastName);
-      navigate('/auth/login');
+      
+      if (selectedPlan) {
+        // If a plan was selected, redirect to login with plan info to trigger checkout after login
+        navigate(`/auth/login?plan=${selectedPlan}&billing=${billingInterval}&action=checkout`);
+      } else {
+        navigate('/auth/login');
+      }
     } catch (error: any) {
       setError(error.message || 'Failed to sign up');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Trigger checkout after user is authenticated (if plan was selected)
+  useEffect(() => {
+    if (user && selectedPlan && !stripeLoading) {
+      const priceId = STRIPE_CONFIG.prices[selectedPlan][billingInterval];
+      createCheckoutSession(priceId);
+    }
+  }, [user, selectedPlan, billingInterval, stripeLoading]);
 
   if (authLoading) {
     return (
@@ -109,6 +132,23 @@ const Register = () => {
           <h1 className="text-2xl font-bold mb-2">Create your account</h1>
           <p className="text-gray-600">We're so excited to welcome you</p>
         </div>
+
+        {selectedPlanConfig && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Crown className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold text-blue-900">Selected Plan: {selectedPlanConfig.name}</h3>
+                <p className="text-sm text-blue-700">
+                  ${selectedPlanConfig.pricing[billingInterval].price}/{billingInterval === 'annual' ? 'year' : 'month'}
+                  {billingInterval === 'annual' && (
+                    <span className="ml-2 text-green-600 font-medium">{selectedPlanConfig.pricing.annual.savings}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />

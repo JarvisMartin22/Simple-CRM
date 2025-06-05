@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Database, Industry } from '@/types/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
+import { useBilling } from '@/contexts/BillingContext';
 
 type ContactRow = Database['public']['Tables']['contacts']['Row'];
 type ContactInsert = Database['public']['Tables']['contacts']['Insert'];
@@ -91,6 +92,7 @@ export const ContactsContext = createContext<ContactsContextType | undefined>(un
 export function ContactsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { enrichDomain } = useCompanyEnrichment();
+  const { checkUsageLimit, tenant } = useBilling();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fields, setFields] = useState<ContactField[]>([
@@ -134,6 +136,17 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   }, [user, toast]);
 
   const createContact = useCallback(async (data: Partial<Contact>): Promise<Contact> => {
+    // Check usage limit before creating
+    const canCreate = await checkUsageLimit('contacts', 1);
+    if (!canCreate) {
+      toast({
+        variant: "destructive",
+        title: "Contact limit reached",
+        description: `You've reached your plan's contact limit. Please upgrade to add more contacts.`,
+      });
+      throw new Error('Contact limit reached');
+    }
+
     // Enhance contact data with company information if email is provided
     let enrichedData = { ...data };
     
@@ -200,7 +213,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     });
 
     return contact;
-  }, [toast, enrichDomain, user]);
+  }, [toast, enrichDomain, user, checkUsageLimit]);
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>): Promise<Contact> => {
     const { data: contact, error } = await supabase

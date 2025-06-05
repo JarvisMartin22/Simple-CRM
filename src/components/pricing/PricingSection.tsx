@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -10,6 +8,10 @@ import { motion } from "framer-motion"
 import { Check, Star } from "lucide-react"
 import confetti from "canvas-confetti"
 import NumberFlow from "@number-flow/react"
+import { useNavigate } from "react-router-dom"
+import { STRIPE_CONFIG } from "@/config/stripe"
+import { useStripeCheckout } from "@/hooks/useStripeCheckout"
+import { useAuth } from "@/contexts/AuthContext"
 
 interface Feature {
   name: string
@@ -29,10 +31,11 @@ interface PricingTier {
   badge?: string
   icon: React.ReactNode
   priceUnit?: string
+  planKey?: string
 }
 
 interface PricingSectionProps {
-  tiers: PricingTier[]
+  tiers?: PricingTier[]
   className?: string
   title?: string
   description?: string
@@ -47,6 +50,48 @@ function PricingSection({
   const [isMonthly, setIsMonthly] = useState(true)
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const switchRef = useRef<HTMLButtonElement>(null)
+  const navigate = useNavigate()
+  const { createCheckoutSession, loading: stripeLoading } = useStripeCheckout()
+  const { user } = useAuth()
+
+  // Use actual Stripe pricing if no tiers provided
+  const actualTiers = tiers || Object.entries(STRIPE_CONFIG.plans).map(([key, plan]) => ({
+    name: plan.name,
+    price: {
+      monthly: plan.pricing.monthly.price,
+      yearly: plan.pricing.annual.price
+    },
+    description: plan.description,
+    highlight: key === 'advanced',
+    badge: key === 'advanced' ? 'Most Popular' : undefined,
+    icon: <Star className="w-6 h-6" />,
+    features: plan.features.map(feature => ({
+      name: feature,
+      description: '',
+      included: true
+    })),
+    planKey: key
+  }))
+
+  const handlePlanSelect = async (planKey: string) => {
+    const billingInterval = isMonthly ? 'monthly' : 'annual'
+    
+    if (user) {
+      // User is authenticated - go directly to Stripe checkout
+      const priceId = STRIPE_CONFIG.prices[planKey as keyof typeof STRIPE_CONFIG.prices][billingInterval]
+      
+      // Check if we have a valid price ID
+      if (!priceId) {
+        navigate(`/app/settings?tab=billing&plan=${planKey}&billing=${billingInterval}`)
+        return
+      }
+      
+      await createCheckoutSession(priceId)
+    } else {
+      // User not authenticated - redirect to signup with plan selection
+      navigate(`/auth/register?plan=${planKey}&billing=${billingInterval}`)
+    }
+  }
 
   const handleToggle = (checked: boolean) => {
     setIsMonthly(!checked)
@@ -115,7 +160,7 @@ function PricingSection({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tiers.map((tier, index) => (
+          {actualTiers.map((tier, index) => (
             <motion.div
               key={index}
               initial={{ y: 50, opacity: 1 }}
@@ -221,8 +266,10 @@ function PricingSection({
                       : "bg-background text-foreground hover:bg-primary hover:text-primary-foreground"
                   )}
                   variant={tier.highlight ? "default" : "outline"}
+                  onClick={() => handlePlanSelect(tier.planKey || tier.name.toLowerCase())}
+                  disabled={stripeLoading}
                 >
-                  Get Started
+                  {stripeLoading ? "Loading..." : user ? "Select Plan" : "Get Started"}
                 </Button>
 
                 <p className="mt-6 text-xs leading-5 text-muted-foreground">

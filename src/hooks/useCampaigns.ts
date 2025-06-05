@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { supabaseWithAuth } from '@/lib/supabaseWithAuth';
 import { useToast } from '@/components/ui/use-toast';
 import type { ScheduleConfig } from '@/components/campaign/CampaignScheduler';
+import { useBilling } from '@/contexts/BillingContext';
 
 export interface Campaign {
   id: string;
@@ -30,6 +31,7 @@ export const useCampaigns = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { tenant } = useBilling();
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -92,6 +94,16 @@ export const useCampaigns = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Check if user can create campaigns
+      if (!tenant?.can_use_campaigns) {
+        toast({
+          variant: "destructive",
+          title: "Campaigns not available",
+          description: "Your current plan doesn't include email campaigns. Please upgrade to access this feature.",
+        });
+        throw new Error('Campaigns not available on current plan');
+      }
 
       // Get the current user's ID
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -301,7 +313,7 @@ export const useCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, tenant]);
 
   const updateCampaign = useCallback(async (id: string, updates: Partial<Campaign>) => {
     try {
