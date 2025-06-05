@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Filter, Building, Settings } from 'lucide-react';
+import { Search, Filter, Building, Settings, Zap } from 'lucide-react';
 import CompaniesTable from '@/components/companies/CompaniesTable';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { CompaniesFieldManager } from '@/components/companies/CompaniesFieldManager';
 import { CreateCompanyForm } from '@/components/companies/CreateCompanyForm';
+import { CompanyEnrichmentSettings } from '@/components/companies/CompanyEnrichmentSettings';
 import { useCompanies } from '@/contexts/CompaniesContext';
 
 const Companies: React.FC = () => {
@@ -27,6 +28,17 @@ const Companies: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-h1 font-semibold">Companies</h1>
         <div className="flex space-x-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="flex items-center">
+                <Zap size={18} className="mr-2" />
+                <span>AI Enrichment</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <CompanyEnrichmentSettings />
+            </SheetContent>
+          </Sheet>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" className="flex items-center">

@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,6 +24,23 @@ export const DatePickerField: React.FC<DatePickerFieldProps> = ({
     setDatePickerOpen(false);
   };
 
+  // Parse the date safely
+  const getSelectedDate = () => {
+    if (!selectedDate) return undefined;
+    try {
+      if (typeof selectedDate === 'string') {
+        // Try to parse ISO string or regular date string
+        const parsed = parseISO(selectedDate);
+        return isValid(parsed) ? parsed : new Date(selectedDate);
+      }
+      return new Date(selectedDate);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const parsedDate = getSelectedDate();
+
   return (
     <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
       <PopoverTrigger asChild>
@@ -32,22 +48,22 @@ export const DatePickerField: React.FC<DatePickerFieldProps> = ({
           variant="outline"
           className={cn(
             "w-full justify-start text-left font-normal",
-            !selectedDate && "text-muted-foreground"
+            !parsedDate && "text-muted-foreground"
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {selectedDate ? 
-            format(new Date(selectedDate), "PPP") : 
+          {parsedDate && isValid(parsedDate) ? 
+            format(parsedDate, "PPP") : 
             "Select date"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
-          selected={selectedDate ? new Date(selectedDate) : undefined}
+          selected={parsedDate}
           onSelect={handleSelectDate}
           initialFocus
-          className={cn("p-3 pointer-events-auto")}
+          className="p-3"
         />
       </PopoverContent>
     </Popover>

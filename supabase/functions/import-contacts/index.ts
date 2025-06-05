@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
+import { analyzeCompanyDomain, isCommonEmailDomain } from "../_shared/companyEnrichment.ts";
 
 // Create a Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
@@ -112,17 +113,20 @@ serve(async (req) => {
     }
     console.log(`Found ${existingEmails.size} existing contacts`);
     
-    // Process domains and create companies where needed
+    // Process domains and create companies where needed using enhanced analysis
     const domains = new Set<string>();
     const domainToCompanyMap = new Map<string, string>(); // Domain to company ID mapping
     
     contacts.forEach(contact => {
-      if (contact.domain && !isCommonEmailDomain(contact.domain)) {
-        domains.add(contact.domain);
+      if (contact.domain) {
+        const analysis = analyzeCompanyDomain(contact.domain);
+        if (!analysis.is_generic && analysis.company_name) {
+          domains.add(contact.domain);
+        }
       }
     });
     
-    console.log(`Found ${domains.size} unique business domains`);
+    console.log(`Found ${domains.size} unique business domains after enhanced filtering`);
     
     // Check existing companies by domain
     for (const domain of domains) {
@@ -137,28 +141,32 @@ serve(async (req) => {
         console.log(`Company already exists for domain ${domain}: ${existingCompanies[0].id}`);
         domainToCompanyMap.set(domain, existingCompanies[0].id);
       } else {
-        // Create new company
-        const companyName = extractCompanyNameFromDomain(domain);
-        console.log(`Creating new company for domain ${domain}: ${companyName}`);
-        
-        const { data: newCompany, error } = await supabase
-          .from('companies')
-          .insert({
-            user_id: userId,
-            name: companyName,
-            domain: domain,
-            website: `https://${domain}`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select('id')
-          .single();
+        // Use enhanced company analysis
+        const analysis = analyzeCompanyDomain(domain);
+        if (analysis.company_name && !analysis.is_generic) {
+          console.log(`Creating new company for domain ${domain}: ${analysis.company_name} (confidence: ${analysis.confidence})`);
           
-        if (error) {
-          console.error(`Error creating company for domain ${domain}:`, error);
-        } else if (newCompany) {
-          console.log(`Created new company with ID: ${newCompany.id}`);
-          domainToCompanyMap.set(domain, newCompany.id);
+          const { data: newCompany, error } = await supabase
+            .from('companies')
+            .insert({
+              user_id: userId,
+              name: analysis.company_name,
+              domain: domain,
+              website: analysis.website,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .select('id')
+            .single();
+            
+          if (error) {
+            console.error(`Error creating company for domain ${domain}:`, error);
+          } else if (newCompany) {
+            console.log(`Created new company with ID: ${newCompany.id}`);
+            domainToCompanyMap.set(domain, newCompany.id);
+          }
+        } else {
+          console.log(`Skipping company creation for domain ${domain} - analysis indicates it's not a valid business domain`);
         }
       }
     }
@@ -222,12 +230,15 @@ serve(async (req) => {
           continue;
         }
         
-        // Link contact to company if domain is not common email provider
+        // Link contact to company using enhanced domain analysis
         let company_id = null;
-        if (contact.domain && !isCommonEmailDomain(contact.domain)) {
-          company_id = domainToCompanyMap.get(contact.domain) || null;
-          if (company_id) {
-            console.log(`Linking contact ${contact.email} to company ID: ${company_id}`);
+        if (contact.domain) {
+          const analysis = analyzeCompanyDomain(contact.domain);
+          if (!analysis.is_generic && analysis.company_name) {
+            company_id = domainToCompanyMap.get(contact.domain) || null;
+            if (company_id) {
+              console.log(`Linking contact ${contact.email} to company ID: ${company_id}`);
+            }
           }
         }
         
@@ -332,30 +343,7 @@ serve(async (req) => {
   }
 });
 
-// Helper function to check if domain is from common email providers
-function isCommonEmailDomain(domain: string): boolean {
-  const commonDomains = [
-    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
-    'icloud.com', 'protonmail.com', 'mail.com', 'zoho.com', 'yandex.com',
-    'gmx.com', 'live.com', 'me.com', 'inbox.com', 'fastmail.com'
-  ];
-  return commonDomains.includes(domain.toLowerCase());
-}
-
-// Helper function to extract company name from domain
-function extractCompanyNameFromDomain(domain: string): string {
-  // Remove TLD
-  let name = domain.split('.')[0];
-  
-  // Split by hyphens or numbers and take first part
-  name = name.split(/[-0-9]/)[0];
-  
-  // Capitalize first letter of each word
-  return name
-    .split(/[\s-_]+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
+// Note: Enhanced company analysis functions are now imported from _shared/companyEnrichment.ts
 
 // Helper function to generate random color for tags
 function getRandomColor(): string {

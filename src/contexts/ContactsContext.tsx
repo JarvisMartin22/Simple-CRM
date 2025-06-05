@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { Database, Industry } from '@/types/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
 
 type ContactRow = Database['public']['Tables']['contacts']['Row'];
 type ContactInsert = Database['public']['Tables']['contacts']['Insert'];
@@ -89,6 +90,7 @@ export const ContactsContext = createContext<ContactsContextType | undefined>(un
 
 export function ContactsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { enrichDomain } = useCompanyEnrichment();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fields, setFields] = useState<ContactField[]>([
@@ -132,9 +134,52 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   }, [user, toast]);
 
   const createContact = useCallback(async (data: Partial<Contact>): Promise<Contact> => {
+    // Enhance contact data with company information if email is provided
+    let enrichedData = { ...data };
+    
+    if (data.email && !data.company_id) {
+      const domain = data.email.split('@')[1];
+      if (domain) {
+        try {
+          const enrichmentResult = await enrichDomain(domain);
+          if (enrichmentResult && !enrichmentResult.is_generic && enrichmentResult.company_name) {
+            // Try to find existing company or create new one
+            const { data: existingCompany } = await supabase
+              .from('companies')
+              .select('id')
+              .eq('user_id', user?.id)
+              .eq('domain', domain)
+              .maybeSingle();
+              
+            if (existingCompany) {
+              enrichedData.company_id = existingCompany.id;
+            } else {
+              // Create new company
+              const { data: newCompany } = await supabase
+                .from('companies')
+                .insert({
+                  user_id: user?.id,
+                  name: enrichmentResult.company_name,
+                  domain: domain,
+                  website: enrichmentResult.website
+                })
+                .select('id')
+                .single();
+                
+              if (newCompany) {
+                enrichedData.company_id = newCompany.id;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Company enrichment failed for manual contact creation:', error);
+        }
+      }
+    }
+
     const { data: contact, error } = await supabase
       .from('contacts')
-      .insert([data])
+      .insert([enrichedData])
       .select()
       .single();
 
@@ -155,7 +200,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     });
 
     return contact;
-  }, [toast]);
+  }, [toast, enrichDomain, user]);
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>): Promise<Contact> => {
     const { data: contact, error } = await supabase

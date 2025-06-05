@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useContacts } from '@/contexts/ContactsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Upload, Check, AlertTriangle, Loader2, FileText } from 'lucide-react';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
 
 export interface CsvImportProps {
   onClose: () => void;
@@ -24,6 +25,7 @@ const CsvImport: React.FC<CsvImportProps> = ({ onClose }) => {
   });
   const { createContact } = useContacts();
   const { user } = useAuth();
+  const { enrichDomain } = useCompanyEnrichment();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -83,7 +85,20 @@ const CsvImport: React.FC<CsvImportProps> = ({ onClose }) => {
 
               // We need at least an email or name
               if ((newContact.first_name || newContact.last_name) || newContact.email) {
-                await createContact(newContact);
+                // Use enhanced company enrichment
+                let enrichedContact = { ...newContact };
+                
+                if (newContact.email) {
+                  const domain = newContact.email.split('@')[1];
+                  if (domain) {
+                    const enrichmentResult = await enrichDomain(domain);
+                    if (enrichmentResult && !enrichmentResult.is_generic && enrichmentResult.company_name) {
+                      enrichedContact.company_name = enrichmentResult.company_name;
+                    }
+                  }
+                }
+                
+                await createContact(enrichedContact);
                 setImportProgress(prev => ({
                   ...prev,
                   processed: prev.processed + 1,
@@ -102,22 +117,26 @@ const CsvImport: React.FC<CsvImportProps> = ({ onClose }) => {
             }
           }
 
-          if (importProgress.successful > 0) {
-            toast.success(`Successfully imported ${importProgress.successful} contacts`);
-            onClose();
-          } else {
-            toast.error('No valid contacts found in CSV file');
+          // Show completion message
+          const { successful, failed, total } = importProgress;
+          if (successful > 0) {
+            toast.success(`Successfully imported ${successful} contact(s)`);
           }
+          if (failed > 0) {
+            toast.error(`Failed to import ${failed} contact(s)`);
+          }
+          
+          onClose();
         } catch (error) {
-          console.error('CSV import failed:', error);
-          toast.error('Failed to import contacts from CSV');
+          console.error('CSV parsing error:', error);
+          toast.error('Failed to parse CSV file');
         } finally {
           setIsImporting(false);
         }
       },
       error: (error) => {
         console.error('CSV parsing error:', error);
-        toast.error('Failed to parse CSV file');
+        toast.error('Failed to read CSV file');
         setIsImporting(false);
       }
     });

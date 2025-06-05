@@ -3,6 +3,7 @@ import { useContacts } from '@/contexts/ContactsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
 
 interface ImportProgress {
   total: number;
@@ -100,6 +101,7 @@ const extractCompanyFromEmail = (email: string): string | null => {
 export function useGmailContactsImport() {
   const { createContact, refreshContacts } = useContacts();
   const { user } = useAuth();
+  const { enrichDomain } = useCompanyEnrichment();
   const [isImporting, setIsImporting] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [includeNoEmail, setIncludeNoEmail] = useState(false);
@@ -366,30 +368,70 @@ export function useGmailContactsImport() {
             continue;
           }
 
-          const companyName = contact.company || contact.organizations?.[0]?.name;
           let companyId = null;
+          let companyName = contact.company || contact.organizations?.[0]?.name;
+
+          // Use enhanced company enrichment from email domain if no company name is provided
+          if (!companyName && email) {
+            const domain = email.split('@')[1];
+            if (domain) {
+              const enrichmentResult = await enrichDomain(domain);
+              if (enrichmentResult && !enrichmentResult.is_generic && enrichmentResult.company_name) {
+                companyName = enrichmentResult.company_name;
+              }
+            }
+          }
 
           // If we have a company name, try to find or create the company
           if (companyName && userId) {
-            // Try to find existing company
-            const { data: existingCompanies } = await supabase
-              .from('companies')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('name', companyName)
-              .maybeSingle();
+            // Try to find existing company by name or domain
+            const domain = email ? email.split('@')[1] : null;
+            let existingCompanies = null;
+            
+            // First try to find by domain if we have one
+            if (domain) {
+              const { data } = await supabase
+                .from('companies')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('domain', domain)
+                .maybeSingle();
+              existingCompanies = data;
+            }
+            
+            // If not found by domain, try by name
+            if (!existingCompanies) {
+              const { data } = await supabase
+                .from('companies')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('name', companyName)
+                .maybeSingle();
+              existingCompanies = data;
+            }
 
             if (existingCompanies) {
               companyId = existingCompanies.id;
             } else {
-              // Create new company
+              // Create new company with enhanced data
+              const companyData: any = {
+                user_id: userId,
+                name: companyName,
+                website: contact.website || contact.urls?.[0]?.value || null
+              };
+              
+              // Add domain if we have one
+              if (domain) {
+                companyData.domain = domain;
+                // Use https:// prefix for website if not already present
+                if (!companyData.website) {
+                  companyData.website = `https://${domain}`;
+                }
+              }
+
               const { data: newCompany, error: companyError } = await supabase
                 .from('companies')
-                .insert({
-                  user_id: userId,
-                  name: companyName,
-                  website: contact.website || contact.urls?.[0]?.value || null
-                })
+                .insert(companyData)
                 .select('id')
                 .single();
 

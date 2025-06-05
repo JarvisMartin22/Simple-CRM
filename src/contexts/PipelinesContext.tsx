@@ -9,6 +9,7 @@ interface Pipeline {
   description: string;
   created_at: string;
   updated_at: string;
+  stages?: PipelineStage[]; // Add stages to Pipeline interface
 }
 
 interface PipelineStage {
@@ -32,11 +33,23 @@ interface Deal {
   updated_at: string;
 }
 
+// Extended interface for component compatibility
+export interface Opportunity extends Deal {
+  name: string; // mapped from title
+  stage: string; // mapped from stage_id
+  probability?: number;
+  expected_close_date?: string;
+  details?: string;
+}
+
 interface PipelinesContextType {
   pipelines: Pipeline[];
   stages: PipelineStage[];
   deals: Deal[];
+  opportunities: Opportunity[]; // mapped deals for component compatibility
+  currentPipeline: Pipeline | null;
   isLoading: boolean;
+  loading: boolean; // alias for isLoading
   createPipeline: (data: Partial<Pipeline>) => Promise<Pipeline>;
   updatePipeline: (id: string, data: Partial<Pipeline>) => Promise<Pipeline>;
   deletePipeline: (id: string) => Promise<void>;
@@ -46,7 +59,11 @@ interface PipelinesContextType {
   createDeal: (data: Partial<Deal>) => Promise<Deal>;
   updateDeal: (id: string, data: Partial<Deal>) => Promise<Deal>;
   deleteDeal: (id: string) => Promise<void>;
+  addOpportunity: (data: any) => Promise<Deal>;
+  updateOpportunity: (data: any) => Promise<Deal>;
+  deleteOpportunity: (id: string) => Promise<void>;
   refreshPipelines: () => Promise<void>;
+  setCurrentPipeline: (pipeline: Pipeline) => void;
 }
 
 export const PipelinesContext = createContext<PipelinesContextType | undefined>(undefined);
@@ -56,6 +73,7 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [currentPipeline, setCurrentPipeline] = useState<Pipeline | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -86,7 +104,18 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Error fetching pipelines: ${pipelinesError.message}`);
       }
 
-      setPipelines(pipelinesData || []);
+      // Attach stages to each pipeline
+      const pipelinesWithStages = (pipelinesData || []).map(pipeline => ({
+        ...pipeline,
+        stages: (stagesData || []).filter(stage => stage.pipeline_id === pipeline.id)
+      }));
+
+      setPipelines(pipelinesWithStages);
+
+      // Set current pipeline to the first one if none is selected
+      if (pipelinesWithStages.length > 0 && !currentPipeline) {
+        setCurrentPipeline(pipelinesWithStages[0]);
+      }
 
       // Finally fetch deals
       const { data: dealsData, error: dealsError } = await supabase
@@ -108,12 +137,14 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user, toast, currentPipeline]);
 
   const createPipeline = useCallback(async (data: Partial<Pipeline>): Promise<Pipeline> => {
+    if (!user) throw new Error('User not authenticated');
+    
     const { data: pipeline, error } = await supabase
       .from('pipelines')
-      .insert([data])
+      .insert([{ ...data, user_id: user.id }])
       .select()
       .single();
 
@@ -133,8 +164,11 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
       description: "The pipeline has been created successfully",
     });
 
+    // Refresh pipelines to get the complete data with stages
+    await refreshPipelines();
+
     return pipeline;
-  }, [toast]);
+  }, [user, toast, refreshPipelines]);
 
   const updatePipeline = useCallback(async (id: string, data: Partial<Pipeline>): Promise<Pipeline> => {
     const { data: pipeline, error } = await supabase
@@ -354,6 +388,117 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
     });
   }, [toast]);
 
+  // Opportunity aliases with field mapping
+  const addOpportunity = useCallback(async (data: any): Promise<Deal> => {
+    if (!user) throw new Error('User not authenticated');
+    
+    // Map opportunity fields to deal fields (database schema)
+    const dealData = {
+      name: data.name, // database uses 'name' not 'title'
+      stage_id: data.stage,
+      value: data.value,
+      probability: data.probability,
+      close_date: data.expected_close_date, // database uses 'close_date' not 'expected_close_date'
+      pipeline_id: data.pipeline_id,
+      contact_id: data.contact_id,
+      company_id: data.company_id,
+      notes: data.details, // database uses 'notes' not 'details'
+      user_id: user.id,
+    };
+    
+    const { data: deal, error } = await supabase
+      .from('deals')
+      .insert([dealData])
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error creating deal",
+        description: error.message,
+      });
+      throw error;
+    }
+
+    // Convert database result back to Deal interface (for our context)
+    const convertedDeal: Deal = {
+      id: deal.id,
+      title: deal.name, // map 'name' back to 'title' for our Deal interface
+      value: deal.value || 0,
+      stage_id: deal.stage_id,
+      pipeline_id: deal.pipeline_id,
+      contact_id: deal.contact_id,
+      company_id: deal.company_id,
+      created_at: deal.created_at,
+      updated_at: deal.updated_at,
+    };
+
+    setDeals(prev => [convertedDeal, ...prev]);
+    
+    toast({
+      title: "Deal created",
+      description: "The deal has been created successfully",
+    });
+
+    return convertedDeal;
+  }, [user, toast]);
+
+  const updateOpportunity = useCallback(async (data: any): Promise<Deal> => {
+    if (!user) throw new Error('User not authenticated');
+    
+    // Map opportunity fields to deal fields (database schema)
+    const dealData = {
+      name: data.name, // database uses 'name' not 'title'
+      stage_id: data.stage,
+      value: data.value,
+      probability: data.probability,
+      close_date: data.expected_close_date, // database uses 'close_date' not 'expected_close_date'
+      pipeline_id: data.pipeline_id,
+      contact_id: data.contact_id,
+      company_id: data.company_id,
+      notes: data.details, // database uses 'notes' not 'details'
+    };
+    
+    const { data: deal, error } = await supabase
+      .from('deals')
+      .update(dealData)
+      .eq('id', data.id)
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error updating deal",
+        description: error.message,
+      });
+      throw error;
+    }
+
+    // Convert database result back to Deal interface (for our context)
+    const convertedDeal: Deal = {
+      id: deal.id,
+      title: deal.name, // map 'name' back to 'title' for our Deal interface
+      value: deal.value || 0,
+      stage_id: deal.stage_id,
+      pipeline_id: deal.pipeline_id,
+      contact_id: deal.contact_id,
+      company_id: deal.company_id,
+      created_at: deal.created_at,
+      updated_at: deal.updated_at,
+    };
+
+    setDeals(prev => prev.map(d => d.id === data.id ? convertedDeal : d));
+    
+    toast({
+      title: "Deal updated",
+      description: "The deal has been updated successfully",
+    });
+
+    return convertedDeal;
+  }, [user, toast]);
+
   React.useEffect(() => {
     if (user) {
       refreshPipelines();
@@ -364,7 +509,17 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
     pipelines,
     stages,
     deals,
+    opportunities: deals.map(deal => ({
+      ...deal,
+      name: deal.title,
+      stage: deal.stage_id,
+      probability: undefined, // Will be fetched from database when needed
+      expected_close_date: undefined, // Will be fetched from database when needed
+      details: undefined, // Will be fetched from database when needed
+    })), // mapped deals for component compatibility
+    currentPipeline,
     isLoading,
+    loading: isLoading, // alias for isLoading
     createPipeline,
     updatePipeline,
     deletePipeline,
@@ -374,11 +529,16 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
     createDeal,
     updateDeal,
     deleteDeal,
+    addOpportunity,
+    updateOpportunity,
+    deleteOpportunity: deleteDeal, // alias for deleteDeal
     refreshPipelines,
+    setCurrentPipeline,
   }), [
     pipelines,
     stages,
     deals,
+    currentPipeline,
     isLoading,
     createPipeline,
     updatePipeline,
@@ -389,7 +549,11 @@ export function PipelinesProvider({ children }: { children: React.ReactNode }) {
     createDeal,
     updateDeal,
     deleteDeal,
+    addOpportunity,
+    updateOpportunity,
+    deleteDeal,
     refreshPipelines,
+    setCurrentPipeline,
   ]);
 
   return (

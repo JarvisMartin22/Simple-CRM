@@ -73,6 +73,12 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
           
           <TabsContent value="gmail">
             <div className="space-y-6">
+              <div className="bg-blue-50 p-4 rounded-md border border-blue-200 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Enhanced Company Detection:</strong> Gmail import now automatically detects and creates companies from email domains using intelligent analysis.
+                </p>
+              </div>
+              
               <div className="bg-gray-50 p-6 rounded-md border border-gray-200">
                 <h3 className="font-normal mb-4 flex items-center justify-center">
                   <Filter className="h-5 w-5 mr-2" />
@@ -159,6 +165,11 @@ const ContactImport: React.FC<ContactImportProps> = ({ onClose }) => {
           </TabsContent>
           
           <TabsContent value="csv">
+            <div className="bg-blue-50 p-4 rounded-md border border-blue-200 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Enhanced Company Detection:</strong> CSV import now automatically detects and creates companies from email domains using intelligent analysis.
+              </p>
+            </div>
             <CsvImport onClose={onClose} />
           </TabsContent>
           

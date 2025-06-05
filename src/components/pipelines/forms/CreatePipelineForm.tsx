@@ -15,7 +15,7 @@ interface CreatePipelineFormProps {
 }
 
 export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = false, onClose }) => {
-  const { addPipeline } = usePipelines();
+  const { createPipeline, createStage } = usePipelines();
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -80,14 +80,25 @@ export const CreatePipelineForm: React.FC<CreatePipelineFormProps> = ({ open = f
     setSubmitting(true);
     
     try {
-      const newPipeline: Partial<Pipeline> = {
+      // First create the pipeline without stages
+      const newPipeline = {
         name,
         description: description || null,
-        stages
       };
       
-      const result = await addPipeline(newPipeline);
+      const result = await createPipeline(newPipeline);
       if (result) {
+        // Then create the stages for the new pipeline
+        const stagePromises = stages.map((stage, index) => 
+          createStage({
+            name: stage.name,
+            position: index + 1,
+            pipeline_id: result.id
+          })
+        );
+        
+        await Promise.all(stagePromises);
+        
         // Reset form
         setName('');
         setDescription('');
