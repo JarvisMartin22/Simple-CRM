@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabase';
 import { STRIPE_CONFIG } from '@/config/stripe';
 import { useToast } from '@/hooks/use-toast';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 const stripePromise = loadStripe(STRIPE_CONFIG.publishableKey);
 

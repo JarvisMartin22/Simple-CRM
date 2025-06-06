@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Monitor, Smartphone, AlertTriangle, Link as LinkIcon, Send } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 interface EmailPreviewProps {
   subject: string;
@@ -99,7 +100,7 @@ export function EmailPreview({ subject, content, recipientData, onSendTest }: Em
   const checkSpamScore = async () => {
     setIsChecking(true);
     try {
-      const { data, error } = await supabase.functions.invoke('check-spam-score', {
+      const { data, error } = await invokeEdgeFunction('check-spam-score', {
         body: {
           subject: previewSubject,
           content: previewContent,

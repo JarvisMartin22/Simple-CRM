@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 interface Integration {
   id: string;
@@ -84,7 +85,7 @@ const OutlookIntegration = () => {
       setIsConnecting(true);
       
       // Call the Outlook auth Edge Function to get OAuth URL
-      const response = await supabase.functions.invoke('outlook-auth');
+      const response = await invokeEdgeFunction('outlook-auth');
       
       if (response.error) {
         throw new Error(response.error);
@@ -128,7 +129,7 @@ const OutlookIntegration = () => {
             
             if (code) {
               // Call Outlook auth endpoint with the code
-              const tokenResponse = await supabase.functions.invoke('outlook-auth', {
+              const tokenResponse = await invokeEdgeFunction('outlook-auth', {
                 body: { code }
               });
               

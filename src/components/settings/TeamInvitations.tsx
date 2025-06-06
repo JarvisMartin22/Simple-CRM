@@ -9,6 +9,7 @@ import { useBilling } from '@/contexts/BillingContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 interface Invitation {
   id: string;
@@ -59,7 +60,7 @@ const TeamInvitations: React.FC = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.functions.invoke('send-invitation', {
+      const { data, error } = await invokeEdgeFunction('send-invitation', {
         body: {
           email: inviteEmail,
           role: inviteRole,

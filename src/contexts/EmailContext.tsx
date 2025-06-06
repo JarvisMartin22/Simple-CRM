@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { PostgrestError } from '@supabase/supabase-js';
+import { invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 interface EmailTrackingData {
   id: string;
@@ -67,7 +68,7 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
     mutationFn: async (params: SendEmailParams) => {
       if (!user?.id) throw new Error("User not authenticated");
       
-      const response = await supabase.functions.invoke('send-email', {
+      const response = await invokeEdgeFunction('send-email', {
         body: {
           userId: user.id,
           ...params
@@ -217,7 +218,7 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
 
     setIsSyncing(true);
     try {
-      const response = await supabase.functions.invoke('sync-contacts', {
+      const response = await invokeEdgeFunction('sync-contacts', {
         body: {
           userId: user?.id
         }
@@ -258,7 +259,7 @@ export function EmailProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true);
     try {
-      const response = await supabase.functions.invoke('sync-emails', {
+      const response = await invokeEdgeFunction('sync-emails', {
         body: {
           userId: user?.id
         }
