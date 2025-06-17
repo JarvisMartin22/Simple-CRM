@@ -124,7 +124,10 @@ export function useGmailConnect() {
         
         // Call Gmail auth endpoint with the code
         const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-          body: { code: data.code }
+          body: { 
+            code: data.code,
+            redirectUri: `${window.location.origin}/auth/callback/gmail`
+          }
         });
         
         if (tokenResponse.error) {
@@ -422,7 +425,10 @@ export function useGmailConnect() {
             
             // Call Gmail auth endpoint with the code
             const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-              body: { code }
+              body: { 
+                code: code,
+                redirectUri: `${window.location.origin}/auth/callback/gmail`
+              }
             });
             
             if (tokenResponse.error) {
