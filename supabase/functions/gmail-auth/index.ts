@@ -18,7 +18,7 @@ function getRedirectUri(requestOrigin?: string): string {
   if (requestOrigin) {
     try {
       const origin = new URL(requestOrigin);
-      const dynamicUri = `${origin.origin}/auth-callback.html`;
+      const dynamicUri = `${origin.origin}/auth/callback/gmail`;
       console.log("Using dynamic redirect URI from origin:", dynamicUri);
       return dynamicUri;
     } catch (e) {
@@ -32,14 +32,14 @@ function getRedirectUri(requestOrigin?: string): string {
     // Try to get the production URL from Vercel environment variables
     const vercelUrl = Deno.env.get("VERCEL_URL");
     if (vercelUrl) {
-      const productionUri = `https://${vercelUrl}/auth-callback.html`;
+      const productionUri = `https://${vercelUrl}/auth/callback/gmail`;
       console.log("Using Vercel URL for redirect URI:", productionUri);
       return productionUri;
     }
   }
   
   // Fallback to localhost for development
-  const fallbackUri = "http://localhost:8080/auth-callback.html";
+  const fallbackUri = "http://localhost:8080/auth/callback/gmail";
   console.log("Using fallback redirect URI:", fallbackUri);
   return fallbackUri;
 }
