@@ -542,18 +542,6 @@ export function useGmailConnect() {
       }
       
       console.log('Gmail: Starting connection process...');
-      
-      // Debug: Log what we're sending
-      const requestBody = { 
-        test: true,
-        redirectUri: `${window.location.origin}/auth/callback/gmail`
-      };
-      console.log('Gmail: Sending request to function:', {
-        origin: window.location.origin,
-        redirectUri: requestBody.redirectUri,
-        requestBody
-      });
-      
       setIsConnecting(true);
       
       // Get the current session to ensure auth headers are included
@@ -565,14 +553,10 @@ export function useGmailConnect() {
       
       // Call the Gmail auth Edge Function to get OAuth URL
       const response = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-        body: requestBody
-      });
-      
-      console.log('Gmail: Function response:', {
-        error: response.error,
-        dataUrl: response.data?.url,
-        dataRedirectUri: response.data?.redirectUri,
-        hasData: !!response.data
+        body: { 
+          test: true,
+          redirectUri: `${window.location.origin}/auth/callback/gmail`
+        }
       });
       
       if (response.error) {

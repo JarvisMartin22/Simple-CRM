@@ -97,12 +97,7 @@ serve(async (req) => {
     
     // Parse request body
     const requestData = await req.json();
-    console.log("Request data:", { 
-      hasCode: !!requestData.code, 
-      isTest: !!requestData.test,
-      providedRedirectUri: requestData.redirectUri,
-      origin: req.headers.get('Origin')
-    });
+    console.log("Request data:", { hasCode: !!requestData.code, isTest: !!requestData.test });
     
     // If this is a test request, generate auth URL
     if (requestData.test) {
@@ -111,13 +106,6 @@ serve(async (req) => {
       
       // Use the provided redirectUri if available, otherwise detect from origin
       const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
-      
-      console.log("Redirect URI determination:", {
-        providedRedirectUri: requestData.redirectUri,
-        detectedFromOrigin: getRedirectUri(req.headers.get('Origin')),
-        finalRedirectUri: redirectUri,
-        origin: req.headers.get('Origin')
-      });
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
@@ -145,17 +133,39 @@ serve(async (req) => {
     if (requestData.code) {
       console.log("Code exchange requested");
       
-      // Use the provided redirectUri if available, otherwise detect from origin
-      const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+              // Use the provided redirectUri if available, otherwise detect from origin
+        const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+        
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+          `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
+          `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+          `response_type=code&` +
+          `scope=${encodeURIComponent(scope)}&` +
+          `access_type=offline&` +
+          `state=${state}&` +
+          `prompt=consent`;
+        
+        console.log("Generated auth URL successfully with redirect URI:", redirectUri);
+        
+        return new Response(JSON.stringify({
+          url: authUrl,
+          redirectUri: redirectUri,
+          state: state,
+          status: "Success"
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
       
-      console.log("Redirect URI determination:", {
-        providedRedirectUri: requestData.redirectUri,
-        detectedFromOrigin: getRedirectUri(req.headers.get('Origin')),
-        finalRedirectUri: redirectUri,
-        origin: req.headers.get('Origin')
-      });
-      
-      const tokenRequestBody = new URLSearchParams({
+      // Handle code exchange (simplified for now)
+      if (requestData.code) {
+        console.log("Code exchange requested");
+        
+        // Use the provided redirectUri if available, otherwise detect from origin
+        const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+        
+        const tokenRequestBody = new URLSearchParams({
         code: requestData.code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,

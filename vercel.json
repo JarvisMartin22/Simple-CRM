@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.trygolly.com"
+        }
+      ],
+      "destination": "https://trygolly.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api|_next|_static|_vercel|favicon.ico|robots.txt|.*\\.).*)",

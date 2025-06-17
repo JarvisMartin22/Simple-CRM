@@ -8,7 +8,6 @@ export default function GmailCallback() {
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(true);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -20,15 +19,6 @@ export default function GmailCallback() {
         const state = params.get('state');
         const oauthError = params.get('error');
         
-        setDebugInfo(`Current URL: ${currentUrl.split('?')[0]}?[parameters]\nCode: ${code ? 'present' : 'missing'}\nState: ${state ? 'present' : 'missing'}\nError: ${oauthError || 'none'}`);
-        
-        console.log('Gmail Callback Debug:', {
-          currentUrl: currentUrl.split('?')[0] + '?[parameters]', // Hide actual parameters
-          code: code ? 'present' : 'missing',
-          state: state ? 'present' : 'missing',
-          error: oauthError || 'none'
-        });
-        
         if (oauthError) {
           throw new Error(`OAuth error: ${oauthError}`);
         }
@@ -37,6 +27,35 @@ export default function GmailCallback() {
           throw new Error('No authorization code received');
         }
 
+        // Check if we're in a popup window
+        const isPopup = window.opener !== null;
+
+        if (isPopup) {
+          // We're in a popup - send the code to the parent and close
+          try {
+            // Send message to parent window with the auth code
+            window.opener.postMessage({
+              type: 'GMAIL_AUTH_CODE',
+              code: code,
+              state: state
+            }, window.location.origin);
+            
+            // Close the popup after a short delay
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+            
+            // Don't process the code here - let the parent handle it
+            return;
+          } catch (e) {
+            console.error('Error communicating with parent window:', e);
+            // Fallback: process the code ourselves
+          }
+        }
+
+        // If we're not in a popup or communication failed, process the code ourselves
+        console.log('Received auth code, processing...');
+        
         // Check state parameter if it exists (CSRF protection)
         const savedState = localStorage.getItem('gmail_auth_state');
         if (state && savedState && state !== savedState) {
@@ -70,36 +89,17 @@ export default function GmailCallback() {
         console.log('Authentication successful');
         setProcessing(false);
         
-        // Check if we're in a popup window
-        const isPopup = window.opener !== null;
+        // Not in popup, show toast and redirect
+        toast({
+          title: "Gmail connected successfully",
+          description: `Connected as ${data.email}`,
+        });
         
-        if (isPopup) {
-          // Send message to parent window
-          try {
-            window.opener.postMessage({
-              type: 'GMAIL_AUTH_SUCCESS',
-              email: data.email
-            }, window.location.origin);
-          } catch (e) {
-            console.log('Could not send message to opener:', e);
-          }
-          
-          // Close the popup after a short delay
-          setTimeout(() => {
-            window.close();
-          }, 1500);
-        } else {
-          // Not in popup, show toast and redirect
-          toast({
-            title: "Gmail connected successfully",
-            description: `Connected as ${data.email}`,
-          });
-          
-          // Redirect back to the integrations page
-          setTimeout(() => {
-            navigate('/app/integrations');
-          }, 1500);
-        }
+        // Redirect back to the integrations page
+        setTimeout(() => {
+          navigate('/app/integrations');
+        }, 1500);
+        
       } catch (error) {
         console.error('Error in Gmail callback:', error);
         setError(error instanceof Error ? error.message : 'Failed to connect Gmail account');
@@ -114,14 +114,14 @@ export default function GmailCallback() {
               type: 'GMAIL_AUTH_ERROR',
               error: error instanceof Error ? error.message : 'Failed to connect Gmail account'
             }, window.location.origin);
+            
+            // Close popup after showing error
+            setTimeout(() => {
+              window.close();
+            }, 3000);
           } catch (e) {
             console.log('Could not send error message to opener:', e);
           }
-          
-          // Close popup after showing error
-          setTimeout(() => {
-            window.close();
-          }, 3000);
         } else {
           // Show error toast
           toast({
@@ -147,12 +147,6 @@ export default function GmailCallback() {
             <h1 className="text-2xl font-semibold mb-4 text-red-600">Connection Failed</h1>
             <p className="text-gray-600 mb-4">{error}</p>
             <p className="text-sm text-gray-500">Redirecting you back...</p>
-            {debugInfo && (
-              <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-left">
-                <strong>Debug Info:</strong>
-                <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-              </div>
-            )}
           </>
         ) : processing ? (
           <>
@@ -161,12 +155,6 @@ export default function GmailCallback() {
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div>
             </div>
             <p className="text-gray-600">Please wait while we complete the connection process.</p>
-            {debugInfo && (
-              <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-left">
-                <strong>Debug Info:</strong>
-                <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-              </div>
-            )}
           </>
         ) : (
           <>
