@@ -3,7 +3,45 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
-const REDIRECT_URI = "http://localhost:8080/auth-callback.html";
+
+// Function to determine redirect URI based on environment and origin
+function getRedirectUri(requestOrigin?: string): string {
+  // First, check if explicit redirect URI is set in environment
+  const configuredRedirectUri = Deno.env.get("GMAIL_REDIRECT_URI");
+  if (configuredRedirectUri) {
+    console.log("Using configured redirect URI:", configuredRedirectUri);
+    return configuredRedirectUri;
+  }
+  
+  // Try to determine from request origin
+  if (requestOrigin) {
+    try {
+      const origin = new URL(requestOrigin);
+      const dynamicUri = `${origin.origin}/auth-callback.html`;
+      console.log("Using dynamic redirect URI from origin:", dynamicUri);
+      return dynamicUri;
+    } catch (e) {
+      console.warn("Failed to parse request origin:", requestOrigin, e.message);
+    }
+  }
+  
+  // Check if we're in production environment
+  const isProduction = Deno.env.get("VERCEL") || Deno.env.get("NODE_ENV") === "production";
+  if (isProduction) {
+    // Try to get the production URL from Vercel environment variables
+    const vercelUrl = Deno.env.get("VERCEL_URL");
+    if (vercelUrl) {
+      const productionUri = `https://${vercelUrl}/auth-callback.html`;
+      console.log("Using Vercel URL for redirect URI:", productionUri);
+      return productionUri;
+    }
+  }
+  
+  // Fallback to localhost for development
+  const fallbackUri = "http://localhost:8080/auth-callback.html";
+  console.log("Using fallback redirect URI:", fallbackUri);
+  return fallbackUri;
+}
 
 // Gmail scopes
 const SCOPES = [
@@ -68,7 +106,7 @@ serve(async (req) => {
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
-        `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+        `redirect_uri=${encodeURIComponent(getRedirectUri(req.headers.get('Origin')))}&` +
         `response_type=code&` +
         `scope=${encodeURIComponent(scope)}&` +
         `access_type=offline&` +
@@ -79,7 +117,7 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({
         url: authUrl,
-        redirectUri: REDIRECT_URI,
+        redirectUri: getRedirectUri(req.headers.get('Origin')),
         state: state,
         status: "Success"
       }), {
@@ -96,7 +134,7 @@ serve(async (req) => {
         code: requestData.code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getRedirectUri(req.headers.get('Origin')),
         grant_type: "authorization_code",
       });
       

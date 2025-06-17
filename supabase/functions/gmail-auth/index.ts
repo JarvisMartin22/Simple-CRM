@@ -4,15 +4,45 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
-// Support multiple possible redirect URIs to handle different environments
-const configuredRedirectUri = Deno.env.get("GMAIL_REDIRECT_URI") || "";
-// Use an existing authorized redirect URI from Google Cloud Console
-const defaultRedirectUri = "http://localhost:8080/auth-callback.html";
-// Fallback URI also from Google Cloud Console authorized list
-const legacyRedirectUri = "http://localhost:8080/integrations";
 
-// Get the redirect URI from the environment variable or use the default
-const REDIRECT_URI = configuredRedirectUri || defaultRedirectUri;
+// Function to determine redirect URI based on environment and origin
+function getRedirectUri(requestOrigin?: string): string {
+  // First, check if explicit redirect URI is set in environment
+  const configuredRedirectUri = Deno.env.get("GMAIL_REDIRECT_URI");
+  if (configuredRedirectUri) {
+    console.log("Using configured redirect URI:", configuredRedirectUri);
+    return configuredRedirectUri;
+  }
+  
+  // Try to determine from request origin
+  if (requestOrigin) {
+    try {
+      const origin = new URL(requestOrigin);
+      const dynamicUri = `${origin.origin}/auth-callback.html`;
+      console.log("Using dynamic redirect URI from origin:", dynamicUri);
+      return dynamicUri;
+    } catch (e) {
+      console.warn("Failed to parse request origin:", requestOrigin, e.message);
+    }
+  }
+  
+  // Check if we're in production environment
+  const isProduction = Deno.env.get("VERCEL") || Deno.env.get("NODE_ENV") === "production";
+  if (isProduction) {
+    // Try to get the production URL from Vercel environment variables
+    const vercelUrl = Deno.env.get("VERCEL_URL");
+    if (vercelUrl) {
+      const productionUri = `https://${vercelUrl}/auth-callback.html`;
+      console.log("Using Vercel URL for redirect URI:", productionUri);
+      return productionUri;
+    }
+  }
+  
+  // Fallback to localhost for development
+  const fallbackUri = "http://localhost:8080/auth-callback.html";
+  console.log("Using fallback redirect URI:", fallbackUri);
+  return fallbackUri;
+}
 
 const API_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -24,10 +54,6 @@ console.log("- Client ID length:", GOOGLE_CLIENT_ID.length);
 console.log("- Client Secret length:", GOOGLE_CLIENT_SECRET.length);
 console.log("- Anon Key length:", SUPABASE_ANON_KEY.length);
 console.log("- Service Key length:", SERVICE_ROLE_KEY.length);
-console.log("- Configured Redirect URI from env:", configuredRedirectUri);
-console.log("- Default Redirect URI:", defaultRedirectUri);
-console.log("- Legacy Redirect URI:", legacyRedirectUri);
-console.log("- Active Redirect URI being used:", REDIRECT_URI);
 console.log("- API URL:", API_URL);
 
 // Scopes needed for Gmail integration
@@ -178,7 +204,7 @@ serve(async (req) => {
         // 1. If explicit redirectUri is provided in the request, use that
         // 2. Otherwise use the configured URI from environment or default
         const requestedRedirectUri = requestData.redirectUri;
-        const effectiveRedirectUri = requestedRedirectUri || REDIRECT_URI;
+        const effectiveRedirectUri = requestedRedirectUri || getRedirectUri(req.headers.get('Origin'));
         
         console.log("Auth URL generation:", {
           requestedUri: requestedRedirectUri ? "provided" : "not provided",
@@ -253,8 +279,8 @@ serve(async (req) => {
         }
         
         // Try with the primary redirect URI next
-        console.log("Using primary redirect URI for token exchange:", REDIRECT_URI);
-        const tokenExchangeResult = await exchangeCodeForToken(code, REDIRECT_URI);
+        console.log("Using primary redirect URI for token exchange:", getRedirectUri(req.headers.get('Origin')));
+        const tokenExchangeResult = await exchangeCodeForToken(code, getRedirectUri(req.headers.get('Origin')));
         
         if (tokenExchangeResult.success) {
           // Process successful authentication
@@ -264,7 +290,9 @@ serve(async (req) => {
         // If primary URI fails with redirect_uri_mismatch, try legacy URI
         if (tokenExchangeResult.error === "redirect_uri_mismatch") {
           console.log("Primary redirect URI failed, trying legacy URI");
-          const legacyExchangeResult = await exchangeCodeForToken(code, legacyRedirectUri);
+          const origin = req.headers.get('Origin');
+          const legacyUri = origin ? `${new URL(origin).origin}/integrations` : "http://localhost:8080/integrations";
+          const legacyExchangeResult = await exchangeCodeForToken(code, legacyUri);
           
           if (legacyExchangeResult.success) {
             return await processSuccessfulAuth(legacyExchangeResult.data, user, supabase);
