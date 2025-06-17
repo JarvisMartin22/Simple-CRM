@@ -8,14 +8,30 @@ export default function GmailCallback() {
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the authorization code from the URL
+        // Debug: Log the current URL and parameters
+        const currentUrl = window.location.href;
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
         const state = params.get('state');
+        const oauthError = params.get('error');
+        
+        setDebugInfo(`Current URL: ${currentUrl}\nCode: ${code ? 'present' : 'missing'}\nState: ${state ? 'present' : 'missing'}\nError: ${oauthError || 'none'}`);
+        
+        console.log('Gmail Callback Debug:', {
+          currentUrl,
+          code: code ? 'present' : 'missing',
+          state: state ? 'present' : 'missing',
+          error: oauthError || 'none'
+        });
+        
+        if (oauthError) {
+          throw new Error(`OAuth error: ${oauthError}`);
+        }
         
         if (!code) {
           throw new Error('No authorization code received');
@@ -41,7 +57,7 @@ export default function GmailCallback() {
 
         if (error) {
           console.error('Error from gmail-auth function:', error);
-          throw new Error(error.message || 'Failed to authenticate with Gmail');
+          throw new Error(typeof error === 'string' ? error : error.message || 'Failed to authenticate with Gmail');
         }
 
         if (!data) {
@@ -128,6 +144,12 @@ export default function GmailCallback() {
             <h1 className="text-2xl font-semibold mb-4 text-red-600">Connection Failed</h1>
             <p className="text-gray-600 mb-4">{error}</p>
             <p className="text-sm text-gray-500">Redirecting you back...</p>
+            {debugInfo && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-left">
+                <strong>Debug Info:</strong>
+                <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+              </div>
+            )}
           </>
         ) : processing ? (
           <>
@@ -136,6 +158,12 @@ export default function GmailCallback() {
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent"></div>
             </div>
             <p className="text-gray-600">Please wait while we complete the connection process.</p>
+            {debugInfo && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-left">
+                <strong>Debug Info:</strong>
+                <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+              </div>
+            )}
           </>
         ) : (
           <>
