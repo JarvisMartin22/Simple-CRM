@@ -20,10 +20,10 @@ export default function GmailCallback() {
         const state = params.get('state');
         const oauthError = params.get('error');
         
-        setDebugInfo(`Current URL: ${currentUrl}\nCode: ${code ? 'present' : 'missing'}\nState: ${state ? 'present' : 'missing'}\nError: ${oauthError || 'none'}`);
+        setDebugInfo(`Current URL: ${currentUrl.split('?')[0]}?[parameters]\nCode: ${code ? 'present' : 'missing'}\nState: ${state ? 'present' : 'missing'}\nError: ${oauthError || 'none'}`);
         
         console.log('Gmail Callback Debug:', {
-          currentUrl,
+          currentUrl: currentUrl.split('?')[0] + '?[parameters]', // Hide actual parameters
           code: code ? 'present' : 'missing',
           state: state ? 'present' : 'missing',
           error: oauthError || 'none'
@@ -52,7 +52,10 @@ export default function GmailCallback() {
         
         // Exchange the code for tokens
         const { data, error } = await supabase.functions.invoke('gmail-auth', {
-          body: { code }
+          body: { 
+            code,
+            redirectUri: `${window.location.origin}/auth/callback/gmail`
+          }
         });
 
         if (error) {

@@ -553,7 +553,10 @@ export function useGmailConnect() {
       
       // Call the Gmail auth Edge Function to get OAuth URL
       const response = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
-        body: { test: true }
+        body: { 
+          test: true,
+          redirectUri: `${window.location.origin}/auth/callback/gmail`
+        }
       });
       
       if (response.error) {

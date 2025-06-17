@@ -104,20 +104,23 @@ serve(async (req) => {
       const scope = SCOPES.join(" ");
       const state = crypto.randomUUID();
       
+      // Use the provided redirectUri if available, otherwise detect from origin
+      const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+      
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
-        `redirect_uri=${encodeURIComponent(getRedirectUri(req.headers.get('Origin')))}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
         `scope=${encodeURIComponent(scope)}&` +
         `access_type=offline&` +
         `state=${state}&` +
         `prompt=consent`;
       
-      console.log("Generated auth URL successfully");
+      console.log("Generated auth URL successfully with redirect URI:", redirectUri);
       
       return new Response(JSON.stringify({
         url: authUrl,
-        redirectUri: getRedirectUri(req.headers.get('Origin')),
+        redirectUri: redirectUri,
         state: state,
         status: "Success"
       }), {
@@ -130,11 +133,14 @@ serve(async (req) => {
     if (requestData.code) {
       console.log("Code exchange requested");
       
+      // Use the provided redirectUri if available, otherwise detect from origin
+      const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+      
       const tokenRequestBody = new URLSearchParams({
         code: requestData.code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: getRedirectUri(req.headers.get('Origin')),
+        redirect_uri: redirectUri,
         grant_type: "authorization_code",
       });
       

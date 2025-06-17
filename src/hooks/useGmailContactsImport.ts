@@ -207,12 +207,7 @@ export function useGmailContactsImport() {
       }
 
       // Call the Gmail contacts import function
-      console.log('Calling Gmail contacts import function with token:', {
-        tokenLength: integration.access_token?.length,
-        tokenStart: integration.access_token?.substring(0, 10) + '...',
-        expiresAt: integration.expires_at,
-        includeNoEmail
-      });
+      console.log('Calling Gmail contacts import function for contacts import');
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-contacts`, {
         method: 'POST',
