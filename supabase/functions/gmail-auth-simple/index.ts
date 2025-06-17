@@ -97,7 +97,12 @@ serve(async (req) => {
     
     // Parse request body
     const requestData = await req.json();
-    console.log("Request data:", { hasCode: !!requestData.code, isTest: !!requestData.test });
+    console.log("Request data:", { 
+      hasCode: !!requestData.code, 
+      isTest: !!requestData.test,
+      providedRedirectUri: requestData.redirectUri,
+      origin: req.headers.get('Origin')
+    });
     
     // If this is a test request, generate auth URL
     if (requestData.test) {
@@ -106,6 +111,13 @@ serve(async (req) => {
       
       // Use the provided redirectUri if available, otherwise detect from origin
       const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+      
+      console.log("Redirect URI determination:", {
+        providedRedirectUri: requestData.redirectUri,
+        detectedFromOrigin: getRedirectUri(req.headers.get('Origin')),
+        finalRedirectUri: redirectUri,
+        origin: req.headers.get('Origin')
+      });
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&` +
@@ -135,6 +147,13 @@ serve(async (req) => {
       
       // Use the provided redirectUri if available, otherwise detect from origin
       const redirectUri = requestData.redirectUri || getRedirectUri(req.headers.get('Origin'));
+      
+      console.log("Redirect URI determination:", {
+        providedRedirectUri: requestData.redirectUri,
+        detectedFromOrigin: getRedirectUri(req.headers.get('Origin')),
+        finalRedirectUri: redirectUri,
+        origin: req.headers.get('Origin')
+      });
       
       const tokenRequestBody = new URLSearchParams({
         code: requestData.code,
