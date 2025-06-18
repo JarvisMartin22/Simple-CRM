@@ -29,34 +29,22 @@ export default function GmailCallback() {
           throw new Error('No authorization code received');
         }
 
-        // Check if we're in a popup window
-        const isPopup = window.opener !== null;
+        // Check if we're in a popup window (more reliable detection)
+        const isPopup = window.opener !== null && window.opener !== window;
+        
+        console.log('Popup detection:', { 
+          hasOpener: window.opener !== null, 
+          isNotSelf: window.opener !== window,
+          isPopup: isPopup,
+          windowName: window.name 
+        });
 
         if (isPopup) {
-          // We're in a popup - try postMessage first, then localStorage fallback
-          try {
-            // Try postMessage first
-            window.opener.postMessage({
-              type: 'GMAIL_AUTH_CODE',
-              code: code,
-              state: state
-            }, window.location.origin);
-            
-            console.log('Successfully sent auth code via postMessage');
-            
-            // Close the popup after a short delay
-            setTimeout(() => {
-              window.close();
-            }, 1000);
-            
-            // Don't process the code here - let the parent handle it
-            return;
-          } catch (e) {
-            console.error('postMessage failed (likely COOP), using localStorage fallback:', e);
-            
-            // Fallback: Process the code ourselves and write result to localStorage
-            console.log('Processing auth code via localStorage fallback...');
-          }
+          console.log('Detected popup window - will process auth and close');
+          // We're in a popup - process the auth code and then communicate success
+          // Continue to process the code below, then close the popup
+        } else {
+          console.log('Not in popup - normal page flow');
         }
 
         // Process the code (either for localStorage fallback or normal flow)
@@ -158,21 +146,33 @@ export default function GmailCallback() {
         setProcessing(false);
         
         if (isPopup) {
-          // We're in a popup - write success to localStorage and close
-          const successResult = {
-            success: true,
-            email: data.email,
-            timestamp: Date.now()
-          };
-          
-          localStorage.setItem('gmail_auth_result', JSON.stringify(successResult));
-          console.log('📧 Gmail: Wrote success result to localStorage:', successResult);
-          
-          // Close the popup
-          setTimeout(() => {
-            console.log('📧 Gmail: Closing popup window...');
-            window.close();
-          }, 500);
+          // We're in a popup - send success message to parent and close
+          try {
+            console.log('📧 Gmail: Sending success message to parent window');
+            window.opener.postMessage({
+              type: 'GMAIL_AUTH_SUCCESS',
+              email: data.email,
+              provider: 'gmail'
+            }, window.location.origin);
+            
+            console.log('📧 Gmail: Success message sent, closing popup in 1 second');
+            
+            // Close the popup after a brief delay
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+          } catch (e) {
+            console.error('📧 Gmail: Failed to send message to parent:', e);
+            // If postMessage fails, show a manual success message
+            document.body.innerHTML = `
+              <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+                <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
+                <p>Connected as: ${data.email}</p>
+                <p>You can close this window and return to the application.</p>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer;">Close Window</button>
+              </div>
+            `;
+          }
         } else {
           // Not in popup, show toast and redirect
           toast({
@@ -192,23 +192,26 @@ export default function GmailCallback() {
         setProcessing(false);
         
         if (isPopup) {
-          // Try postMessage first, then localStorage fallback
+          // Try to send error message to parent
           try {
+            console.log('📧 Gmail: Sending error message to parent window');
             window.opener.postMessage({
               type: 'GMAIL_AUTH_ERROR',
               error: error instanceof Error ? error.message : 'Failed to connect Gmail account'
             }, window.location.origin);
             
-            console.log('Successfully sent error via postMessage');
+            console.log('📧 Gmail: Error message sent, closing popup in 3 seconds');
           } catch (e) {
-            console.log('postMessage failed, using localStorage fallback for error:', e);
-            
-            // Fallback: Write error to localStorage
-            localStorage.setItem('gmail_auth_result', JSON.stringify({
-              success: false,
-              error: error instanceof Error ? error.message : 'Failed to connect Gmail account',
-              timestamp: Date.now()
-            }));
+            console.error('📧 Gmail: Failed to send error to parent:', e);
+            // If postMessage fails, show manual error message
+            document.body.innerHTML = `
+              <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+                <h2 style="color: red;">❌ Gmail Connection Failed</h2>
+                <p>Error: ${error instanceof Error ? error.message : 'Failed to connect Gmail account'}</p>
+                <p>You can close this window and try again.</p>
+                <button onclick="window.close()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">Close Window</button>
+              </div>
+            `;
           }
           
           // Close popup after showing error
