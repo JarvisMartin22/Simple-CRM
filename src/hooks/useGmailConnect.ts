@@ -552,6 +552,7 @@ export function useGmailConnect() {
       }
       
       console.log('Gmail: Starting connection process...');
+      console.log('🔍 Expected redirect URI:', getGmailRedirectUri());
       setIsConnecting(true);
       
       // Get the current session to ensure auth headers are included

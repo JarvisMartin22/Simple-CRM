@@ -20,6 +20,13 @@ export default function GmailCallback() {
       const state = params.get('state');
       const oauthError = params.get('error');
       
+      console.log('🚨 CRITICAL DEBUG INFO:');
+      console.log('Current URL:', currentUrl);
+      console.log('Expected path: /auth/callback/gmail');
+      console.log('Actual path:', window.location.pathname);
+      console.log('Is correct callback path?', window.location.pathname === '/auth/callback/gmail');
+      console.log('Full search params:', window.location.search);
+      
       // Enhanced popup detection for COOP-restricted environments (moved outside try block)
       const hasOAuthParams = code && state;
       const fromGoogle = document.referrer.includes('accounts.google.com');
