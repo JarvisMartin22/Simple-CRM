@@ -90,8 +90,15 @@ export function useGmailConnectWithFallback() {
         } catch (e) {
           console.error('Error parsing localStorage auth result:', e);
         }
+      } else {
+        // Log periodic polling (every 10 polls)
+        const pollCount = (window as any).gmailPollCount || 0;
+        (window as any).gmailPollCount = pollCount + 1;
+        if (pollCount % 10 === 0) {
+          console.log('📧 Gmail: Still polling localStorage... (poll #' + pollCount + ')');
+        }
       }
-    }, 1000);
+    }, 500); // Poll more frequently (every 500ms)
     
     // Stop polling after timeout
     setTimeout(() => {
@@ -220,6 +227,9 @@ export function useGmailConnectWithFallback() {
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
       
+      // Log the OAuth URL for debugging
+      console.log('📧 Gmail: Opening OAuth URL:', response.data.url);
+      
       // Open popup
       activeAuthPopup = window.open(
         response.data.url,
@@ -227,7 +237,7 @@ export function useGmailConnectWithFallback() {
         `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
       );
       
-      if (!activeAuthPopup || activeAuthPopup.closed) {
+      if (!activeAuthPopup) {
         setIsConnecting(false);
         toast({
           title: "Popup blocked",
@@ -237,25 +247,19 @@ export function useGmailConnectWithFallback() {
         return false;
       }
       
+      console.log('📧 Gmail: Popup opened successfully');
+      
       // Start localStorage polling as fallback
       startLocalStoragePolling();
       
-      // Monitor popup closure
+      // Monitor popup closure (simplified - don't rely on window.closed due to COOP)
       const popupCheckInterval = setInterval(() => {
-        try {
-          if (!activeAuthPopup || activeAuthPopup.closed) {
-            clearInterval(popupCheckInterval);
-            
-            if (authPromiseResolve && !isPollingLocalStorage) {
-              setIsConnecting(false);
-              authPromiseResolve(false);
-              authPromiseResolve = null;
-            }
-          }
-        } catch (e) {
-          // COOP errors are expected - ignore them
+        // Just check if the popup reference exists
+        // COOP will prevent us from checking window.closed, so we rely on localStorage polling
+        if (!activeAuthPopup) {
+          clearInterval(popupCheckInterval);
         }
-      }, 1000);
+      }, 5000); // Check less frequently since we can't reliably detect closure
       
       // Set timeout
       const timeoutId = setTimeout(() => {
