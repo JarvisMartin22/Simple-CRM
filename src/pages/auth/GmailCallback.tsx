@@ -30,13 +30,15 @@ export default function GmailCallback() {
         }
 
         // Check if we're in a popup window (more reliable detection)
-        const isPopup = window.opener !== null && window.opener !== window;
+        const isPopup = (window.opener !== null && window.opener !== window) || window.name === 'gmail_auth';
         
         console.log('Popup detection:', { 
           hasOpener: window.opener !== null, 
           isNotSelf: window.opener !== window,
           isPopup: isPopup,
-          windowName: window.name 
+          windowName: window.name,
+          origin: window.location.origin,
+          parentOrigin: window.opener ? 'present' : 'none'
         });
 
         if (isPopup) {
@@ -157,6 +159,15 @@ export default function GmailCallback() {
             
             console.log('📧 Gmail: Success message sent, closing popup in 1 second');
             
+            // Show success message immediately and close popup
+            document.body.innerHTML = `
+              <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+                <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
+                <p>Connected as: ${data.email}</p>
+                <p>This window will close automatically...</p>
+              </div>
+            `;
+            
             // Close the popup after a brief delay
             setTimeout(() => {
               window.close();
@@ -168,7 +179,7 @@ export default function GmailCallback() {
               <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
                 <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
                 <p>Connected as: ${data.email}</p>
-                <p>You can close this window and return to the application.</p>
+                <p>Close this window and return to the application.</p>
                 <button onclick="window.close()" style="padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer;">Close Window</button>
               </div>
             `;

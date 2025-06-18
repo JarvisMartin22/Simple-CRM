@@ -38,11 +38,18 @@ export function useGmailConnect() {
         description: `Connected as ${data.email}`,
       });
       
-      // Invalidate queries
+      // Force refresh all integration-related queries
       queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
       queryClient.invalidateQueries({ queryKey: ['email-integration'] });
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
       queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
       queryClient.invalidateQueries({ queryKey: ['email-stats'] });
+      
+      // Force immediate refetch
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['gmail-integration'] });
+        queryClient.refetchQueries({ queryKey: ['integrations'] });
+      }, 500);
       
       if (authPromiseResolve) {
         authPromiseResolve(true);
