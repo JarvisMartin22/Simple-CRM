@@ -148,41 +148,30 @@ export default function GmailCallback() {
         setProcessing(false);
         
         if (isPopup) {
-          // We're in a popup - send success message to parent and close
+          // We're in a popup - show success and try to communicate with parent
+          console.log('📧 Gmail: In popup mode, showing success message');
+          
+          // Always show success message first
+          document.body.innerHTML = `
+            <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+              <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
+              <p>Connected as: ${data.email}</p>
+              <p>Please refresh the main application to see the connection.</p>
+              <button onclick="window.close()" style="padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 20px;">Close Window</button>
+            </div>
+          `;
+          
+          // Try to send message to parent (will fail due to COOP but that's ok)
           try {
-            console.log('📧 Gmail: Sending success message to parent window');
+            console.log('📧 Gmail: Attempting to send success message to parent');
             window.opener.postMessage({
               type: 'GMAIL_AUTH_SUCCESS',
               email: data.email,
               provider: 'gmail'
             }, window.location.origin);
-            
-            console.log('📧 Gmail: Success message sent, closing popup in 1 second');
-            
-            // Show success message immediately and close popup
-            document.body.innerHTML = `
-              <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
-                <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
-                <p>Connected as: ${data.email}</p>
-                <p>This window will close automatically...</p>
-              </div>
-            `;
-            
-            // Close the popup after a brief delay
-            setTimeout(() => {
-              window.close();
-            }, 1000);
+            console.log('📧 Gmail: Success message sent (if COOP allows)');
           } catch (e) {
-            console.error('📧 Gmail: Failed to send message to parent:', e);
-            // If postMessage fails, show a manual success message
-            document.body.innerHTML = `
-              <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
-                <h2 style="color: green;">✅ Gmail Connected Successfully!</h2>
-                <p>Connected as: ${data.email}</p>
-                <p>Close this window and return to the application.</p>
-                <button onclick="window.close()" style="padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 5px; cursor: pointer;">Close Window</button>
-              </div>
-            `;
+            console.log('📧 Gmail: PostMessage blocked by COOP (expected):', e.message);
           }
         } else {
           // Not in popup, show toast and redirect

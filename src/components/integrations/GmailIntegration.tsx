@@ -77,7 +77,7 @@ const GmailIntegration = () => {
     };
   }, [isConnecting, resetConnectionState, toast]);
   
-  // Fetch integration data
+  // Fetch integration data with auto-refresh
   const { data: dbIntegration, isLoading, error, refetch } = useQuery<Integration | null>({
     queryKey: ['gmail-integration', user?.id],
     queryFn: async () => {
@@ -113,7 +113,8 @@ const GmailIntegration = () => {
     },
     enabled: !!user?.id,
     retry: false,
-    staleTime: 60000 // Cache for 1 minute to reduce DB load
+    refetchInterval: isConnecting ? 2000 : 30000, // Auto-refresh every 2s when connecting, every 30s otherwise
+    staleTime: 10000 // Shorter cache time to pick up changes faster
   });
   
   // Get effective integration (prioritize database, fallback to localStorage)
