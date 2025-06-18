@@ -13,14 +13,32 @@ export default function GmailCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Debug: Log the current URL and parameters
+      const currentUrl = window.location.href;
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const oauthError = params.get('error');
+      
+      // Enhanced popup detection for COOP-restricted environments (moved outside try block)
+      const hasOAuthParams = code && state;
+      const fromGoogle = document.referrer.includes('accounts.google.com');
+      const traditionalPopupDetection = window.name === 'gmail_auth' || 
+                                       (window.opener !== null && window.opener !== window);
+      
+      // Additional detection methods for COOP environments
+      const hasPopupFeatures = window.outerWidth <= 700 && window.outerHeight <= 800; // Popup-sized window
+      const isPopupContext = window !== window.top; // Not the top-level window
+      const hasAuthFlow = hasOAuthParams && (fromGoogle || window.location.search.includes('code='));
+      
+      // Force popup mode if any reliable indicator suggests we're in a popup
+      // In COOP environments, we rely heavily on OAuth params + context clues
+      const isPopup = traditionalPopupDetection || 
+                     (hasAuthFlow && (hasPopupFeatures || isPopupContext)) ||
+                     (hasOAuthParams && fromGoogle) ||
+                     (hasOAuthParams && window.location.search.includes('state='));
+      
       try {
-        // Debug: Log the current URL and parameters
-        const currentUrl = window.location.href;
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get('code');
-        const state = params.get('state');
-        const oauthError = params.get('error');
-        
         if (oauthError) {
           throw new Error(`OAuth error: ${oauthError}`);
         }
@@ -28,15 +46,19 @@ export default function GmailCallback() {
         if (!code) {
           throw new Error('No authorization code received');
         }
-
-        // Check if we're in a popup window (more reliable detection)
-        const isPopup = (window.opener !== null && window.opener !== window) || window.name === 'gmail_auth';
         
         console.log('Popup detection:', { 
           hasOpener: window.opener !== null, 
           isNotSelf: window.opener !== window,
+          hasOAuthParams,
+          fromGoogle,
+          hasPopupFeatures,
+          isPopupContext,
+          hasAuthFlow,
+          traditionalPopupDetection,
           isPopup: isPopup,
           windowName: window.name,
+          windowSize: `${window.outerWidth}x${window.outerHeight}`,
           origin: window.location.origin,
           parentOrigin: window.opener ? 'present' : 'none'
         });
