@@ -32,14 +32,16 @@ export default function GmailCallback() {
         const isPopup = window.opener !== null;
 
         if (isPopup) {
-          // We're in a popup - send the code to the parent and close
+          // We're in a popup - try postMessage first, then localStorage fallback
           try {
-            // Send message to parent window with the auth code
+            // Try postMessage first
             window.opener.postMessage({
               type: 'GMAIL_AUTH_CODE',
               code: code,
               state: state
             }, window.location.origin);
+            
+            console.log('Successfully sent auth code via postMessage');
             
             // Close the popup after a short delay
             setTimeout(() => {
@@ -49,8 +51,11 @@ export default function GmailCallback() {
             // Don't process the code here - let the parent handle it
             return;
           } catch (e) {
-            console.error('Error communicating with parent window:', e);
-            // Fallback: process the code ourselves
+            console.error('postMessage failed (likely COOP), using localStorage fallback:', e);
+            
+            // Fallback: Use localStorage to communicate
+            // Process the code and write result to localStorage
+            // (This will be handled by the main flow below)
           }
         }
 
@@ -90,16 +95,35 @@ export default function GmailCallback() {
         console.log('Authentication successful');
         setProcessing(false);
         
-        // Not in popup, show toast and redirect
-        toast({
-          title: "Gmail connected successfully",
-          description: `Connected as ${data.email}`,
-        });
+        // Check if we're in a popup window
+        const isPopup = window.opener !== null;
         
-        // Redirect back to the integrations page
-        setTimeout(() => {
-          navigate(GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT);
-        }, 1500);
+        if (isPopup) {
+          // We're in a popup - write success to localStorage and close
+          localStorage.setItem('gmail_auth_result', JSON.stringify({
+            success: true,
+            email: data.email,
+            timestamp: Date.now()
+          }));
+          
+          console.log('Wrote success result to localStorage for parent window');
+          
+          // Close the popup
+          setTimeout(() => {
+            window.close();
+          }, 500);
+        } else {
+          // Not in popup, show toast and redirect
+          toast({
+            title: "Gmail connected successfully",
+            description: `Connected as ${data.email}`,
+          });
+          
+          // Redirect back to the integrations page
+          setTimeout(() => {
+            navigate(GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT);
+          }, 1500);
+        }
         
       } catch (error) {
         console.error('Error in Gmail callback:', error);
@@ -109,20 +133,29 @@ export default function GmailCallback() {
         const isPopup = window.opener !== null;
         
         if (isPopup) {
-          // Send error message to parent window
+          // Try postMessage first, then localStorage fallback
           try {
             window.opener.postMessage({
               type: 'GMAIL_AUTH_ERROR',
               error: error instanceof Error ? error.message : 'Failed to connect Gmail account'
             }, window.location.origin);
             
-            // Close popup after showing error
-            setTimeout(() => {
-              window.close();
-            }, 3000);
+            console.log('Successfully sent error via postMessage');
           } catch (e) {
-            console.log('Could not send error message to opener:', e);
+            console.log('postMessage failed, using localStorage fallback for error:', e);
+            
+            // Fallback: Write error to localStorage
+            localStorage.setItem('gmail_auth_result', JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : 'Failed to connect Gmail account',
+              timestamp: Date.now()
+            }));
           }
+          
+          // Close popup after showing error
+          setTimeout(() => {
+            window.close();
+          }, 3000);
         } else {
           // Show error toast
           toast({
