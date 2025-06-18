@@ -314,9 +314,7 @@ export function useGmailConnect() {
           // Close the popup if it's still open
           if (activeAuthPopup) {
             try {
-              if (!activeAuthPopup.closed) {
-                activeAuthPopup.close();
-              }
+              activeAuthPopup.close();
             } catch (e) {
               // Silently handle COOP policy restrictions
             }
@@ -345,9 +343,7 @@ export function useGmailConnect() {
         // Close the popup if it's still open
         if (activeAuthPopup) {
           try {
-            if (!activeAuthPopup.closed) {
-              activeAuthPopup.close();
-            }
+            activeAuthPopup.close();
           } catch (e) {
             // Silently handle COOP policy restrictions
           }
@@ -614,7 +610,7 @@ export function useGmailConnect() {
       );
       
       // Check if popup was blocked
-      if (!activeAuthPopup || activeAuthPopup.closed) {
+      if (!activeAuthPopup) {
         setIsConnecting(false);
         toast({
           title: "Popup blocked",
@@ -624,38 +620,18 @@ export function useGmailConnect() {
         return false;
       }
       
-      // Monitor the popup window
-      const popupCheckInterval = setInterval(() => {
-        try {
-          // Check if the popup is closed (this may throw COOP errors)
-          if (!activeAuthPopup || activeAuthPopup.closed) {
-            clearInterval(popupCheckInterval);
-            
-            // If the auth promise hasn't been resolved yet, assume the user canceled
-            if (authPromiseResolve) {
-              setIsConnecting(false);
-              authPromiseResolve(false);
-              authPromiseResolve = null;
-            }
-          }
-        } catch (e) {
-          // COOP policy might block access to window.closed
-          // This is expected behavior and not an error - just silently continue
-          // The auth code handler or timeout will eventually resolve the authentication flow
-        }
-      }, 1000);
+      // Note: We don't monitor popup window in COOP environments since window.closed
+      // calls are blocked and generate errors. The auth flow will complete via
+      // the callback page or timeout instead.
       
       // Set timeout to prevent hanging if auth takes too long
       const timeoutId = setTimeout(() => {
         if (authPromiseResolve) {
           console.log('Auth timeout reached, canceling...');
-          clearInterval(popupCheckInterval);
           
           if (activeAuthPopup) {
             try {
-              if (!activeAuthPopup.closed) {
-                activeAuthPopup.close();
-              }
+              activeAuthPopup.close();
             } catch (e) {
               // Silently handle COOP policy restrictions
             }
@@ -678,7 +654,6 @@ export function useGmailConnect() {
       
       // Clean up
       clearTimeout(timeoutId);
-      clearInterval(popupCheckInterval);
       
       return result;
     } catch (error) {
