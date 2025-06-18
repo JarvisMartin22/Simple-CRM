@@ -95,9 +95,6 @@ export default function GmailCallback() {
         console.log('Authentication successful');
         setProcessing(false);
         
-        // Check if we're in a popup window
-        const isPopup = window.opener !== null;
-        
         if (isPopup) {
           // We're in a popup - write success to localStorage and close
           localStorage.setItem('gmail_auth_result', JSON.stringify({
@@ -129,8 +126,6 @@ export default function GmailCallback() {
         console.error('Error in Gmail callback:', error);
         setError(error instanceof Error ? error.message : 'Failed to connect Gmail account');
         setProcessing(false);
-        
-        const isPopup = window.opener !== null;
         
         if (isPopup) {
           // Try postMessage first, then localStorage fallback
