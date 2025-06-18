@@ -78,6 +78,9 @@ const App: React.FC = () => {
                       <Route path="/auth/test-supabase" element={<TestSupabase />} />
                       <Route path="/" element={<LandingPage />} />
                       
+                      {/* Redirect for simplified integrations route */}
+                      <Route path="/integrations" element={<Navigate to="/app/integrations" replace />} />
+                      
                       {/* Legal pages (public) */}
                       <Route path="/legal/privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="/legal/terms-of-service" element={<TermsOfService />} />

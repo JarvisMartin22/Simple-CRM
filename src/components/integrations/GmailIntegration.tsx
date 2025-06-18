@@ -193,7 +193,7 @@ const GmailIntegration = () => {
   }
   
   return (
-    <Card>
+    <Card data-testid="gmail-integration">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
@@ -269,7 +269,7 @@ const GmailIntegration = () => {
             
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full">
+                <Button className="w-full" data-testid="connect-gmail-button">
                   Connect Gmail
                 </Button>
               </DialogTrigger>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { GMAIL_OAUTH_CONFIG, getGmailRedirectUri } from '@/config/gmail';
 
 export default function GmailCallback() {
   const navigate = useNavigate();
@@ -69,11 +70,11 @@ export default function GmailCallback() {
 
         console.log('Received auth code, processing...');
         
-        // Exchange the code for tokens
-        const { data, error } = await supabase.functions.invoke('gmail-auth', {
+        // Exchange the code for tokens using the simple auth function
+        const { data, error } = await supabase.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
           body: { 
             code,
-            redirectUri: `${window.location.origin}/auth/callback/gmail`
+            redirectUri: getGmailRedirectUri()
           }
         });
 
@@ -97,7 +98,7 @@ export default function GmailCallback() {
         
         // Redirect back to the integrations page
         setTimeout(() => {
-          navigate('/app/integrations');
+          navigate(GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT);
         }, 1500);
         
       } catch (error) {
@@ -131,7 +132,7 @@ export default function GmailCallback() {
           });
           
           // Redirect after a short delay to show the error
-          setTimeout(() => navigate('/app/integrations'), 3000);
+          setTimeout(() => navigate(GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT), 3000);
         }
       }
     };

@@ -37,9 +37,12 @@ export default function GmailCallback() {
 
         console.log('Received auth code, processing...')
         
-        // Exchange the code for tokens
-        const { data, error } = await supabase.functions.invoke('gmail-auth', {
-          body: { code }
+        // Exchange the code for tokens using the simple auth function
+        const { data, error } = await supabase.functions.invoke('gmail-auth-simple', {
+          body: { 
+            code,
+            redirectUri: `${window.location.origin}/auth/callback/gmail`
+          }
         })
 
         if (error) {
@@ -56,14 +59,14 @@ export default function GmailCallback() {
         
         // Redirect back to the integrations page
         setTimeout(() => {
-          router.push('/settings/integrations')
+          router.push('/integrations')
         }, 1500)
       } catch (error) {
         console.error('Error in Gmail callback:', error)
         setError(error instanceof Error ? error.message : 'Failed to connect Gmail account')
         setProcessing(false)
         // Redirect after a short delay to show the error
-        setTimeout(() => router.push('/settings/integrations'), 3000)
+        setTimeout(() => router.push('/integrations'), 3000)
       }
     }
 

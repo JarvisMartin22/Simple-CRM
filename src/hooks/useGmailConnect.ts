@@ -4,14 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseWithAuth } from '@/lib/supabaseWithAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { GMAIL_OAUTH_CONFIG, getGmailRedirectUri } from '@/config/gmail';
 
 // Global variable to track if listener is attached
 let isMessageListenerAttached = false;
 let activeAuthPopup: Window | null = null;
 let authPromiseResolve: ((value: boolean) => void) | null = null;
 
-// Configure this based on your app's needs
-const REDIRECT_TIMEOUT_MS = 120000; // 2 minutes
+// Use centralized configuration
+const REDIRECT_TIMEOUT_MS = GMAIL_OAUTH_CONFIG.REDIRECT_TIMEOUT_MS;
 
 export function useGmailConnect() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -123,10 +124,10 @@ export function useGmailConnect() {
         const { data: { session } } = await supabase.auth.getSession();
         
         // Call Gmail auth endpoint with the code
-        const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
+        const tokenResponse = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
           body: { 
             code: data.code,
-            redirectUri: `${window.location.origin}/auth/callback/gmail`
+            redirectUri: getGmailRedirectUri()
           }
         });
         
@@ -424,10 +425,10 @@ export function useGmailConnect() {
             const { data: { session } } = await supabase.auth.getSession();
             
             // Call Gmail auth endpoint with the code
-            const tokenResponse = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
+            const tokenResponse = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
               body: { 
                 code: code,
-                redirectUri: `${window.location.origin}/auth/callback/gmail`
+                redirectUri: getGmailRedirectUri()
               }
             });
             
@@ -558,10 +559,10 @@ export function useGmailConnect() {
       }
       
       // Call the Gmail auth Edge Function to get OAuth URL
-      const response = await supabaseWithAuth.functions.invoke('gmail-auth-simple', {
+      const response = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
         body: { 
           test: true,
-          redirectUri: `${window.location.origin}/auth/callback/gmail`
+          redirectUri: getGmailRedirectUri()
         }
       });
       

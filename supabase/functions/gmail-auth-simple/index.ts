@@ -1,58 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { GMAIL_CONFIG, getRedirectUri, validateOAuthConfig } from "../_shared/gmail-config.ts";
 
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
-
-// Function to determine redirect URI based on environment and origin
-function getRedirectUri(requestOrigin?: string): string {
-  // First, check if explicit redirect URI is set in environment
-  const configuredRedirectUri = Deno.env.get("GMAIL_REDIRECT_URI");
-  if (configuredRedirectUri) {
-    console.log("Using configured redirect URI:", configuredRedirectUri);
-    return configuredRedirectUri;
-  }
-  
-  // Try to determine from request origin
-  if (requestOrigin) {
-    try {
-      const origin = new URL(requestOrigin);
-      const dynamicUri = `${origin.origin}/auth/callback/gmail`;
-      console.log("Using dynamic redirect URI from origin:", dynamicUri);
-      return dynamicUri;
-    } catch (e) {
-      console.warn("Failed to parse request origin:", requestOrigin, e.message);
-    }
-  }
-  
-  // Check if we're in production environment
-  const isProduction = Deno.env.get("VERCEL") || Deno.env.get("NODE_ENV") === "production";
-  if (isProduction) {
-    // Try to get the production URL from Vercel environment variables
-    const vercelUrl = Deno.env.get("VERCEL_URL");
-    if (vercelUrl) {
-      const productionUri = `https://${vercelUrl}/auth/callback/gmail`;
-      console.log("Using Vercel URL for redirect URI:", productionUri);
-      return productionUri;
-    }
-  }
-  
-  // Fallback to localhost for development
-  const fallbackUri = "http://localhost:8080/auth/callback/gmail";
-  console.log("Using fallback redirect URI:", fallbackUri);
-  return fallbackUri;
-}
-
-// Gmail scopes
-const SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-  "https://www.googleapis.com/auth/contacts.readonly",
-  "https://www.googleapis.com/auth/contacts.other.readonly",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/userinfo.profile",
-  "openid"
-];
 
 serve(async (req) => {
   // Handle CORS
@@ -101,7 +52,21 @@ serve(async (req) => {
     
     // If this is a test request, generate auth URL
     if (requestData.test) {
-      const scope = SCOPES.join(" ");
+      // Validate OAuth configuration
+      const validation = validateOAuthConfig(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
+      if (!validation.isValid) {
+        console.error("OAuth configuration issues:", validation.issues);
+        return new Response(JSON.stringify({
+          error: "OAuth configuration error",
+          status: "Error",
+          details: validation.issues
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      
+      const scope = GMAIL_CONFIG.SCOPES.join(" ");
       const state = crypto.randomUUID();
       
       // Use the provided redirectUri if available, otherwise detect from origin
