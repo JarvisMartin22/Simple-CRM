@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { useGmailConnect } from "@/hooks/useGmailConnect";
+import { useGmailConnectWithFallback as useGmailConnect } from "@/hooks/useGmailConnectWithFallback";
 import { useGmailDisconnect } from "@/hooks/useGmailDisconnect";
 import { ConfirmDisconnect } from "./ConfirmDisconnect";
 

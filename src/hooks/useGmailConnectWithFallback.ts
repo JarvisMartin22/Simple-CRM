@@ -33,10 +33,13 @@ export function useGmailConnectWithFallback() {
   const startLocalStoragePolling = () => {
     if (isPollingLocalStorage) return;
     
+    console.log('📧 Gmail: Starting localStorage polling fallback...');
     isPollingLocalStorage = true;
+    
     const pollInterval = setInterval(() => {
       const authResult = localStorage.getItem('gmail_auth_result');
       if (authResult) {
+        console.log('📧 Gmail: Found auth result in localStorage:', authResult);
         try {
           const result = JSON.parse(authResult);
           localStorage.removeItem('gmail_auth_result');
@@ -51,6 +54,9 @@ export function useGmailConnectWithFallback() {
             
             queryClient.invalidateQueries({ queryKey: ['gmail-integration'] });
             queryClient.invalidateQueries({ queryKey: ['email-integration'] });
+            queryClient.invalidateQueries({ queryKey: ['integrations'] });
+            queryClient.invalidateQueries({ queryKey: ['recent-emails'] });
+            queryClient.invalidateQueries({ queryKey: ['email-stats'] });
             
             if (authPromiseResolve) {
               authPromiseResolve(true);

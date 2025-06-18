@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { supabaseWithAuth } from '@/lib/supabaseWithAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { GMAIL_OAUTH_CONFIG, getGmailRedirectUri } from '@/config/gmail';
 
@@ -53,13 +54,12 @@ export default function GmailCallback() {
           } catch (e) {
             console.error('postMessage failed (likely COOP), using localStorage fallback:', e);
             
-            // Fallback: Use localStorage to communicate
-            // Process the code and write result to localStorage
-            // (This will be handled by the main flow below)
+            // Fallback: Process the code ourselves and write result to localStorage
+            console.log('Processing auth code via localStorage fallback...');
           }
         }
 
-        // If we're not in a popup or communication failed, process the code ourselves
+        // Process the code (either for localStorage fallback or normal flow)
         console.log('Received auth code, processing...');
         
         // Check state parameter if it exists (CSRF protection)
@@ -76,7 +76,7 @@ export default function GmailCallback() {
         console.log('Received auth code, processing...');
         
         // Exchange the code for tokens using the simple auth function
-        const { data, error } = await supabase.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
+        const { data, error } = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
           body: { 
             code,
             redirectUri: getGmailRedirectUri()
@@ -92,21 +92,85 @@ export default function GmailCallback() {
           throw new Error('No data received from authentication service');
         }
 
-        console.log('Authentication successful');
+        console.log('Authentication successful, saving integration...');
+        
+        // Save the integration to the database
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('No authenticated user found');
+        }
+
+        // Check for existing integration
+        const { data: existingIntegration, error: checkError } = await supabase
+          .from('user_integrations')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('provider', 'gmail')
+          .maybeSingle();
+          
+        if (checkError && checkError.code !== 'PGRST116') {
+          console.error('Error checking existing integration:', checkError);
+          throw new Error(`Database error: ${checkError.message}`);
+        }
+
+        const integrationData = {
+          user_id: user.id,
+          provider: data.provider || "gmail",
+          provider_user_id: data.provider_user_id || null,
+          email: data.email || null,
+          access_token: data.access_token || "",
+          refresh_token: data.refresh_token || null,
+          expires_at: typeof data.expires_at === 'number' 
+            ? new Date(data.expires_at).toISOString() 
+            : data.expires_at,
+          scope: data.scope || null
+        };
+
+        let saveResult;
+        if (existingIntegration) {
+          // Update existing integration
+          saveResult = await supabase
+            .from('user_integrations')
+            .update({
+              ...integrationData,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingIntegration.id)
+            .select();
+        } else {
+          // Insert new integration
+          saveResult = await supabase
+            .from('user_integrations')
+            .insert({
+              ...integrationData,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .select();
+        }
+
+        if (saveResult.error) {
+          console.error('Error saving integration:', saveResult.error);
+          throw new Error(`Failed to save integration: ${saveResult.error.message}`);
+        }
+
+        console.log('Integration saved successfully');
         setProcessing(false);
         
         if (isPopup) {
           // We're in a popup - write success to localStorage and close
-          localStorage.setItem('gmail_auth_result', JSON.stringify({
+          const successResult = {
             success: true,
             email: data.email,
             timestamp: Date.now()
-          }));
+          };
           
-          console.log('Wrote success result to localStorage for parent window');
+          localStorage.setItem('gmail_auth_result', JSON.stringify(successResult));
+          console.log('📧 Gmail: Wrote success result to localStorage:', successResult);
           
           // Close the popup
           setTimeout(() => {
+            console.log('📧 Gmail: Closing popup window...');
             window.close();
           }, 500);
         } else {
