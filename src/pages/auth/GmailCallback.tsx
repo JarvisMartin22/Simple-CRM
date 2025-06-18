@@ -33,10 +33,12 @@ export default function GmailCallback() {
       
       // Force popup mode if any reliable indicator suggests we're in a popup
       // In COOP environments, we rely heavily on OAuth params + context clues
+      // For production, be more aggressive about popup detection
       const isPopup = traditionalPopupDetection || 
                      (hasAuthFlow && (hasPopupFeatures || isPopupContext)) ||
                      (hasOAuthParams && fromGoogle) ||
-                     (hasOAuthParams && window.location.search.includes('state='));
+                     (hasOAuthParams && window.location.search.includes('state=')) ||
+                     (hasOAuthParams && window.location.hostname !== 'localhost'); // Assume popup for non-localhost with OAuth params
       
       try {
         if (oauthError) {
@@ -56,6 +58,8 @@ export default function GmailCallback() {
           isPopupContext,
           hasAuthFlow,
           traditionalPopupDetection,
+          hostname: window.location.hostname,
+          isNotLocalhost: window.location.hostname !== 'localhost',
           isPopup: isPopup,
           windowName: window.name,
           windowSize: `${window.outerWidth}x${window.outerHeight}`,
@@ -195,6 +199,9 @@ export default function GmailCallback() {
           } catch (e) {
             console.log('📧 Gmail: PostMessage blocked by COOP (expected):', e.message);
           }
+          
+          // IMPORTANT: Return early to prevent any navigation
+          return;
         } else {
           // Not in popup, show toast and redirect
           toast({
