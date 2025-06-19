@@ -79,7 +79,8 @@ serve(async (req) => {
         `scope=${encodeURIComponent(scope)}&` +
         `access_type=offline&` +
         `state=${state}&` +
-        `prompt=consent`;
+        `prompt=consent&` +
+        `include_granted_scopes=true`; // Force Google to refresh redirect URI cache
       
       console.log("Generated auth URL successfully with redirect URI:", redirectUri);
       
