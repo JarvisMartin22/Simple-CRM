@@ -10,9 +10,13 @@ export default function GmailCallback() {
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(true);
+  
+  console.log('🚀 GMAIL CALLBACK COMPONENT: Mounted/Rendered');
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('🔥 GMAIL CALLBACK: Starting handleCallback function');
+      
       // Debug: Log the current URL and parameters
       const currentUrl = window.location.href;
       const params = new URLSearchParams(window.location.search);
@@ -26,6 +30,9 @@ export default function GmailCallback() {
       console.log('Actual path:', window.location.pathname);
       console.log('Is correct callback path?', window.location.pathname === '/auth/callback/gmail');
       console.log('Full search params:', window.location.search);
+      console.log('Code present:', !!code);
+      console.log('State present:', !!state);
+      console.log('Error present:', !!oauthError);
       
       // Enhanced popup detection for COOP-restricted environments (moved outside try block)
       const hasOAuthParams = code && state;
@@ -198,8 +205,11 @@ export default function GmailCallback() {
         console.log('Integration saved successfully');
         setProcessing(false);
         
+        console.log('🎯 DECISION POINT: isPopup =', isPopup);
+        
         if (isPopup) {
           // We're in a popup - show success and try to communicate with parent
+          console.log('✅ POPUP PATH: Entering popup mode - will show success UI and return early');
           console.log('📧 Gmail: In popup mode, showing success message');
           
           // Always show success message first
@@ -229,6 +239,9 @@ export default function GmailCallback() {
           return;
         } else {
           // Not in popup, show toast and redirect
+          console.log('❌ NON-POPUP PATH: Will redirect to /integrations');
+          console.log('📧 Gmail: Not in popup mode, showing toast and redirecting');
+          
           toast({
             title: "Gmail connected successfully",
             description: `Connected as ${data.email}`,
@@ -236,6 +249,7 @@ export default function GmailCallback() {
           
           // Redirect back to the integrations page
           setTimeout(() => {
+            console.log('🔄 REDIRECTING to:', GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT);
             navigate(GMAIL_OAUTH_CONFIG.SUCCESS_REDIRECT);
           }, 1500);
         }

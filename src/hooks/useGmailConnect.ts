@@ -586,6 +586,21 @@ export function useGmailConnect() {
         throw new Error('Invalid response from server: Missing authorization URL');
       }
       
+      console.log('🔍 OAUTH URL ANALYSIS:');
+      console.log('Generated OAuth URL:', response.data.url);
+      console.log('Redirect URI in response:', response.data.redirectUri);
+      
+      // Parse the OAuth URL to see the redirect_uri parameter
+      try {
+        const oauthUrl = new URL(response.data.url);
+        const redirectUriParam = oauthUrl.searchParams.get('redirect_uri');
+        console.log('🎯 ACTUAL REDIRECT_URI PARAM:', redirectUriParam);
+        console.log('🎯 EXPECTED:', getGmailRedirectUri());
+        console.log('🎯 MATCH:', redirectUriParam === getGmailRedirectUri());
+      } catch (e) {
+        console.error('Failed to parse OAuth URL:', e);
+      }
+      
       // Store the state parameter for CSRF verification if provided
       if (response.data.state) {
         localStorage.setItem('gmail_auth_state', response.data.state);
