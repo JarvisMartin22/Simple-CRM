@@ -126,15 +126,18 @@ export default function GmailCallback() {
         console.log('Received auth code, processing...');
         
         // Exchange the code for tokens using the simple auth function
+        // IMPORTANT: Use the exact redirect URI that Google used (including popup parameter)
+        const exactRedirectUri = `${getGmailRedirectUri()}?popup=true`;
         const { data, error } = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
           body: { 
             code,
-            redirectUri: getGmailRedirectUri()
+            redirectUri: exactRedirectUri
           }
         });
 
         if (error) {
           console.error('Error from gmail-auth function:', error);
+          console.error('Full error details:', JSON.stringify(error, null, 2));
           throw new Error(typeof error === 'string' ? error : error.message || 'Failed to authenticate with Gmail');
         }
 
