@@ -563,14 +563,10 @@ export function useGmailConnect() {
       }
       
       // Call the Gmail auth Edge Function to get OAuth URL
-      // Add popup indicator to redirect URI for reliable popup detection
-      const baseRedirectUri = getGmailRedirectUri();
-      const popupRedirectUri = `${baseRedirectUri}?popup=true`;
-      
       const response = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
         body: { 
           test: true,
-          redirectUri: popupRedirectUri
+          redirectUri: getGmailRedirectUri()
         }
       });
       
@@ -590,20 +586,23 @@ export function useGmailConnect() {
         throw new Error('Invalid response from server: Missing authorization URL');
       }
       
+      // Add popup parameter to the OAuth URL for reliable popup detection
+      const oauthUrl = new URL(response.data.url);
+      const currentRedirectUri = oauthUrl.searchParams.get('redirect_uri');
+      if (currentRedirectUri) {
+        const popupRedirectUri = `${currentRedirectUri}?popup=true`;
+        oauthUrl.searchParams.set('redirect_uri', popupRedirectUri);
+      }
+      
       console.log('🔍 OAUTH URL ANALYSIS:');
-      console.log('Generated OAuth URL:', response.data.url);
+      console.log('Generated OAuth URL:', oauthUrl.toString());
       console.log('Redirect URI in response:', response.data.redirectUri);
       
-      // Parse the OAuth URL to see the redirect_uri parameter
-      try {
-        const oauthUrl = new URL(response.data.url);
-        const redirectUriParam = oauthUrl.searchParams.get('redirect_uri');
-        console.log('🎯 ACTUAL REDIRECT_URI PARAM:', redirectUriParam);
-        console.log('🎯 EXPECTED:', getGmailRedirectUri());
-        console.log('🎯 MATCH:', redirectUriParam === getGmailRedirectUri());
-      } catch (e) {
-        console.error('Failed to parse OAuth URL:', e);
-      }
+      // Parse the OAuth URL to see the redirect_uri parameter  
+      const redirectUriParam = oauthUrl.searchParams.get('redirect_uri');
+      console.log('🎯 ACTUAL REDIRECT_URI PARAM:', redirectUriParam);
+      console.log('🎯 EXPECTED:', getGmailRedirectUri());
+      console.log('🎯 MATCH:', redirectUriParam === `${getGmailRedirectUri()}?popup=true`);
       
       // Store the state parameter for CSRF verification if provided
       if (response.data.state) {
@@ -624,7 +623,7 @@ export function useGmailConnect() {
       
       // Open authorization URL in a popup window
       activeAuthPopup = window.open(
-        response.data.url,
+        oauthUrl.toString(),
         'gmail_auth',
         `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
       );
