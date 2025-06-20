@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyEnrichment } from '@/hooks/useCompanyEnrichment';
+import { getSupabaseFunctionsUrl, getSupabaseAnonKey } from '@/lib/env';
 
 interface ImportProgress {
   total: number;
@@ -164,12 +165,15 @@ export function useGmailContactsImport() {
       if (isTokenExpired && integration.refresh_token) {
         console.log('Access token expired, refreshing...');
         try {
-          const refreshResponse = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-auth`, {
+          const functionsUrl = getSupabaseFunctionsUrl();
+          const anonKey = getSupabaseAnonKey();
+          
+          const refreshResponse = await fetch(`${functionsUrl}/gmail-auth`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+              'Authorization': `Bearer ${anonKey}`,
+              'apikey': anonKey
             },
             body: JSON.stringify({
               refresh_token: integration.refresh_token
@@ -209,13 +213,16 @@ export function useGmailContactsImport() {
       // Call the Gmail contacts import function
       console.log('Calling Gmail contacts import function for contacts import');
       
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-contacts`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+      const anonKey = getSupabaseAnonKey();
+      
+      const response = await fetch(`${functionsUrl}/gmail-contacts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${anonKey}`,
           'X-Gmail-Token': integration.access_token,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'apikey': anonKey
         },
         body: JSON.stringify({
           integration_id: integration.id,

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getSupabaseFunctionsUrl, getSupabaseAnonKey, getEnvWithFallback } from '@/lib/env';
 
 interface GmailIntegration {
   id: string;
@@ -30,9 +31,9 @@ export const GmailDebug: React.FC = () => {
     try {
       // Check environment variables
       const env = {
-        VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'undefined',
+        VITE_SUPABASE_URL: getEnvWithFallback('VITE_SUPABASE_URL', 'undefined'),
         VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'undefined',
-        VITE_SUPABASE_FUNCTIONS_URL: import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || 'undefined',
+        VITE_SUPABASE_FUNCTIONS_URL: getEnvWithFallback('VITE_SUPABASE_FUNCTIONS_URL', 'undefined'),
       };
       setEnvVars(env);
 
@@ -68,13 +69,24 @@ export const GmailDebug: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/gmail-contacts`, {
+      let functionsUrl: string;
+      let anonKey: string;
+      
+      try {
+        functionsUrl = getSupabaseFunctionsUrl();
+        anonKey = getSupabaseAnonKey();
+      } catch (envError) {
+        setError(envError instanceof Error ? envError.message : 'Environment configuration error');
+        return;
+      }
+      
+      const response = await fetch(`${functionsUrl}/gmail-contacts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${anonKey}`,
           'X-Gmail-Token': integration.access_token,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+          'apikey': anonKey
         },
         body: JSON.stringify({
           integration_id: integration.id,

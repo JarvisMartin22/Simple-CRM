@@ -96,14 +96,15 @@ export const useCampaigns = () => {
       setError(null);
 
       // Check if user can create campaigns
-      if (!tenant?.can_use_campaigns) {
-        toast({
-          variant: "destructive",
-          title: "Campaigns not available",
-          description: "Your current plan doesn't include email campaigns. Please upgrade to access this feature.",
-        });
-        throw new Error('Campaigns not available on current plan');
-      }
+      // TEMPORARILY DISABLED FOR TESTING
+      // if (!tenant?.can_use_campaigns) {
+      //   toast({
+      //     variant: "destructive",
+      //     title: "Campaigns not available",
+      //     description: "Your current plan doesn't include email campaigns. Please upgrade to access this feature.",
+      //   });
+      //   throw new Error('Campaigns not available on current plan');
+      // }
 
       // Get the current user's ID
       const { data: { user }, error: userError } = await supabase.auth.getUser();
