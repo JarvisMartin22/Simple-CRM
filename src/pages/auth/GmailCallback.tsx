@@ -45,15 +45,17 @@ export default function GmailCallback() {
       const isPopupContext = window !== window.top; // Not the top-level window
       const hasAuthFlow = hasOAuthParams && (fromGoogle || window.location.search.includes('code='));
       
+      // MOST RELIABLE: Check for explicit popup parameter in URL
+      const popupParam = params.get('popup');
+      const isExplicitPopup = popupParam === 'true';
+      
       // Force popup mode if any reliable indicator suggests we're in a popup
-      // In COOP environments, we rely heavily on OAuth params + context clues
-      // AGGRESSIVE: If we have OAuth code AND state params, it's almost certainly a popup
-      const isPopup = traditionalPopupDetection || 
+      // Prioritize explicit popup parameter for production reliability
+      const isPopup = isExplicitPopup || 
+                     traditionalPopupDetection || 
                      (hasAuthFlow && (hasPopupFeatures || isPopupContext)) ||
                      (hasOAuthParams && fromGoogle) ||
-                     (hasOAuthParams && window.location.search.includes('state=')) ||
-                     (hasOAuthParams && window.location.hostname !== 'localhost') ||
-                     (code && state); // MOST AGGRESSIVE: Any OAuth callback with both code and state is a popup
+                     (hasPopupFeatures && hasOAuthParams); // Popup-sized window with OAuth params
       
       try {
         if (oauthError) {
@@ -73,8 +75,8 @@ export default function GmailCallback() {
           isPopupContext,
           hasAuthFlow,
           traditionalPopupDetection,
-          hostname: window.location.hostname,
-          isNotLocalhost: window.location.hostname !== 'localhost',
+          popupParam,
+          isExplicitPopup,
           hasCodeAndState: code && state,
           FINAL_isPopup: isPopup,
           windowName: window.name,
@@ -86,12 +88,12 @@ export default function GmailCallback() {
         
         // Log the decision making process
         if (isPopup) {
-          if (traditionalPopupDetection) {
+          if (isExplicitPopup) {
+            console.log('✅ Popup detected via EXPLICIT parameter (?popup=true)');
+          } else if (traditionalPopupDetection) {
             console.log('✅ Popup detected via traditional method (window.opener or window.name)');
-          } else if (code && state) {
-            console.log('✅ Popup detected via AGGRESSIVE method (has both code and state params)');
-          } else if (hasOAuthParams && window.location.hostname !== 'localhost') {
-            console.log('✅ Popup detected via hostname method (OAuth params + non-localhost)');
+          } else if (hasPopupFeatures && hasOAuthParams) {
+            console.log('✅ Popup detected via window size + OAuth params method');
           } else {
             console.log('✅ Popup detected via other method');
           }

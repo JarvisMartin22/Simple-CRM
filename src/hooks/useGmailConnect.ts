@@ -563,10 +563,14 @@ export function useGmailConnect() {
       }
       
       // Call the Gmail auth Edge Function to get OAuth URL
+      // Add popup indicator to redirect URI for reliable popup detection
+      const baseRedirectUri = getGmailRedirectUri();
+      const popupRedirectUri = `${baseRedirectUri}?popup=true`;
+      
       const response = await supabaseWithAuth.functions.invoke(GMAIL_OAUTH_CONFIG.EDGE_FUNCTION, {
         body: { 
           test: true,
-          redirectUri: getGmailRedirectUri()
+          redirectUri: popupRedirectUri
         }
       });
       
