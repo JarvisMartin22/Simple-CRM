@@ -165,6 +165,7 @@ const LandingPage: React.FC = () => {
       <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
+            <img src="/Logo.png" alt="Golly Logo" className="h-12 w-12 mr-3" />
             <span className="font-poetsen text-orange-500 text-center text-5xl">Golly</span>
           </div>
           

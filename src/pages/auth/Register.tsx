@@ -129,6 +129,9 @@ const Register = () => {
       
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md relative z-10">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <img src="/Logo.png" alt="Golly Logo" className="h-16 w-16" />
+          </div>
           <h1 className="text-2xl font-bold mb-2">Create your account</h1>
           <p className="text-gray-600">We're so excited to welcome you</p>
         </div>
