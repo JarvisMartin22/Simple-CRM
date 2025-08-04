@@ -1,4 +1,4 @@
-# Golly CRM - The Simplest CRM Ever <3
+# Golly CRM - The Simplest CRM Ever
 
 ## About Golly
 
