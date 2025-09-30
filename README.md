@@ -1,5 +1,7 @@
 # Golly CRM - The Simplest CRM Ever
 
+#THIS PROJECT IS NO LONGER LIVE - MAKING PUBLIC FOR THOSE INTERESTED IN BUILDING THEIR OWN CRM. STOPPED PROJECT AFTER GOING THROUGH GOOGLE AUTH. 
+
 ## About Golly
 
 Golly is a modern, lightweight CRM system built for growing businesses. It provides essential features for managing contacts, companies, and deals while maintaining simplicity and ease of use.
